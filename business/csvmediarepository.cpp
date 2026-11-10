@@ -58,6 +58,9 @@ bool validRecord(const MediaRecord& r) {
     if (r.id.isEmpty() || r.id != r.id.trimmed() || r.fileName.trimmed().isEmpty() ||
         r.fileType.isEmpty() || r.fileType != r.fileType.trimmed().toUpper() ||
         r.fileType.contains('.') || !r.releaseDate.isValid()) return false;
+    // ISO 日期必须能以四位年格式往返，否则写入后无法重新加载。
+    const QString dateText = r.releaseDate.toString(Qt::ISODate);
+    if (dateText.size() != 10 || QDate::fromString(dateText, Qt::ISODate) != r.releaseDate) return false;
     for (const auto& s : r.actors) if (s.trimmed().isEmpty()) return false;
     for (const auto& s : r.awards) if (s.trimmed().isEmpty()) return false;
     return true;

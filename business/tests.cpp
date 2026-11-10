@@ -13,6 +13,7 @@ private slots:
     void failureKeepsMemoryAndIndex();
     void lockedFileRejectsSave();
     void externalChangeRequiresReload();
+    void rejectUnserializableDates();
 };
 
 void BusinessTests::sampleDeleteAndRestart() {
@@ -155,6 +156,50 @@ void BusinessTests::externalChangeRequiresReload() {
     MediaRecord record;
     QVERIFY(second.find("M000002", record));
     QVERIFY(!second.find("M000001", record));
+}
+void BusinessTests::rejectUnserializableDates() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const auto path = dir.filePath("records.csv");
+    QVERIFY(QFile::copy(QString::fromUtf8(SAMPLE_CSV), path));
+    MediaLibrary library(path, "pass");
+    QVERIFY(library.load().success);
+    QFile original(path);
+    QVERIFY(original.open(QIODevice::ReadOnly));
+    const QByteArray before = original.readAll();
+    original.close();
+    MediaRecord record = library.records().first();
+    record.id = "DATE-INVALID";
+    record.releaseDate = QDate(10000, 1, 1);
+    QVERIFY(record.releaseDate.isValid());
+    const auto result = library.add(record);
+    QVERIFY(!result.success);
+    QVERIFY(!result.error.isEmpty());
+    QVERIFY(original.open(QIODevice::ReadOnly));
+    QCOMPARE(original.readAll(), before);
+    original.close();
+    MediaLibrary restarted(path, "pass");
+    QVERIFY(restarted.load().success);
+    SearchQuery q{QString::fromUtf8("林川"), QString::fromUtf8("陈明"), "MP4"};
+    QCOMPARE(restarted.search(q), (QStringList{"M000001", "M000002"}));
+    MediaRecord found;
+    QVERIFY(!restarted.find("DATE-INVALID", found));
+    for (const auto& invalid : {QDate(-1, 1, 1), QDate(10000, 12, 31)}) {
+        record.releaseDate = invalid;
+        QVERIFY(!library.add(record).success);
+    }
+    record.id = "DATE-MIN";
+    record.releaseDate = QDate(1, 1, 1);
+    QVERIFY(library.add(record).success);
+    record.id = "DATE-MAX";
+    record.releaseDate = QDate(9999, 12, 31);
+    QVERIFY(library.add(record).success);
+    MediaLibrary boundaries(path, "pass");
+    QVERIFY(boundaries.load().success);
+    QVERIFY(boundaries.find("DATE-MIN", found));
+    QCOMPARE(found.releaseDate, QDate(1, 1, 1));
+    QVERIFY(boundaries.find("DATE-MAX", found));
+    QCOMPARE(found.releaseDate, QDate(9999, 12, 31));
 }
 QTEST_GUILESS_MAIN(BusinessTests)
 #include "tests.moc"
