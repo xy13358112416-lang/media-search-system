@@ -16,4 +16,5 @@ struct MediaRecord {
     quint64 viewCount = 0;  // 浏览次数
     QDate releaseDate;      // 发行日期
     QStringList awards;     // 所获奖项，可为空
+    QString category;       // 内容类别，例如纪录片，可为空
 };
