@@ -4,6 +4,8 @@
 
 字段类型：ID、文件名、类型、导演为 QString；演员和奖项为 QStringList；大小和浏览次数为无符号 64 位整数；日期为 QDate。文件类型采用不带点的大写扩展名，如 `MP4`。文件大小单位为字节。记录 ID 非空、唯一、创建后不变。
 
+CSV 文件名约定为 `media_records.csv`。运行时由主程序确定该文件的具体目录并传给未来的 CSV 实现，不依赖当前工作目录；此提交不创建实际数据文件。字段顺序约定为 `id,file_name,file_type,file_size,director,actors,view_count,release_date,awards`。
+
 主程序与检索模块对接顺序：
 
 1. `load(records)` 成功后调用 `rebuild(records)`。
