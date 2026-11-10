@@ -8,5 +8,5 @@ set(sample_csv "${PROJECT_SOURCE_DIR}/sample-data/data/media_records.csv")
 set_property(TARGET media_library_qt APPEND PROPERTY LINK_DEPENDS "${sample_csv}")
 add_custom_command(TARGET media_library_qt POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${sample_csv}"
-            "$<TARGET_FILE_DIR:media_library_qt>/media_records.csv"
+            "$<TARGET_FILE_DIR:media_library_qt>/media_records_sample.csv"
     VERBATIM)

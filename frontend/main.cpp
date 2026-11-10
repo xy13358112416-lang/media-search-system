@@ -3,7 +3,9 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
+#include <QFile>
 #include <QFormLayout>
 #include <QHeaderView>
 #include <QHBoxLayout>
@@ -15,6 +17,7 @@
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QTableWidget>
+#include <QUuid>
 #include <QVBoxLayout>
 #include <QComboBox>
 
@@ -68,9 +71,30 @@ bool showLogin(const MediaLibrary& library)
     return dialog.exec() == QDialog::Accepted;
 }
 
+// Split the form's list fields and discard empty entries.
+QStringList splitEntries(const QString& text)
+{
+    QStringList entries;
+    for (const auto& part : text.split(QChar(u'、'))) {
+        const QString entry = part.trimmed();
+        if (!entry.isEmpty())
+            entries.append(entry);
+    }
+    return entries;
+}
+
+// Parse a nonnegative count without narrowing the supported 64-bit range.
+bool readCount(const QString& text, quint64& value)
+{
+    const QString number = text.trimmed();
+    bool ok = false;
+    value = number.toULongLong(&ok);
+    return ok && !number.startsWith(QLatin1Char('-'));
+}
+
 class LibraryWindow final : public QWidget {
 public:
-    explicit LibraryWindow(const MediaLibrary& library) : library_(library)
+    explicit LibraryWindow(MediaLibrary& library) : library_(library)
     {
         setWindowTitle(QStringLiteral("多媒体文件管理及检索系统"));
         resize(1080, 600);
@@ -83,14 +107,12 @@ public:
         filterLabel->setBuddy(filter_);
         toolbar->addWidget(filterLabel);
         toolbar->addWidget(filter_);
+        toolbar->addWidget(add_);
+        toolbar->addWidget(remove_);
         toolbar->addStretch();
         toolbar->addWidget(new QLabel(QStringLiteral("发行日期：从近到远")));
         toolbar->addWidget(count_);
         layout->addLayout(toolbar);
-
-        filter_->addItem(QStringLiteral("全部类型"), QString());
-        for (const auto& type : library_.fileTypes())
-            filter_->addItem(type, type);
 
         table_->setColumnCount(4);
         table_->setHorizontalHeaderLabels({QStringLiteral("文件名"), QStringLiteral("类型"),
@@ -130,19 +152,151 @@ public:
         connect(filter_, &QComboBox::currentIndexChanged, this, [this] { refresh(); });
         connect(table_, &QTableWidget::currentCellChanged, this,
                 [this](int row) { showDetail(row); });
-        refresh();
+        connect(add_, &QPushButton::clicked, this, [this] { addRecord(); });
+        connect(remove_, &QPushButton::clicked, this, [this] { removeRecord(); });
+        refreshTypes();
     }
 
 private:
+    // Collect a record and keep the form open if validation or saving fails.
+    void addRecord()
+    {
+        QDialog dialog(this);
+        dialog.setWindowTitle(QStringLiteral("新增媒体记录"));
+        dialog.setMinimumWidth(420);
+        auto* form = new QFormLayout(&dialog);
+
+        QLineEdit name, type, size(QStringLiteral("0")), director, actors;
+        QLineEdit views(QStringLiteral("0")), date, awards, category;
+        type.setPlaceholderText(QStringLiteral("例如 MP4"));
+        date.setPlaceholderText(QStringLiteral("YYYY-MM-DD"));
+        const QString listHint = QStringLiteral("多项用顿号「、」分隔");
+        actors.setPlaceholderText(listHint);
+        awards.setPlaceholderText(listHint);
+        form->addRow(QStringLiteral("文件名"), &name);
+        form->addRow(QStringLiteral("文件类型"), &type);
+        form->addRow(QStringLiteral("文件大小（字节）"), &size);
+        form->addRow(QStringLiteral("导演"), &director);
+        form->addRow(QStringLiteral("演员"), &actors);
+        form->addRow(QStringLiteral("浏览次数"), &views);
+        form->addRow(QStringLiteral("发行日期"), &date);
+        form->addRow(QStringLiteral("所获奖项"), &awards);
+        form->addRow(QStringLiteral("类别"), &category);
+
+        QDialogButtonBox buttons(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
+        buttons.button(QDialogButtonBox::Save)->setText(QStringLiteral("保存"));
+        buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("取消"));
+        form->addRow(&buttons);
+        connect(&buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+        // Keep the generated ID stable while the user corrects the form or retries.
+        const QString id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        connect(&buttons, &QDialogButtonBox::accepted, &dialog, [&] {
+            MediaRecord record;
+            record.id = id;
+            record.fileName = name.text().trimmed();
+            record.fileType = type.text().trimmed().toUpper();
+            record.director = director.text().trimmed();
+            record.actors = splitEntries(actors.text());
+            record.awards = splitEntries(awards.text());
+            record.category = category.text().trimmed();
+
+            const QString dateText = date.text().trimmed();
+            record.releaseDate = QDate::fromString(dateText, Qt::ISODate);
+            if (record.fileName.isEmpty() || record.fileType.isEmpty() || record.fileType.contains('.')) {
+                QMessageBox::warning(&dialog, QStringLiteral("检查输入"),
+                                     QStringLiteral("请填写文件名和文件类型，类型无需带点。"));
+                return;
+            }
+            if (!record.releaseDate.isValid() || record.releaseDate.toString(Qt::ISODate) != dateText) {
+                QMessageBox::warning(&dialog, QStringLiteral("检查输入"),
+                                     QStringLiteral("请输入有效的发行日期，格式为 YYYY-MM-DD。"));
+                return;
+            }
+            if (!readCount(size.text(), record.fileSize) || !readCount(views.text(), record.viewCount)) {
+                QMessageBox::warning(&dialog, QStringLiteral("检查输入"),
+                                     QStringLiteral("文件大小和浏览次数须填写有效的非负整数。"));
+                return;
+            }
+
+            const auto result = library_.add(record);
+            if (!result.success) {
+                recoverAfterError(&dialog, QStringLiteral("新增失败"), result.error);
+                MediaRecord saved;
+                if (!library_.find(id, saved))
+                    return;
+            }
+
+            // If another file type was selected, switch to the new record's type.
+            const QString activeType = filter_->currentData().toString();
+            refreshTypes(activeType.isEmpty() ? QString() : record.fileType, id);
+            dialog.accept();
+        });
+        name.setFocus();
+        dialog.exec();
+    }
+
+    // Confirm the selected record and delete it by ID through the business layer.
+    void removeRecord()
+    {
+        const int row = table_->currentRow();
+        if (row < 0 || row >= records_.size())
+            return;
+        const auto record = records_.at(row);
+        QMessageBox confirmation(QMessageBox::Question, QStringLiteral("删除媒体记录"),
+                                 QStringLiteral("确定删除「%1」的记录吗？").arg(record.fileName),
+                                 QMessageBox::Yes | QMessageBox::Cancel, this);
+        confirmation.setTextFormat(Qt::PlainText);
+        confirmation.button(QMessageBox::Yes)->setText(QStringLiteral("删除"));
+        confirmation.button(QMessageBox::Cancel)->setText(QStringLiteral("取消"));
+        confirmation.setDefaultButton(QMessageBox::Cancel);
+        if (confirmation.exec() != QMessageBox::Yes)
+            return;
+
+        const auto result = library_.remove(record.id);
+        if (!result.success) {
+            recoverAfterError(this, QStringLiteral("删除失败"), result.error);
+            return;
+        }
+        refreshTypes(filter_->currentData().toString());
+    }
+
+    // Reload the current snapshot in case a write succeeded before indexing failed.
+    void recoverAfterError(QWidget* parent, const QString& title, const QString& error)
+    {
+        const auto reload = library_.load();
+        refreshTypes(filter_->currentData().toString());
+        QMessageBox message(QMessageBox::Warning, title,
+                            reload.success ? error : error + QStringLiteral("\n重新加载失败：") + reload.error,
+                            QMessageBox::Ok, parent);
+        message.setTextFormat(Qt::PlainText);
+        message.exec();
+    }
+
+    // Restore the filter if the type still exists, or show all records.
+    void refreshTypes(const QString& type = {}, const QString& selectedId = {})
+    {
+        const QSignalBlocker blockFilter(filter_);
+        filter_->clear();
+        filter_->addItem(QStringLiteral("全部类型"), QString());
+        for (const auto& availableType : library_.fileTypes())
+            filter_->addItem(availableType, availableType);
+        const int index = filter_->findData(type);
+        filter_->setCurrentIndex(index < 0 ? 0 : index);
+        refresh(selectedId);
+    }
     // Apply the selected file type and display the date order returned by the library.
-    void refresh()
+    void refresh(const QString& selectedId = {})
     {
         const QSignalBlocker blockSelection(table_);
         table_->clearSelection();
         records_ = library_.records(filter_->currentData().toString());
         table_->setRowCount(static_cast<int>(records_.size()));
+        int selectedRow = 0;
         for (int row = 0; row < table_->rowCount(); ++row) {
             const auto& record = records_.at(row);
+            if (record.id == selectedId)
+                selectedRow = row;
             const QStringList values{record.fileName, record.fileType, record.director,
                                      displayDate(record.releaseDate)};
             for (int column = 0; column < values.size(); ++column)
@@ -155,14 +309,15 @@ private:
             showDetail(-1);
             return;
         }
-        table_->setCurrentCell(0, 0);
-        showDetail(0);
+        table_->setCurrentCell(selectedRow, 0);
+        showDetail(selectedRow);
     }
 
     // Update the details from the record associated with the current table row.
     void showDetail(int row)
     {
-        if (row < 0 || row >= records_.size()) {
+        remove_->setEnabled(row >= 0 && row < records_.size());
+        if (!remove_->isEnabled()) {
             for (auto* value : detailValues_)
                 value->setText(displayText({}));
             return;
@@ -179,10 +334,12 @@ private:
             detailValues_.at(i)->setText(displayText(values.at(i)));
     }
 
-    const MediaLibrary& library_;      // Loaded business service, owned by main.
+    MediaLibrary& library_;            // Loaded business service, owned by main.
     QList<MediaRecord> records_;       // Visible records in table row order.
     QList<QLabel*> detailValues_;      // Detail value labels in form order.
     QComboBox* filter_ = new QComboBox; // File type filter with an empty value for all types.
+    QPushButton* add_ = new QPushButton(QStringLiteral("新增")); // Open the record form.
+    QPushButton* remove_ = new QPushButton(QStringLiteral("删除")); // Delete the selected row.
     QLabel* count_ = new QLabel;       // Visible record count or empty state.
     QTableWidget* table_ = new QTableWidget; // Read-only list of filtered records.
 };
@@ -207,12 +364,22 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    const QString csvPath = parser.isSet(csvOption)
-        ? parser.value(csvOption)
-        : QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("media_records.csv"));
+    const QDir appDir(QCoreApplication::applicationDirPath());
+    const bool useDefaultCsv = !parser.isSet(csvOption);
+    const QString csvPath = useDefaultCsv ? appDir.filePath(QStringLiteral("media_records.csv"))
+                                          : parser.value(csvOption);
     MediaLibrary library(csvPath, password);
     if (!showLogin(library))
         return 0;
+
+    // Initialize the writable demo file once. Subsequent builds only copy the seed.
+    if (useDefaultCsv && !QFile::exists(csvPath)) {
+        QFile seed(appDir.filePath(QStringLiteral("media_records_sample.csv")));
+        if (!seed.copy(csvPath) && !QFile::exists(csvPath)) {
+            QMessageBox::critical(nullptr, QStringLiteral("无法初始化媒体库"), seed.errorString());
+            return 1;
+        }
+    }
 
     const auto result = library.load();
     if (!result.success) {

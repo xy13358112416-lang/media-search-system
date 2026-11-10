@@ -13,6 +13,8 @@ $env:MEDIA_LIBRARY_PASSWORD = Read-Host '设置本次演示口令'
 & .\build\frontend\media_library_qt.exe
 ```
 
-输入刚设置的口令即可打开媒体库。可执行文件默认读取同目录的样例 `media_records.csv`，由构建步骤复制。也可以在启动时用 `--csv "C:\path\media_records.csv"` 指定其他数据文件。
+输入刚设置的口令即可打开媒体库。首次运行时会把可执行文件同目录的 `media_records_sample.csv` 复制为可修改的 `media_records.csv`。之后启动继续使用这份文件，重新构建只更新样例原件。也可以在启动时用 `--csv "C:\path\media_records.csv"` 指定其他数据文件。
 
 验收时可先输入错误口令，再输入正确口令。登录后切换「全部类型」和「MP4」，核对列表数量和发行日期降序，再点选一条记录核对详情。
+
+测试增删时，先新增一条记录并确认列表和详情已更新，再重启程序检查记录仍在。选中记录后点「删除」，先取消一次，再确认删除，最后重启检查该记录已删除。操作只修改 CSV 中的媒体记录。
