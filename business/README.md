@@ -22,7 +22,7 @@ auto ordered = library.records("MP4"); // 按发行日期从新到旧
 MediaRecord detail;
 bool found = library.find(id, detail);
 auto ids = library.search(query);
-result = library.add(record); // result.success 时界面刷新
+result = library.addNew(record); // 自动分配新 ID；成功后 record.id 可用于界面刷新
 result = library.remove(id);  // result.success 时界面刷新
 ```
 
@@ -31,3 +31,7 @@ result = library.remove(id);  // result.success 时界面刷新
 CSV 使用 UTF-8，支持标准双引号转义和字段内换行；`actors`、`awards` 必须是 JSON 字符串数组。支持原九列表头并将缺失的 `category` 视为空，保存时升级为十列。加载失败时保留原有记录和索引。新增、删除先读原数据，用 `QSaveFile` 写临时文件并提交；文件保存成功后才更新检索索引。索引更新异常时尝试从已保存文件重建，错误信息会说明文件是否已修改；主程序应根据提示重新加载并刷新界面。
 
 该模块不自动创建 CSV 或修改样例数据。联调时请先将 `sample-data/data/media_records.csv` 复制到单独的可写位置，并把副本路径传入。修改前会检查文件内容是否已变化，但该检查不提供跨进程锁；不要让多个进程同时修改同一文件。日期相同时按 ID 升序排列。
+
+新增与导入均使用 `MediaLibrary::supportedFileTypes()` 支持列表（如 MP4、MP3、WAV），必须使用大写扩展名。界面可用该列表提供选项；不支持的 CSV 类型会导致加载失败，需由用户先更正源数据。
+
+新记录请调用 `addNew(record)`，它在保存前分配 `M` 加至少六位数字的 ID；旧记录、包括 UUID，不会改写。旧的 `MediaLibrary::add` 仍可调用，也会自动分配新 ID，但不会返回分配的 ID，新代码应使用 `addNew`。`CsvMediaRepository::add` 是保留既有 ID 的底层接口，不应用于界面新增。编号高水位保存在 CSV 同目录的 `<CSV文件名>.id-sequence`，首次加载时根据现存 `M` 编号初始化，以后删记录不会降低高水位。预留成功后如果保存失败，编号会留空，不再复用；损坏或不可写的编号文件会返回错误，拒绝分配。迁移或备份时必须同时保留 CSV 和编号状态文件；第一次启用前已经删除的编号无法从现存 CSV 中推断。此机制不允许多个进程同时修改同一媒体库。

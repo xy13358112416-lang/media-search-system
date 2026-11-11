@@ -19,6 +19,8 @@ RepositoryResult MediaLibrary::load() {
     QList<MediaRecord> next;
     auto result = repository_.load(next);
     if (!result.success) return result;
+    result = repository_.ensureSequence(next);
+    if (!result.success) return result;
     try { search_.rebuild(next); }
     catch (const std::exception& e) { return {false, QString::fromUtf8(e.what())}; }
     records_ = std::move(next);
@@ -26,7 +28,23 @@ RepositoryResult MediaLibrary::load() {
     return {true, {}};
 }
 
+RepositoryResult MediaLibrary::addNew(MediaRecord& record) {
+    if (!loaded_) return {false, QStringLiteral("请先加载数据")};
+    auto result = verifyUnchanged();
+    if (!result.success) return result;
+    QString id;
+    result = repository_.reserveNextId(id);
+    if (!result.success) return result;
+    record.id = id;
+    return persistRecord(record);
+}
+
 RepositoryResult MediaLibrary::add(const MediaRecord& record) {
+    MediaRecord copy = record;
+    return addNew(copy);
+}
+
+RepositoryResult MediaLibrary::persistRecord(const MediaRecord& record) {
     if (!loaded_) return {false, QStringLiteral("请先加载数据")};
     auto check = verifyUnchanged();
     if (!check.success) return check;
@@ -79,6 +97,7 @@ QStringList MediaLibrary::fileTypes() const {
     for (const auto& r : records_) if (!result.contains(r.fileType)) result.append(r.fileType);
     result.sort(); return result;
 }
+QStringList MediaLibrary::supportedFileTypes() { return CsvMediaRepository::supportedFileTypes(); }
 QList<MediaRecord> MediaLibrary::records(const QString& fileType) const {
     QList<MediaRecord> result;
     if (!loaded_) return result;

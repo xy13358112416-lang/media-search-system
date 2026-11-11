@@ -3,9 +3,12 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonParseError>
+#include <QLockFile>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QSet>
 #include <utility>
+#include <limits>
 
 namespace {
 RepositoryResult fail(const QString& message) { return {false, message}; }
@@ -56,8 +59,7 @@ bool parseNumber(const QString& value, quint64& result) {
 }
 bool validRecord(const MediaRecord& r) {
     if (r.id.isEmpty() || r.id != r.id.trimmed() || r.fileName.trimmed().isEmpty() ||
-        r.fileType.isEmpty() || r.fileType != r.fileType.trimmed().toUpper() ||
-        r.fileType.contains('.') || !r.releaseDate.isValid()) return false;
+        !CsvMediaRepository::supportedFileTypes().contains(r.fileType) || !r.releaseDate.isValid()) return false;
     // ISO 日期必须能以四位年格式往返，否则写入后无法重新加载。
     const QString dateText = r.releaseDate.toString(Qt::ISODate);
     if (dateText.size() != 10 || QDate::fromString(dateText, Qt::ISODate) != r.releaseDate) return false;
@@ -76,6 +78,61 @@ QString listJson(const QStringList& values) {
 }
 
 CsvMediaRepository::CsvMediaRepository(QString path) : path_(std::move(path)) {}
+
+QStringList CsvMediaRepository::supportedFileTypes() {
+    return {"AAC", "AVI", "FLAC", "FLV", "M4A", "MKV", "MOV", "MP3", "MP4", "OGG", "WAV", "WEBM", "WMV"};
+}
+
+RepositoryResult CsvMediaRepository::ensureSequence(const QList<MediaRecord>& records) {
+    return updateSequence(records, false, nullptr);
+}
+
+RepositoryResult CsvMediaRepository::reserveNextId(QString& id) {
+    QList<MediaRecord> records;
+    auto result = load(records);
+    if (!result.success) return result;
+    return updateSequence(records, true, &id);
+}
+
+RepositoryResult CsvMediaRepository::updateSequence(const QList<MediaRecord>& records, bool reserve, QString* id) {
+    const QString statePath = path_ + QStringLiteral(".id-sequence");
+    QLockFile lock(statePath + QStringLiteral(".lock"));
+    if (!lock.tryLock(1000)) return fail(QStringLiteral("编号状态正被其他进程使用"));
+    quint64 maximum = 0;
+    const QRegularExpression pattern(QStringLiteral("^M([0-9]{6,})$"));
+    for (const auto& record : records) {
+        const auto match = pattern.match(record.id);
+        if (!match.hasMatch()) continue; // 现有 UUID 和其他旧 ID 原样保留。
+        bool ok = false;
+        const quint64 value = match.captured(1).toULongLong(&ok);
+        if (!ok) return fail(QStringLiteral("已有编号超出支持范围"));
+        maximum = qMax(maximum, value);
+    }
+    QFile current(statePath);
+    const bool exists = current.exists();
+    quint64 previous = 0;
+    if (exists) {
+        if (!current.open(QIODevice::ReadOnly)) return fail(QStringLiteral("无法读取编号状态：") + current.errorString());
+        const QByteArray bytes = current.readAll();
+        if (current.error() != QFileDevice::NoError) return fail(QStringLiteral("读取编号状态失败"));
+        const QString text = QString::fromLatin1(bytes).trimmed();
+        if (!parseNumber(text, previous)) return fail(QStringLiteral("编号状态损坏，拒绝分配编号"));
+        current.close();
+    }
+    maximum = qMax(maximum, previous);
+    if (reserve) {
+        if (maximum == std::numeric_limits<quint64>::max()) return fail(QStringLiteral("编号已用尽"));
+        ++maximum;
+    }
+    if (!exists || maximum != previous) {
+        QSaveFile state(statePath);
+        if (!state.open(QIODevice::WriteOnly)) return fail(QStringLiteral("无法保存编号状态：") + state.errorString());
+        const QByteArray bytes = QByteArray::number(maximum) + '\n';
+        if (state.write(bytes) != bytes.size() || !state.commit()) return fail(QStringLiteral("保存编号状态失败：") + state.errorString());
+    }
+    if (reserve && id) *id = QStringLiteral("M%1").arg(maximum, 6, 10, QLatin1Char('0'));
+    return {true, {}};
+}
 
 RepositoryResult CsvMediaRepository::load(QList<MediaRecord>& records) {
     QFile file(path_);
@@ -122,6 +179,8 @@ RepositoryResult CsvMediaRepository::save(const QList<MediaRecord>& records) {
 }
 
 RepositoryResult CsvMediaRepository::add(const MediaRecord& record) {
+    if (!supportedFileTypes().contains(record.fileType))
+        return fail(QStringLiteral("不支持的文件类型，请选择支持的音视频扩展名"));
     if (!validRecord(record)) return fail(QStringLiteral("记录字段无效"));
     QList<MediaRecord> all; auto result = load(all); if (!result.success) return result;
     for (const auto& r : all) if (r.id == record.id) return fail(QStringLiteral("ID 已存在"));
