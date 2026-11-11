@@ -10,6 +10,7 @@ public:
     RepositoryResult load(); // 加载 CSV 并重建索引；返回成功状态或错误。
     RepositoryResult add(const MediaRecord& record); // 添加 record；ID 由调用方提供且必须唯一。
     RepositoryResult remove(const QString& id); // 按 id 删除，返回成功状态或错误。
+    RepositoryResult incrementViewCount(const QString& id, quint64& count); // 保存并返回累计浏览次数。
     bool authenticate(const QString& password) const; // 验证输入口令，匹配时返回 true。
     QStringList fileTypes() const; // 返回现有扩展名列表。
     QList<MediaRecord> records(const QString& fileType = {}) const; // 按类型筛选，空字符串代表全部；日期降序。

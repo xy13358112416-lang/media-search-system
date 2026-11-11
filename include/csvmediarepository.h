@@ -8,6 +8,7 @@ public:
     RepositoryResult load(QList<MediaRecord>& records) override;
     RepositoryResult add(const MediaRecord& record) override;
     RepositoryResult remove(const QString& id) override;
+    RepositoryResult incrementViewCount(const QString& id, quint64& count);
 private:
     RepositoryResult save(const QList<MediaRecord>& records);
     QString path_;  // CSV 文件路径

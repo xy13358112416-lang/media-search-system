@@ -3,8 +3,10 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonParseError>
+#include <QLockFile>
 #include <QSaveFile>
 #include <QSet>
+#include <limits>
 #include <utility>
 
 namespace {
@@ -123,13 +125,43 @@ RepositoryResult CsvMediaRepository::save(const QList<MediaRecord>& records) {
 
 RepositoryResult CsvMediaRepository::add(const MediaRecord& record) {
     if (!validRecord(record)) return fail(QStringLiteral("记录字段无效"));
+    QLockFile lock(path_ + QStringLiteral(".lock"));
+    if (!lock.tryLock(1000))
+        return fail(QStringLiteral("无法锁定 CSV，请稍后重试"));
     QList<MediaRecord> all; auto result = load(all); if (!result.success) return result;
     for (const auto& r : all) if (r.id == record.id) return fail(QStringLiteral("ID 已存在"));
     all.append(record); return save(all);
 }
 
 RepositoryResult CsvMediaRepository::remove(const QString& id) {
+    QLockFile lock(path_ + QStringLiteral(".lock"));
+    if (!lock.tryLock(1000))
+        return fail(QStringLiteral("无法锁定 CSV，请稍后重试"));
     QList<MediaRecord> all; auto result = load(all); if (!result.success) return result;
     for (qsizetype i=0; i<all.size(); ++i) if (all[i].id == id) { all.removeAt(i); return save(all); }
+    return fail(QStringLiteral("未找到该 ID"));
+}
+
+// Read the current count while holding the same writer lock as add/remove.
+RepositoryResult CsvMediaRepository::incrementViewCount(const QString& id, quint64& count) {
+    QLockFile lock(path_ + QStringLiteral(".lock"));
+    if (!lock.tryLock(1000))
+        return fail(QStringLiteral("无法锁定 CSV，请稍后重试"));
+
+    QList<MediaRecord> records;
+    const auto loaded = load(records);
+    if (!loaded.success)
+        return loaded;
+    for (auto& record : records) {
+        if (record.id != id)
+            continue;
+        if (record.viewCount == std::numeric_limits<quint64>::max())
+            return fail(QStringLiteral("浏览次数已达到上限"));
+        ++record.viewCount;
+        const auto saved = save(records);
+        if (saved.success)
+            count = record.viewCount;
+        return saved;
+    }
     return fail(QStringLiteral("未找到该 ID"));
 }

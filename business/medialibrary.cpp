@@ -60,6 +60,21 @@ RepositoryResult MediaLibrary::remove(const QString& id) {
     }
 }
 
+RepositoryResult MediaLibrary::incrementViewCount(const QString& id, quint64& count) {
+    if (!loaded_)
+        return {false, QStringLiteral("请先加载数据")};
+    for (auto& record : records_) {
+        if (record.id != id)
+            continue;
+        const auto saved = repository_.incrementViewCount(id, count);
+        // The search index matches director, actor and type, so it needs no update.
+        if (saved.success)
+            record.viewCount = count;
+        return saved;
+    }
+    return {false, QStringLiteral("未找到该 ID")};
+}
+
 RepositoryResult MediaLibrary::verifyUnchanged() {
     QList<MediaRecord> current;
     auto result = repository_.load(current);

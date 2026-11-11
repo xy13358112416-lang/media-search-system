@@ -384,11 +384,23 @@ private:
     {
         if (row < 0 || row >= records_.size())
             return;
-        QString error;
-        if (!clicks_.record(userId_, records_.at(row).id, error) && !reportedClickError_) {
-            reportedClickError_ = true;
-            QMessageBox::warning(this, QStringLiteral("点击记录保存失败"), error);
+        auto& record = records_[row];
+        QStringList errors;
+        const auto updated = library_.incrementViewCount(record.id, record.viewCount);
+        if (updated.success) {
+            if (tabs_->currentIndex() == 2)
+                table_->item(row, 3)->setText(QLocale().toString(record.viewCount));
+            showDetail(row);
+        } else {
+            errors.append(QStringLiteral("CSV 浏览次数：") + updated.error);
         }
+
+        QString clickError;
+        if (!clicks_.record(userId_, record.id, clickError))
+            errors.append(QStringLiteral("SQLite 点击明细：") + clickError);
+        if (!errors.isEmpty() && !reportedClickError_)
+            QMessageBox::warning(this, QStringLiteral("部分点击数据保存失败"), errors.join(QLatin1Char('\n')));
+        reportedClickError_ = !errors.isEmpty();
     }
 
     void showClickRanking()
