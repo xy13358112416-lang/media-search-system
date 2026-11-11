@@ -14,8 +14,11 @@
 #include <QLocale>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSet>
 #include <QSignalBlocker>
 #include <QSplitter>
+#include <QStackedWidget>
+#include <QTabBar>
 #include <QTableWidget>
 #include <QUuid>
 #include <QVBoxLayout>
@@ -92,6 +95,16 @@ bool readCount(const QString& text, quint64& value)
     return ok && !number.startsWith(QLatin1Char('-'));
 }
 
+QString fieldName(SearchField field)
+{
+    switch (field) {
+    case SearchField::Director: return QStringLiteral("导演");
+    case SearchField::Actor: return QStringLiteral("演员");
+    case SearchField::FileType: return QStringLiteral("文件类型");
+    }
+    return {};
+}
+
 class LibraryWindow final : public QWidget {
 public:
     explicit LibraryWindow(MediaLibrary& library) : library_(library)
@@ -102,7 +115,13 @@ public:
         layout->setContentsMargins(20, 20, 20, 20);
         layout->setSpacing(12);
 
-        auto* toolbar = new QHBoxLayout;
+        tabs_->addTab(QStringLiteral("媒体库"));
+        tabs_->addTab(QStringLiteral("检索"));
+        layout->addWidget(tabs_);
+
+        auto* libraryControls = new QWidget;
+        auto* toolbar = new QHBoxLayout(libraryControls);
+        toolbar->setContentsMargins(0, 0, 0, 0);
         auto* filterLabel = new QLabel(QStringLiteral("文件类型"));
         filterLabel->setBuddy(filter_);
         toolbar->addWidget(filterLabel);
@@ -110,9 +129,39 @@ public:
         toolbar->addWidget(add_);
         toolbar->addWidget(remove_);
         toolbar->addStretch();
-        toolbar->addWidget(new QLabel(QStringLiteral("发行日期：从近到远")));
-        toolbar->addWidget(count_);
-        layout->addLayout(toolbar);
+
+        auto* searchControls = new QWidget;
+        auto* searchBar = new QHBoxLayout(searchControls);
+        searchBar->setContentsMargins(0, 0, 0, 0);
+        director_->setPlaceholderText(QStringLiteral("完整姓名"));
+        actor_->setPlaceholderText(QStringLiteral("完整姓名"));
+        searchType_->setPlaceholderText(QStringLiteral("例如 MP4"));
+        auto* directorLabel = new QLabel(QStringLiteral("导演"));
+        auto* actorLabel = new QLabel(QStringLiteral("演员"));
+        auto* typeLabel = new QLabel(QStringLiteral("文件类型"));
+        directorLabel->setBuddy(director_);
+        actorLabel->setBuddy(actor_);
+        typeLabel->setBuddy(searchType_);
+        searchBar->addWidget(directorLabel);
+        searchBar->addWidget(director_);
+        searchBar->addWidget(actorLabel);
+        searchBar->addWidget(actor_);
+        searchBar->addWidget(typeLabel);
+        searchBar->addWidget(searchType_);
+        auto* searchButton = new QPushButton(QStringLiteral("查询"));
+        auto* clearButton = new QPushButton(QStringLiteral("清空条件"));
+        searchBar->addWidget(searchButton);
+        searchBar->addWidget(clearButton);
+
+        controls_->addWidget(libraryControls);
+        controls_->addWidget(searchControls);
+        layout->addWidget(controls_);
+
+        auto* summary = new QHBoxLayout;
+        summary->addWidget(count_);
+        summary->addStretch();
+        summary->addWidget(new QLabel(QStringLiteral("发行日期：从近到远")));
+        layout->addLayout(summary);
 
         table_->setColumnCount(4);
         table_->setHorizontalHeaderLabels({QStringLiteral("文件名"), QStringLiteral("类型"),
@@ -148,6 +197,33 @@ public:
         splitter->setStretchFactor(0, 3);
         splitter->setStretchFactor(1, 1);
         layout->addWidget(splitter);
+        trace_->setTextFormat(Qt::PlainText);
+        trace_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        trace_->hide();
+        layout->addWidget(trace_);
+
+        connect(tabs_, &QTabBar::currentChanged, this, [this](int index) {
+            controls_->setCurrentIndex(index);
+            trace_->setVisible(index == 1);
+            if (index == 1)
+                showSearchResults();
+            else
+                refresh();
+        });
+        const auto submitSearch = [this] {
+            query_ = {director_->text(), actor_->text(), searchType_->text()};
+            showSearchResults();
+        };
+        connect(searchButton, &QPushButton::clicked, this, submitSearch);
+        for (auto* input : {director_, actor_, searchType_})
+            connect(input, &QLineEdit::returnPressed, this, submitSearch);
+        connect(clearButton, &QPushButton::clicked, this, [this, submitSearch] {
+            director_->clear();
+            actor_->clear();
+            searchType_->clear();
+            submitSearch();
+            director_->setFocus();
+        });
 
         connect(filter_, &QComboBox::currentIndexChanged, this, [this] { refresh(); });
         connect(table_, &QTableWidget::currentCellChanged, this,
@@ -288,9 +364,43 @@ private:
     // Apply the selected file type and display the date order returned by the library.
     void refresh(const QString& selectedId = {})
     {
+        populateTable(library_.records(filter_->currentData().toString()), selectedId);
+        count_->setText(records_.isEmpty() ? QStringLiteral("暂无媒体记录")
+                                          : QStringLiteral("共 %1 条").arg(records_.size()));
+    }
+
+    // Use the business layer's current index and keep the same display order as the library.
+    void showSearchResults()
+    {
+        SearchTrace trace;
+        const auto ids = library_.search(query_, trace);
+        const QSet<QString> matched(ids.cbegin(), ids.cend());
+        QList<MediaRecord> results;
+        for (const auto& record : library_.records()) {
+            if (matched.contains(record.id))
+                results.append(record);
+        }
+        populateTable(results);
+        count_->setText(QStringLiteral("命中 %1 条").arg(ids.size()));
+
+        QStringList lines{QStringLiteral("检索过程 · 短列表优先")};
+        if (trace.steps.isEmpty())
+            lines.append(QStringLiteral("未填写条件，显示全部记录。"));
+        for (qsizetype i = 0; i < trace.steps.size(); ++i) {
+            const auto& step = trace.steps.at(i);
+            lines.append(QStringLiteral("第 %1 步：%2 · 单项命中 %3 条 · 剩余候选 %4 条")
+                             .arg(i + 1).arg(fieldName(step.field))
+                             .arg(step.postingCount).arg(step.remainingCount));
+        }
+        trace_->setText(lines.join(QLatin1Char('\n')));
+    }
+
+    // Update the shared table and details from the current page.
+    void populateTable(const QList<MediaRecord>& records, const QString& selectedId = {})
+    {
         const QSignalBlocker blockSelection(table_);
         table_->clearSelection();
-        records_ = library_.records(filter_->currentData().toString());
+        records_ = records;
         table_->setRowCount(static_cast<int>(records_.size()));
         int selectedRow = 0;
         for (int row = 0; row < table_->rowCount(); ++row) {
@@ -303,8 +413,6 @@ private:
                 table_->setItem(row, column, new QTableWidgetItem(displayText(values.at(column))));
         }
 
-        count_->setText(records_.isEmpty() ? QStringLiteral("暂无媒体记录")
-                                          : QStringLiteral("共 %1 条").arg(records_.size()));
         if (records_.isEmpty()) {
             showDetail(-1);
             return;
@@ -337,6 +445,13 @@ private:
     MediaLibrary& library_;            // Loaded business service, owned by main.
     QList<MediaRecord> records_;       // Visible records in table row order.
     QList<QLabel*> detailValues_;      // Detail value labels in form order.
+    SearchQuery query_; // Last submitted combination of search fields.
+    QTabBar* tabs_ = new QTabBar; // Switch between browsing and searching.
+    QStackedWidget* controls_ = new QStackedWidget; // Controls for the selected tab.
+    QLineEdit* director_ = new QLineEdit; // Director full-name query.
+    QLineEdit* actor_ = new QLineEdit; // Actor full-name query.
+    QLineEdit* searchType_ = new QLineEdit; // File extension query.
+    QLabel* trace_ = new QLabel; // Actual index steps of the submitted query.
     QComboBox* filter_ = new QComboBox; // File type filter with an empty value for all types.
     QPushButton* add_ = new QPushButton(QStringLiteral("新增")); // Open the record form.
     QPushButton* remove_ = new QPushButton(QStringLiteral("删除")); // Delete the selected row.

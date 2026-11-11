@@ -97,3 +97,10 @@ bool MediaLibrary::find(const QString& id, MediaRecord& result) const {
 QStringList MediaLibrary::search(const SearchQuery& query) const {
     return loaded_ ? search_.search(query) : QStringList{};
 }
+QStringList MediaLibrary::search(const SearchQuery& query, SearchTrace& trace) const {
+    if (!loaded_) {
+        trace = {};
+        return {};
+    }
+    return search_.search(query, SearchStrategy::SmallestListFirst, &trace);
+}

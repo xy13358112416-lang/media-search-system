@@ -15,6 +15,7 @@ public:
     QList<MediaRecord> records(const QString& fileType = {}) const; // 按类型筛选，空字符串代表全部；日期降序。
     bool find(const QString& id, MediaRecord& result) const; // 查找 id，存在时写入 result 并返回 true。
     QStringList search(const SearchQuery& query) const; // 组合查询，返回匹配记录的 ID。
+    QStringList search(const SearchQuery& query, SearchTrace& trace) const; // 同时返回实际索引步骤。
 private:
     RepositoryResult verifyUnchanged(); // 防止外部修改后使用过期索引写入
     CsvMediaRepository repository_; // 持久化存储
