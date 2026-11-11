@@ -12,7 +12,7 @@ struct RecommendationOptions {
 };
 
 // 从当前 records 中选出最多 options.limit 条记录，返回按推荐顺序排列的媒体 ID。
-// 排序综合考虑类别匹配、文件类型匹配和记录自带的 viewCount，同分时按 ID 升序。
+// 依次按匹配偏好项数降序、viewCount 降序和 ID 升序排列。
 // 类别取自 MediaRecord::category，文件类型取自 MediaRecord::fileType。
 QStringList recommendMedia(const QList<MediaRecord>& records,
                            const RecommendationOptions& options);
