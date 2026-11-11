@@ -19,6 +19,7 @@ private slots:
     void allocateStableIdsAcrossDeletionAndRestart();
     void sequenceFailuresNeverReuseIds();
     void sequenceLockPreventsAllocation();
+    void failedCsvWriteDoesNotReuseId();
     void legacyAddAlsoAllocates();
 };
 
@@ -119,6 +120,28 @@ void BusinessTests::legacyAddAlsoAllocates() {
     MediaRecord found;
     QVERIFY(library.find("M000031", found));
     QVERIFY(!library.find("caller-supplied-uuid", found));
+}
+
+void BusinessTests::failedCsvWriteDoesNotReuseId() {
+#ifdef Q_OS_WIN
+    QTemporaryDir dir;
+    const auto path = dir.filePath("records.csv");
+    QVERIFY(QFile::copy(QString::fromUtf8(SAMPLE_CSV), path));
+    MediaLibrary library(path, "pass");
+    QVERIFY(library.load().success);
+    QFile locked(path);
+    QVERIFY(locked.open(QIODevice::ReadOnly));
+    MediaRecord record = library.records().first();
+    QVERIFY(!library.addNew(record).success);
+    QCOMPARE(record.id, QString("M000031"));
+    locked.close();
+    MediaLibrary restarted(path, "pass");
+    QVERIFY(restarted.load().success);
+    QVERIFY(restarted.addNew(record).success);
+    QCOMPARE(record.id, QString("M000032"));
+#else
+    QSKIP("Windows-specific file replacement lock test");
+#endif
 }
 
 void BusinessTests::rejectUnsupportedFileTypes() {
