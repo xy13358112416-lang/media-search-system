@@ -1,3 +1,4 @@
+#include "mediarecommendation.h"
 #include "mediasearch.h"
 
 #include <QTextStream>
@@ -5,15 +6,18 @@
 
 namespace {
 
-// 创建手写 MediaRecord，演员列表和文件类型用于组合检索。
+// 同一组手写记录用于对照检索策略和推荐排序。
 MediaRecord makeRecord(const QString& id, const QString& name, const QString& director,
-                       const QStringList& actors, const QString& fileType) {
+                       const QStringList& actors, const QString& fileType,
+                       const QString& category, quint64 views) {
     MediaRecord record;
     record.id = id;
     record.fileName = name;
     record.director = director;
     record.actors = actors;
     record.fileType = fileType;
+    record.category = category;
+    record.viewCount = views;
     return record;
 }
 
@@ -48,11 +52,13 @@ int main() {
     const QString directorB = QStringLiteral("导演乙");
     const QString actorA = QStringLiteral("演员甲");
     const QString actorB = QStringLiteral("演员乙");
+    const QString documentary = QStringLiteral("纪录片");
+    const QString movie = QStringLiteral("电影");
     const QList<MediaRecord> records{
-        makeRecord("M000003", "three.mkv", directorA, {actorA}, "MKV"),
-        makeRecord("M000001", "one.mp4", directorA, {actorA, actorB}, "MP4"),
-        makeRecord("M000002", "two.mp4", directorA, {actorA}, "MP4"),
-        makeRecord("M000004", "four.mp4", directorB, {actorA}, "MP4"),
+        makeRecord("M000003", "three.mkv", directorA, {actorA}, "MKV", documentary, 600),
+        makeRecord("M000001", "one.mp4", directorA, {actorA, actorB}, "MP4", documentary, 200),
+        makeRecord("M000002", "two.mp4", directorA, {actorA}, "MP4", movie, 900),
+        makeRecord("M000004", "four.mp4", directorB, {actorA}, "MP4", movie, 120),
     };
     MediaSearch search;
     search.rebuild(records);
@@ -62,6 +68,11 @@ int main() {
     printQuery(output, search, query, SearchStrategy::LinearScan, "Linear scan");
     printQuery(output, search, query, SearchStrategy::FixedIndexOrder, "Fixed index order");
     printQuery(output, search, query, SearchStrategy::SmallestListFirst, "Smallest list first");
+
+    const QStringList popular = recommendMedia(records, {{}, {}, 3});
+    const QStringList preferred = recommendMedia(records, {documentary, "MP4", 3});
+    output << "Popular Top 3: [" << popular.join(", ") << "]\n";
+    output << "Recommendation (" << documentary << " + MP4): [" << preferred.join(", ") << "]\n";
 
     search.removeRecord("M000001");
     printQuery(output, search, query, SearchStrategy::SmallestListFirst, "After removing M000001");
