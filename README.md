@@ -20,3 +20,15 @@ $env:MEDIA_LIBRARY_PASSWORD = Read-Host '设置本次演示口令'
 测试增删时，先新增一条记录并确认列表和详情已更新，再重启程序检查记录仍在。选中记录后点「删除」，先取消一次，再确认删除，最后重启检查该记录已删除。操作只修改 CSV 中的媒体记录。
 
 打开「检索」，可组合输入导演、演员和文件类型。使用原始样例时，输入「林川」「陈明」「MP4」应命中两条。结果下方按实际索引执行顺序显示各步的单项命中数和剩余候选数。「清空条件」会显示全部记录。
+
+「推荐」可选择类别和文件类型。优先显示匹配偏好项较多的记录，再按浏览次数从高到低排序，最多展示 5 条。「检索」中的「性能对照」展示已记录的 10 万条合成数据实验。
+
+## Windows 演示打包
+
+Release 构建后，使用对应 Qt 套件的 bin 目录运行 `frontend/package.ps1`。指定一个尚不存在的输出目录。
+
+```powershell
+.\frontend\package.ps1 -BuildDirectory .\build -QtBin C:\Qt\6.x\mingw_64\bin -OutputDirectory .\media-library-demo
+```
+
+将输出目录整体压缩。解压后打开 `start-demo.cmd` 设置本次口令并启动。

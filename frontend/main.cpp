@@ -1,4 +1,5 @@
 #include "medialibrary.h"
+#include "mediarecommendation.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -105,6 +106,51 @@ QString fieldName(SearchField field)
     return {};
 }
 
+// Display the recorded benchmark from retrieval/REPORT_NOTES.md.
+void showPerformance(QWidget* parent)
+{
+    QDialog dialog(parent);
+    dialog.setWindowTitle(QStringLiteral("检索性能对照"));
+    dialog.resize(850, 340);
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* context = new QLabel(QStringLiteral(
+        "10 万条合成记录 · 每种策略测量 31 次 · Windows 11 / Qt 6.8.3 / MinGW 13.1 / Release"));
+    context->setWordWrap(true);
+    layout->addWidget(context);
+
+    const QList<QStringList> rows{
+        {QStringLiteral("稀有演员"), QStringLiteral("9169.1"), QStringLiteral("2458.6"),
+         QStringLiteral("2451.3"), QStringLiteral("50163 → 101")},
+        {QStringLiteral("稀有类型"), QStringLiteral("12693.2"), QStringLiteral("4785.7"),
+         QStringLiteral("2778.8"), QStringLiteral("50163 → 101")},
+        {QStringLiteral("热门条件"), QStringLiteral("27571.0"), QStringLiteral("7676.5"),
+         QStringLiteral("7428.9"), QStringLiteral("50163 → 50163")},
+        {QStringLiteral("无结果"), QStringLiteral("9206.7"), QStringLiteral("5.5"),
+         QStringLiteral("1.6"), QStringLiteral("50163 → 0")}
+    };
+    auto* table = new QTableWidget(static_cast<int>(rows.size()), 5);
+    table->setHorizontalHeaderLabels({QStringLiteral("查询场景"), QStringLiteral("逐条扫描（µs）"),
+        QStringLiteral("固定顺序索引（µs）"), QStringLiteral("短列表优先（µs）"),
+        QStringLiteral("首步候选数：固定 → 优先")});
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table->setAlternatingRowColors(true);
+    table->verticalHeader()->hide();
+    table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    for (int row = 0; row < table->rowCount(); ++row)
+        for (int column = 0; column < table->columnCount(); ++column)
+            table->setItem(row, column, new QTableWidgetItem(rows.at(row).at(column)));
+    layout->addWidget(table);
+
+    auto* note = new QLabel(QStringLiteral(
+        "耗时为查询中位数。索引构建约 162 ms。数据来源：retrieval/REPORT_NOTES.md。"));
+    note->setWordWrap(true);
+    layout->addWidget(note);
+    auto* close = new QPushButton(QStringLiteral("关闭"));
+    layout->addWidget(close, 0, Qt::AlignRight);
+    QObject::connect(close, &QPushButton::clicked, &dialog, &QDialog::accept);
+    dialog.exec();
+}
+
 class LibraryWindow final : public QWidget {
 public:
     explicit LibraryWindow(MediaLibrary& library) : library_(library)
@@ -117,6 +163,7 @@ public:
 
         tabs_->addTab(QStringLiteral("媒体库"));
         tabs_->addTab(QStringLiteral("检索"));
+        tabs_->addTab(QStringLiteral("推荐"));
         layout->addWidget(tabs_);
 
         auto* libraryControls = new QWidget;
@@ -152,20 +199,40 @@ public:
         auto* clearButton = new QPushButton(QStringLiteral("清空条件"));
         searchBar->addWidget(searchButton);
         searchBar->addWidget(clearButton);
+        auto* performance = new QPushButton(QStringLiteral("性能对照"));
+        searchBar->addWidget(performance);
+        connect(performance, &QPushButton::clicked, this, [this] { showPerformance(this); });
+
+        auto* recommendationControls = new QWidget;
+        auto* recommendationBar = new QHBoxLayout(recommendationControls);
+        recommendationBar->setContentsMargins(0, 0, 0, 0);
+        auto* categoryLabel = new QLabel(QStringLiteral("偏好类别"));
+        categoryLabel->setBuddy(categoryPreference_);
+        auto* preferenceTypeLabel = new QLabel(QStringLiteral("偏好文件类型"));
+        preferenceTypeLabel->setBuddy(typePreference_);
+        recommendationBar->addWidget(categoryLabel);
+        recommendationBar->addWidget(categoryPreference_);
+        recommendationBar->addWidget(preferenceTypeLabel);
+        recommendationBar->addWidget(typePreference_);
+        auto* recommend = new QPushButton(QStringLiteral("生成推荐"));
+        recommendationBar->addWidget(recommend);
+        recommendationBar->addStretch();
+        connect(recommend, &QPushButton::clicked, this,
+                [this] { showRecommendations(library_.records()); });
 
         controls_->addWidget(libraryControls);
         controls_->addWidget(searchControls);
+        controls_->addWidget(recommendationControls);
         layout->addWidget(controls_);
 
         auto* summary = new QHBoxLayout;
         summary->addWidget(count_);
         summary->addStretch();
-        summary->addWidget(new QLabel(QStringLiteral("发行日期：从近到远")));
+        summary->addWidget(order_);
+        order_->setText(QStringLiteral("发行日期：从近到远"));
         layout->addLayout(summary);
 
         table_->setColumnCount(4);
-        table_->setHorizontalHeaderLabels({QStringLiteral("文件名"), QStringLiteral("类型"),
-                                           QStringLiteral("导演"), QStringLiteral("发行日期")});
         table_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
         table_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
         table_->verticalHeader()->hide();
@@ -205,10 +272,17 @@ public:
         connect(tabs_, &QTabBar::currentChanged, this, [this](int index) {
             controls_->setCurrentIndex(index);
             trace_->setVisible(index == 1);
-            if (index == 1)
+            order_->setText(index == 2 ? QStringLiteral("按推荐顺序")
+                                       : QStringLiteral("发行日期：从近到远"));
+            if (index == 2) {
+                const auto records = library_.records();
+                refreshPreferences(records);
+                showRecommendations(records);
+            } else if (index == 1) {
                 showSearchResults();
-            else
+            } else {
                 refresh();
+            }
         });
         const auto submitSearch = [this] {
             query_ = {director_->text(), actor_->text(), searchType_->text()};
@@ -395,20 +469,67 @@ private:
         trace_->setText(lines.join(QLatin1Char('\n')));
     }
 
+    // Refresh available preferences while preserving choices that still exist.
+    void refreshPreferences(const QList<MediaRecord>& records)
+    {
+        QStringList categories;
+        for (const auto& record : records)
+            if (!record.category.isEmpty() && !categories.contains(record.category))
+                categories.append(record.category);
+        categories.sort();
+        fillPreferences(categoryPreference_, categories);
+        fillPreferences(typePreference_, library_.fileTypes());
+    }
+
+    // Populate a preference control with an empty option followed by available choices.
+    static void fillPreferences(QComboBox* combo, const QStringList& choices)
+    {
+        const QSignalBlocker block(combo);
+        const auto previous = combo->currentData();
+        combo->clear();
+        combo->addItem(QStringLiteral("不限"), QString());
+        for (const auto& choice : choices)
+            combo->addItem(choice, choice);
+        const int index = combo->findData(previous);
+        combo->setCurrentIndex(index < 0 ? 0 : index);
+    }
+
+    // Preserve the rank returned by the recommendation function in the shared table.
+    void showRecommendations(const QList<MediaRecord>& records)
+    {
+        RecommendationOptions options;
+        options.preferredCategory = categoryPreference_->currentData().toString();
+        options.preferredFileType = typePreference_->currentData().toString();
+        const auto ids = recommendMedia(records, options);
+        QList<MediaRecord> results;
+        for (const auto& id : ids) {
+            MediaRecord record;
+            if (library_.find(id, record))
+                results.append(record);
+        }
+        populateTable(results, {}, true);
+        count_->setText(QStringLiteral("推荐 %1 条").arg(results.size()));
+    }
+
     // Update the shared table and details from the current page.
-    void populateTable(const QList<MediaRecord>& records, const QString& selectedId = {})
+    void populateTable(const QList<MediaRecord>& records, const QString& selectedId = {},
+                       bool recommended = false)
     {
         const QSignalBlocker blockSelection(table_);
         table_->clearSelection();
         records_ = records;
+        table_->setHorizontalHeaderLabels({QStringLiteral("文件名"), QStringLiteral("类型"),
+            recommended ? QStringLiteral("类别") : QStringLiteral("导演"),
+            recommended ? QStringLiteral("浏览次数") : QStringLiteral("发行日期")});
         table_->setRowCount(static_cast<int>(records_.size()));
         int selectedRow = 0;
         for (int row = 0; row < table_->rowCount(); ++row) {
             const auto& record = records_.at(row);
             if (record.id == selectedId)
                 selectedRow = row;
-            const QStringList values{record.fileName, record.fileType, record.director,
-                                     displayDate(record.releaseDate)};
+            const QStringList values{record.fileName, record.fileType,
+                recommended ? record.category : record.director,
+                recommended ? QLocale().toString(record.viewCount) : displayDate(record.releaseDate)};
             for (int column = 0; column < values.size(); ++column)
                 table_->setItem(row, column, new QTableWidgetItem(displayText(values.at(column))));
         }
@@ -451,6 +572,9 @@ private:
     QLineEdit* director_ = new QLineEdit; // Director full-name query.
     QLineEdit* actor_ = new QLineEdit; // Actor full-name query.
     QLineEdit* searchType_ = new QLineEdit; // File extension query.
+    QComboBox* categoryPreference_ = new QComboBox; // Preferred category.
+    QComboBox* typePreference_ = new QComboBox; // Preferred extension.
+    QLabel* order_ = new QLabel; // Current table ordering.
     QLabel* trace_ = new QLabel; // Actual index steps of the submitted query.
     QComboBox* filter_ = new QComboBox; // File type filter with an empty value for all types.
     QPushButton* add_ = new QPushButton(QStringLiteral("新增")); // Open the record form.
