@@ -1,7 +1,7 @@
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Sql)
 
-add_executable(media_library_qt WIN32 main.cpp)
-target_link_libraries(media_library_qt PRIVATE media_business Qt6::Widgets)
+add_executable(media_library_qt WIN32 main.cpp media_click_store.cpp)
+target_link_libraries(media_library_qt PRIVATE media_business Qt6::Widgets Qt6::Sql)
 target_compile_options(media_library_qt PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 set(sample_csv "${PROJECT_SOURCE_DIR}/sample-data/data/media_records.csv")

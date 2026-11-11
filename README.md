@@ -2,7 +2,7 @@
 
 ## Qt 前端
 
-需要 C++17、CMake、Ninja 和 Qt 6（Core、Test、Widgets）。Windows 上可用业务模块提供的环境脚本配置工具链。使用其他 Qt 套件时，确保 CMake 能找到 Qt，并且 Qt 的 DLL 位于 PATH 中。
+需要 C++17、CMake、Ninja 和 Qt 6（Core、Test、Widgets、Sql（含 QSQLITE 驱动））。Windows 上可用业务模块提供的环境脚本配置工具链。使用其他 Qt 套件时，确保 CMake 能找到 Qt，并且 Qt 的 DLL 位于 PATH 中。
 
 ```powershell
 . .\business\dev-env.ps1
@@ -32,3 +32,9 @@ Release 构建后，使用对应 Qt 套件的 bin 目录运行 `frontend/package
 ```
 
 将输出目录整体压缩。解压后双击 `media_library_qt.exe`，在图形窗口设置本次演示口令，再用同一口令登录。若启动环境已配置 `MEDIA_LIBRARY_PASSWORD`，程序直接进入登录窗口。
+
+## 多用户点击榜
+
+登录时填写固定的用户标识。标识忽略首尾空格和大小写，用于区分点击人数。口令仍是媒体库共用口令。点击列表中的记录后，可在「媒体库 → 点击榜」查看最近 7 天的前 10 条。榜单按不同用户数降序，再按点击次数降序。筛选、检索和自动选中记录不计为点击。
+
+行为数据保存在 CSV 同目录的 `<CSV 文件名>.clicks.sqlite`，统计范围为使用这份数据库的演示会话。

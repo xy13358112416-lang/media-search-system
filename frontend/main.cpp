@@ -1,6 +1,7 @@
 #include "medialibrary.h"
 #include "mediarecommendation.h"
 #include "library_style.h"
+#include "media_click_store.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -8,6 +9,7 @@
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QFont>
 #include <QFrame>
@@ -44,7 +46,7 @@ QString displayDate(const QDate& date)
 }
 
 // Verify the entered password before opening the media library.
-bool showLogin(const MediaLibrary& library)
+bool showLogin(const MediaLibrary& library, QString& userId)
 {
     QDialog dialog;
     dialog.setWindowTitle(QStringLiteral("媒体库登录"));
@@ -53,6 +55,10 @@ bool showLogin(const MediaLibrary& library)
     layout->setSpacing(14);
     auto* title = new QLabel(QStringLiteral("登录媒体库"));
     title->setObjectName(QStringLiteral("dialogTitle"));
+    auto* user = new QLineEdit;
+    user->setPlaceholderText(QStringLiteral("用户标识，例如学号或昵称"));
+    user->setAccessibleName(QStringLiteral("用户标识"));
+    user->setMaxLength(64);
     auto* password = new QLineEdit;
     password->setEchoMode(QLineEdit::Password);
     password->setPlaceholderText(QStringLiteral("请输入系统口令"));
@@ -64,14 +70,23 @@ bool showLogin(const MediaLibrary& library)
     login->setDefault(true);
     login->setObjectName(QStringLiteral("primary"));
     layout->addWidget(title);
+    layout->addWidget(user);
     layout->addWidget(password);
     layout->addWidget(error);
     layout->addWidget(login);
     dialog.setMinimumWidth(390);
-    password->setFocus();
+    user->setFocus();
 
     QObject::connect(login, &QPushButton::clicked, &dialog, [&] {
+        const QString identifier = user->text().trimmed().toCaseFolded();
+        if (identifier.isEmpty()) {
+            error->setText(QStringLiteral("请输入用于统计点击的用户标识。"));
+            error->show();
+            user->setFocus();
+            return;
+        }
         if (library.authenticate(password->text())) {
+            userId = identifier;
             dialog.accept();
             return;
         }
@@ -80,6 +95,7 @@ bool showLogin(const MediaLibrary& library)
         password->selectAll();
         password->setFocus();
     });
+    QObject::connect(user, &QLineEdit::textEdited, error, &QWidget::hide);
     QObject::connect(password, &QLineEdit::textEdited, error, &QWidget::hide);
     return dialog.exec() == QDialog::Accepted;
 }
@@ -162,7 +178,8 @@ void showPerformance(QWidget* parent)
 
 class LibraryWindow final : public QWidget {
 public:
-    explicit LibraryWindow(MediaLibrary& library) : library_(library)
+    LibraryWindow(MediaLibrary& library, MediaClickStore& clicks, const QString& userId)
+        : library_(library), clicks_(clicks), userId_(userId)
     {
         setWindowTitle(QStringLiteral("多媒体文件管理及检索系统"));
         setObjectName(QStringLiteral("libraryWindow"));
@@ -198,6 +215,9 @@ public:
         toolbar->addWidget(filter_);
         toolbar->addWidget(add_);
         toolbar->addWidget(remove_);
+        auto* ranking = new QPushButton(QStringLiteral("点击榜"));
+        toolbar->addWidget(ranking);
+        connect(ranking, &QPushButton::clicked, this, [this] { showClickRanking(); });
         toolbar->addStretch();
 
         auto* searchControls = new QWidget;
@@ -350,6 +370,8 @@ public:
         });
 
         connect(filter_, &QComboBox::currentIndexChanged, this, [this] { refresh(); });
+        connect(table_, &QTableWidget::cellClicked, this,
+                [this](int row) { recordClick(row); });
         connect(table_, &QTableWidget::currentCellChanged, this,
                 [this](int row) { showDetail(row); });
         connect(add_, &QPushButton::clicked, this, [this] { addRecord(); });
@@ -358,6 +380,63 @@ public:
     }
 
 private:
+    void recordClick(int row)
+    {
+        if (row < 0 || row >= records_.size())
+            return;
+        QString error;
+        if (!clicks_.record(userId_, records_.at(row).id, error) && !reportedClickError_) {
+            reportedClickError_ = true;
+            QMessageBox::warning(this, QStringLiteral("点击记录保存失败"), error);
+        }
+    }
+
+    void showClickRanking()
+    {
+        QList<MediaClickCount> results;
+        QString error;
+        if (!clicks_.ranking(results, error)) {
+            QMessageBox::warning(this, QStringLiteral("读取点击榜失败"), error);
+            return;
+        }
+
+        QDialog dialog(this);
+        dialog.setWindowTitle(QStringLiteral("最近 7 天点击榜"));
+        dialog.resize(640, 380);
+        auto* layout = new QVBoxLayout(&dialog);
+        auto* table = new QTableWidget(0, 3);
+        table->setHorizontalHeaderLabels({QStringLiteral("影片"), QStringLiteral("点击人数"),
+                                           QStringLiteral("点击次数")});
+        table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        table->setAlternatingRowColors(true);
+        table->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+        table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+        table->verticalHeader()->hide();
+
+        for (const auto& result : results) {
+            MediaRecord record;
+            if (!library_.find(result.mediaId, record))
+                continue;
+            const int row = table->rowCount();
+            table->insertRow(row);
+            table->setItem(row, 0, new QTableWidgetItem(record.fileName));
+            table->setItem(row, 1, new QTableWidgetItem(QString::number(result.users)));
+            table->setItem(row, 2, new QTableWidgetItem(QString::number(result.clicks)));
+            if (table->rowCount() == 10)
+                break;
+        }
+
+        auto* summary = new QLabel(table->rowCount() == 0
+            ? QStringLiteral("最近 7 天暂无影片点击。")
+            : QStringLiteral("按不同用户数排序，人数相同时按点击次数排序。"));
+        layout->addWidget(summary);
+        layout->addWidget(table);
+        auto* close = new QPushButton(QStringLiteral("关闭"));
+        layout->addWidget(close, 0, Qt::AlignRight);
+        connect(close, &QPushButton::clicked, &dialog, &QDialog::accept);
+        dialog.exec();
+    }
+
     // Collect a record and keep the form open if validation or saving fails.
     void addRecord()
     {
@@ -617,6 +696,9 @@ private:
     }
 
     MediaLibrary& library_;            // Loaded business service, owned by main.
+    MediaClickStore& clicks_; // Click database for this library.
+    const QString userId_; // Normalized identifier for this session.
+    bool reportedClickError_ = false; // Avoid repeating the same warning on every click.
     QList<MediaRecord> records_;       // Visible records in table row order.
     QList<QLabel*> detailValues_;      // Detail value labels in form order.
     SearchQuery query_; // Last submitted combination of search fields.
@@ -678,7 +760,8 @@ int main(int argc, char* argv[])
     const QString csvPath = useDefaultCsv ? appDir.filePath(QStringLiteral("media_records.csv"))
                                           : parser.value(csvOption);
     MediaLibrary library(csvPath, password);
-    if (!showLogin(library))
+    QString userId;
+    if (!showLogin(library, userId))
         return 0;
 
     // Initialize the writable demo file once. Subsequent builds only copy the seed.
@@ -696,7 +779,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    LibraryWindow window(library);
+    MediaClickStore clicks(QFileInfo(csvPath).absoluteFilePath() + QStringLiteral(".clicks.sqlite"));
+    LibraryWindow window(library, clicks, userId);
     window.show();
     return app.exec();
 }
