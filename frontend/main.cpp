@@ -1,5 +1,6 @@
 #include "medialibrary.h"
 #include "mediarecommendation.h"
+#include "library_style.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -8,6 +9,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFormLayout>
+#include <QFont>
+#include <QFrame>
+#include <QInputDialog>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -15,6 +19,7 @@
 #include <QLocale>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSet>
 #include <QSignalBlocker>
 #include <QSplitter>
@@ -44,7 +49,10 @@ bool showLogin(const MediaLibrary& library)
     QDialog dialog;
     dialog.setWindowTitle(QStringLiteral("媒体库登录"));
     auto* layout = new QVBoxLayout(&dialog);
-    auto* title = new QLabel(QStringLiteral("多媒体文件管理及检索系统"));
+    layout->setContentsMargins(28, 26, 28, 28);
+    layout->setSpacing(14);
+    auto* title = new QLabel(QStringLiteral("登录媒体库"));
+    title->setObjectName(QStringLiteral("dialogTitle"));
     auto* password = new QLineEdit;
     password->setEchoMode(QLineEdit::Password);
     password->setPlaceholderText(QStringLiteral("请输入系统口令"));
@@ -54,11 +62,12 @@ bool showLogin(const MediaLibrary& library)
     error->hide();
     auto* login = new QPushButton(QStringLiteral("登录"));
     login->setDefault(true);
+    login->setObjectName(QStringLiteral("primary"));
     layout->addWidget(title);
     layout->addWidget(password);
     layout->addWidget(error);
     layout->addWidget(login);
-    dialog.setMinimumWidth(340);
+    dialog.setMinimumWidth(390);
     password->setFocus();
 
     QObject::connect(login, &QPushButton::clicked, &dialog, [&] {
@@ -156,10 +165,24 @@ public:
     explicit LibraryWindow(MediaLibrary& library) : library_(library)
     {
         setWindowTitle(QStringLiteral("多媒体文件管理及检索系统"));
-        resize(1080, 600);
+        setObjectName(QStringLiteral("libraryWindow"));
+        resize(1120, 710);
         auto* layout = new QVBoxLayout(this);
-        layout->setContentsMargins(20, 20, 20, 20);
-        layout->setSpacing(12);
+        layout->setContentsMargins(24, 22, 24, 24);
+        layout->setSpacing(14);
+
+        auto* banner = new QFrame;
+        banner->setObjectName(QStringLiteral("banner"));
+        auto* bannerLayout = new QHBoxLayout(banner);
+        bannerLayout->setContentsMargins(20, 16, 20, 16);
+        auto* heading = new QLabel(QStringLiteral("多媒体文件管理及检索系统"));
+        heading->setObjectName(QStringLiteral("appTitle"));
+        bannerLayout->addWidget(heading);
+        layout->addWidget(banner);
+        add_->setObjectName(QStringLiteral("primary"));
+        remove_->setObjectName(QStringLiteral("danger"));
+        count_->setObjectName(QStringLiteral("resultCount"));
+        order_->setObjectName(QStringLiteral("muted"));
 
         tabs_->addTab(QStringLiteral("媒体库"));
         tabs_->addTab(QStringLiteral("检索"));
@@ -196,6 +219,7 @@ public:
         searchBar->addWidget(typeLabel);
         searchBar->addWidget(searchType_);
         auto* searchButton = new QPushButton(QStringLiteral("查询"));
+        searchButton->setObjectName(QStringLiteral("primary"));
         auto* clearButton = new QPushButton(QStringLiteral("清空条件"));
         searchBar->addWidget(searchButton);
         searchBar->addWidget(clearButton);
@@ -215,6 +239,7 @@ public:
         recommendationBar->addWidget(preferenceTypeLabel);
         recommendationBar->addWidget(typePreference_);
         auto* recommend = new QPushButton(QStringLiteral("生成推荐"));
+        recommend->setObjectName(QStringLiteral("primary"));
         recommendationBar->addWidget(recommend);
         recommendationBar->addStretch();
         connect(recommend, &QPushButton::clicked, this,
@@ -223,6 +248,7 @@ public:
         controls_->addWidget(libraryControls);
         controls_->addWidget(searchControls);
         controls_->addWidget(recommendationControls);
+        controls_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
         layout->addWidget(controls_);
 
         auto* summary = new QHBoxLayout;
@@ -236,14 +262,32 @@ public:
         table_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
         table_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
         table_->verticalHeader()->hide();
+        table_->verticalHeader()->setDefaultSectionSize(36);
+        table_->setShowGrid(false);
         table_->setAlternatingRowColors(true);
         table_->setSelectionBehavior(QAbstractItemView::SelectRows);
         table_->setSelectionMode(QAbstractItemView::SingleSelection);
         table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
-        auto* detailPane = new QWidget;
-        detailPane->setMinimumWidth(280);
-        auto* form = new QFormLayout(detailPane);
+        auto* detailPane = new QFrame;
+        detailPane->setObjectName(QStringLiteral("detailCard"));
+        detailPane->setMinimumWidth(310);
+        auto* detailLayout = new QVBoxLayout(detailPane);
+        detailLayout->setContentsMargins(16, 14, 16, 14);
+        auto* detailTitle = new QLabel(QStringLiteral("记录详情"));
+        detailTitle->setObjectName(QStringLiteral("sectionTitle"));
+        detailLayout->addWidget(detailTitle);
+        auto* detailScroll = new QScrollArea;
+        detailScroll->setObjectName(QStringLiteral("detailScroll"));
+        detailScroll->setWidgetResizable(true);
+        auto* detailBody = new QWidget;
+        detailBody->setObjectName(QStringLiteral("detailBody"));
+        detailScroll->setWidget(detailBody);
+        detailLayout->addWidget(detailScroll);
+        auto* form = new QFormLayout(detailBody);
+        form->setContentsMargins(0, 4, 8, 0);
+        form->setVerticalSpacing(9);
+        form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         const QStringList labels{QStringLiteral("编号"), QStringLiteral("文件名"),
                                  QStringLiteral("文件类型"), QStringLiteral("文件大小"),
                                  QStringLiteral("导演"), QStringLiteral("演员"),
@@ -255,15 +299,21 @@ public:
             value->setWordWrap(true);
             value->setTextInteractionFlags(Qt::TextSelectableByMouse);
             detailValues_.append(value);
-            form->addRow(label, value);
+            auto* fieldLabel = new QLabel(label);
+            fieldLabel->setObjectName(QStringLiteral("fieldLabel"));
+            form->addRow(fieldLabel, value);
         }
 
         auto* splitter = new QSplitter;
+        splitter->setChildrenCollapsible(false);
+        splitter->setHandleWidth(12);
         splitter->addWidget(table_);
         splitter->addWidget(detailPane);
         splitter->setStretchFactor(0, 3);
         splitter->setStretchFactor(1, 1);
-        layout->addWidget(splitter);
+        layout->addWidget(splitter, 1);
+        trace_->setObjectName(QStringLiteral("tracePanel"));
+        trace_->setWordWrap(true);
         trace_->setTextFormat(Qt::PlainText);
         trace_->setTextInteractionFlags(Qt::TextSelectableByMouse);
         trace_->hide();
@@ -315,6 +365,8 @@ private:
         dialog.setWindowTitle(QStringLiteral("新增媒体记录"));
         dialog.setMinimumWidth(420);
         auto* form = new QFormLayout(&dialog);
+        form->setContentsMargins(22, 20, 22, 22);
+        form->setVerticalSpacing(10);
 
         QLineEdit name, type, size(QStringLiteral("0")), director, actors;
         QLineEdit views(QStringLiteral("0")), date, awards, category;
@@ -335,6 +387,7 @@ private:
 
         QDialogButtonBox buttons(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
         buttons.button(QDialogButtonBox::Save)->setText(QStringLiteral("保存"));
+        buttons.button(QDialogButtonBox::Save)->setObjectName(QStringLiteral("primary"));
         buttons.button(QDialogButtonBox::Cancel)->setText(QStringLiteral("取消"));
         form->addRow(&buttons);
         connect(&buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
@@ -588,6 +641,9 @@ private:
 int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
+    app.setStyle(QStringLiteral("Fusion"));
+    app.setFont(QFont(QStringLiteral("Microsoft YaHei UI")));
+    app.setStyleSheet(libraryStyle());
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("多媒体文件管理及检索系统"));
     parser.addHelpOption();
@@ -596,11 +652,25 @@ int main(int argc, char* argv[])
     parser.addOption(csvOption);
     parser.process(app);
 
-    const QString password = qEnvironmentVariable("MEDIA_LIBRARY_PASSWORD");
+    QString password = qEnvironmentVariable("MEDIA_LIBRARY_PASSWORD");
     if (password.isEmpty()) {
-        QMessageBox::warning(nullptr, QStringLiteral("缺少系统口令"),
-                             QStringLiteral("请设置 MEDIA_LIBRARY_PASSWORD 后重新启动。"));
-        return 1;
+        QInputDialog setup;
+        setup.setWindowTitle(QStringLiteral("设置演示口令"));
+        setup.setLabelText(QStringLiteral("请设置本次演示使用的口令。"));
+        setup.setTextEchoMode(QLineEdit::Password);
+        setup.setOkButtonText(QStringLiteral("继续"));
+        setup.setCancelButtonText(QStringLiteral("取消"));
+        setup.setMinimumWidth(390);
+        do {
+            if (setup.exec() != QDialog::Accepted)
+                return 0;
+            password = setup.textValue();
+            if (password.trimmed().isEmpty()) {
+                password.clear();
+                setup.setLabelText(QStringLiteral("口令不能为空，请重新输入。"));
+                setup.setTextValue({});
+            }
+        } while (password.isEmpty());
     }
 
     const QDir appDir(QCoreApplication::applicationDirPath());

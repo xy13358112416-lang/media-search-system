@@ -1,6 +1,6 @@
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
-add_executable(media_library_qt main.cpp)
+add_executable(media_library_qt WIN32 main.cpp)
 target_link_libraries(media_library_qt PRIVATE media_business Qt6::Widgets)
 target_compile_options(media_library_qt PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 

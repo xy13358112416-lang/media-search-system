@@ -31,4 +31,4 @@ Release 构建后，使用对应 Qt 套件的 bin 目录运行 `frontend/package
 .\frontend\package.ps1 -BuildDirectory .\build -QtBin C:\Qt\6.x\mingw_64\bin -OutputDirectory .\media-library-demo
 ```
 
-将输出目录整体压缩。解压后打开 `start-demo.cmd` 设置本次口令并启动。
+将输出目录整体压缩。解压后双击 `media_library_qt.exe`，在图形窗口设置本次演示口令，再用同一口令登录。若启动环境已配置 `MEDIA_LIBRARY_PASSWORD`，程序直接进入登录窗口。
