@@ -4,6 +4,7 @@
 #include "media_click_store.h"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QCommandLineParser>
 #include <QCompleter>
 #include <QDialog>
@@ -14,7 +15,6 @@
 #include <QFormLayout>
 #include <QFont>
 #include <QFrame>
-#include <QInputDialog>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -51,6 +51,60 @@ QString displayDate(const QDate& date)
     return displayText(date.toString(Qt::ISODate));
 }
 
+// Keep the password masked without telling the Windows input context to disable IME.
+QLineEdit* addPasswordField(QVBoxLayout* layout, const QString& placeholder)
+{
+    auto* input = new QLineEdit;
+    input->setPlaceholderText(placeholder);
+    input->setAccessibleName(QStringLiteral("系统口令"));
+    auto* visibility = new QCheckBox(QStringLiteral("显示口令"));
+    const auto setVisible = [input](bool visible) {
+        input->setEchoMode(visible ? QLineEdit::Normal : QLineEdit::Password);
+        input->setInputMethodHints(Qt::ImhSensitiveData | Qt::ImhNoAutoUppercase);
+    };
+    setVisible(false);
+    QObject::connect(visibility, &QCheckBox::toggled, input, setVisible);
+    layout->addWidget(input);
+    layout->addWidget(visibility);
+    return input;
+}
+
+QString setupDemoPassword()
+{
+    QDialog dialog;
+    dialog.setWindowTitle(QStringLiteral("设置演示口令"));
+    dialog.setMinimumWidth(390);
+    auto* layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(28, 26, 28, 28);
+    layout->setSpacing(14);
+    auto* title = new QLabel(QStringLiteral("设置演示口令"));
+    title->setObjectName(QStringLiteral("dialogTitle"));
+    layout->addWidget(title);
+    auto* input = addPasswordField(layout, QStringLiteral("请输入本次演示使用的口令"));
+    auto* error = new QLabel(QStringLiteral("口令不能为空，请重新输入。"));
+    error->setStyleSheet(QStringLiteral("color: #b42318;"));
+    error->hide();
+    layout->addWidget(error);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    buttons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("继续"));
+    buttons->button(QDialogButtonBox::Ok)->setObjectName(QStringLiteral("primary"));
+    buttons->button(QDialogButtonBox::Ok)->setDefault(true);
+    buttons->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("取消"));
+    layout->addWidget(buttons);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    QObject::connect(input, &QLineEdit::textEdited, error, &QWidget::hide);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, [&] {
+        if (input->text().trimmed().isEmpty()) {
+            error->show();
+            input->setFocus();
+            return;
+        }
+        dialog.accept();
+    });
+    input->setFocus();
+    return dialog.exec() == QDialog::Accepted ? input->text() : QString();
+}
+
 // Verify the entered password before opening the media library.
 bool showLogin(const MediaLibrary& library, QString& userId)
 {
@@ -65,10 +119,6 @@ bool showLogin(const MediaLibrary& library, QString& userId)
     user->setPlaceholderText(QStringLiteral("用户标识，例如学号或昵称"));
     user->setAccessibleName(QStringLiteral("用户标识"));
     user->setMaxLength(64);
-    auto* password = new QLineEdit;
-    password->setEchoMode(QLineEdit::Password);
-    password->setPlaceholderText(QStringLiteral("请输入系统口令"));
-    password->setAccessibleName(QStringLiteral("系统口令"));
     auto* error = new QLabel;
     error->setStyleSheet(QStringLiteral("color: #b42318;"));
     error->hide();
@@ -77,7 +127,7 @@ bool showLogin(const MediaLibrary& library, QString& userId)
     login->setObjectName(QStringLiteral("primary"));
     layout->addWidget(title);
     layout->addWidget(user);
-    layout->addWidget(password);
+    auto* password = addPasswordField(layout, QStringLiteral("请输入系统口令"));
     layout->addWidget(error);
     layout->addWidget(login);
     dialog.setMinimumWidth(390);
@@ -867,25 +917,10 @@ int main(int argc, char* argv[])
     parser.process(app);
 
     QString password = qEnvironmentVariable("MEDIA_LIBRARY_PASSWORD");
-    if (password.isEmpty()) {
-        QInputDialog setup;
-        setup.setWindowTitle(QStringLiteral("设置演示口令"));
-        setup.setLabelText(QStringLiteral("请设置本次演示使用的口令。"));
-        setup.setTextEchoMode(QLineEdit::Password);
-        setup.setOkButtonText(QStringLiteral("继续"));
-        setup.setCancelButtonText(QStringLiteral("取消"));
-        setup.setMinimumWidth(390);
-        do {
-            if (setup.exec() != QDialog::Accepted)
-                return 0;
-            password = setup.textValue();
-            if (password.trimmed().isEmpty()) {
-                password.clear();
-                setup.setLabelText(QStringLiteral("口令不能为空，请重新输入。"));
-                setup.setTextValue({});
-            }
-        } while (password.isEmpty());
-    }
+    if (password.isEmpty())
+        password = setupDemoPassword();
+    if (password.isEmpty())
+        return 0;
 
     const QDir appDir(QCoreApplication::applicationDirPath());
     const bool useDefaultCsv = !parser.isSet(csvOption);
