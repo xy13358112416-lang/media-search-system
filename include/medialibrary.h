@@ -8,15 +8,18 @@ public:
     // password 必须由调用方配置；空口令始终不能通过验证。
     MediaLibrary(QString csvPath, QString password);
     RepositoryResult load(); // 加载 CSV 并重建索引；返回成功状态或错误。
-    RepositoryResult add(const MediaRecord& record); // 添加 record；ID 由调用方提供且必须唯一。
+    RepositoryResult add(const MediaRecord& record); // 兼容旧调用；自动分配 ID。新代码应使用 addNew。
+    RepositoryResult addNew(MediaRecord& record); // 为新记录分配编号后保存；record.id 接收分配结果。
     RepositoryResult remove(const QString& id); // 按 id 删除，返回成功状态或错误。
     bool authenticate(const QString& password) const; // 验证输入口令，匹配时返回 true。
     QStringList fileTypes() const; // 返回现有扩展名列表。
+    static QStringList supportedFileTypes(); // 返回可新增和导入的扩展名。
     QList<MediaRecord> records(const QString& fileType = {}) const; // 按类型筛选，空字符串代表全部；日期降序。
     bool find(const QString& id, MediaRecord& result) const; // 查找 id，存在时写入 result 并返回 true。
     QStringList search(const SearchQuery& query) const; // 组合查询，返回匹配记录的 ID。
     QStringList search(const SearchQuery& query, SearchTrace& trace) const; // 同时返回实际索引步骤。
 private:
+    RepositoryResult persistRecord(const MediaRecord& record); // 保存已预留 ID 的新记录。
     RepositoryResult verifyUnchanged(); // 防止外部修改后使用过期索引写入
     CsvMediaRepository repository_; // 持久化存储
     MediaSearch search_;           // 检索索引

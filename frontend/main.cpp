@@ -26,7 +26,6 @@
 #include <QStackedWidget>
 #include <QTabBar>
 #include <QTableWidget>
-#include <QUuid>
 #include <QVBoxLayout>
 #include <QComboBox>
 
@@ -392,11 +391,8 @@ private:
         form->addRow(&buttons);
         connect(&buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 
-        // Keep the generated ID stable while the user corrects the form or retries.
-        const QString id = QUuid::createUuid().toString(QUuid::WithoutBraces);
         connect(&buttons, &QDialogButtonBox::accepted, &dialog, [&] {
             MediaRecord record;
-            record.id = id;
             record.fileName = name.text().trimmed();
             record.fileType = type.text().trimmed().toUpper();
             record.director = director.text().trimmed();
@@ -422,7 +418,8 @@ private:
                 return;
             }
 
-            const auto result = library_.add(record);
+            const auto result = library_.addNew(record);
+            const QString id = record.id;
             if (!result.success) {
                 recoverAfterError(&dialog, QStringLiteral("新增失败"), result.error);
                 MediaRecord saved;
