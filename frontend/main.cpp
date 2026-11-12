@@ -201,6 +201,7 @@ public:
         count_->setObjectName(QStringLiteral("resultCount"));
         order_->setObjectName(QStringLiteral("muted"));
 
+        tabs_->setDrawBase(false);
         tabs_->addTab(QStringLiteral("媒体库"));
         tabs_->addTab(QStringLiteral("检索"));
         tabs_->addTab(QStringLiteral("推荐"));

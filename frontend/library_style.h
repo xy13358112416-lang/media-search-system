@@ -22,13 +22,28 @@ inline QString libraryStyle()
         QScrollArea#detailScroll { border: none; background: transparent; }
         QTabBar::tab { background: #e6edf7; color: #314766; padding: 9px 22px;
                        margin-right: 6px; border-radius: 8px; font-weight: 600; }
+        QTabBar::tab:last { margin-right: 0; }
         QTabBar::tab:hover { background: #dce8fb; }
         QTabBar::tab:selected { color: #ffffff; background: #244f91; }
         QLineEdit, QComboBox { background: #ffffff; border: 1px solid #c9d6e8;
                                border-radius: 8px; padding: 7px 10px; min-height: 20px; }
         QLineEdit:focus, QComboBox:focus { border-color: #315fa4; }
-        QComboBox { padding-right: 22px; }
-        QComboBox::drop-down { width: 24px; }
+        QComboBox { padding-right: 22px; combobox-popup: 0; }
+        QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right;
+                              width: 24px; border: none; background: transparent; }
+        QComboBox::down-arrow { image: url(:/chevron-down.png); width: 16px; height: 16px; }
+        QComboBox QAbstractItemView {
+            background-color: #ffffff; color: #182942;
+            border: 1px solid #c9d6e8; padding: 3px; outline: 0;
+            selection-background-color: #244f91; selection-color: #ffffff;
+        }
+        QComboBox QAbstractItemView::item { min-height: 26px; padding: 3px 8px; }
+        QComboBox QAbstractItemView::item:hover:!selected {
+            background-color: #eaf1fc; color: #182942;
+        }
+        QComboBox QAbstractItemView::item:selected {
+            background-color: #244f91; color: #ffffff;
+        }
         QPushButton { background: #ffffff; border: 1px solid #c9d6e8;
                       border-radius: 8px; padding: 8px 14px; font-weight: 600; }
         QPushButton:hover { background: #eaf1fc; border-color: #9cb5dc; }
