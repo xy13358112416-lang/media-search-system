@@ -1,0 +1,531 @@
+id,file_name,file_type,file_size,director,actors,view_count,release_date,awards,category
+M000001,同名作品.mp4,MP4,1048576,林川,"[""陈明"", ""王青""]",0,2010-01-01,"[""示例奖项""]",纪录片
+M000002,同名作品.mp4,MP4,2097152,林川,"[""陈明"", ""王青""]",37,2011-02-02,[],剧情
+M000003,城市.wav,WAV,3145728,赵岚,"[""王青"", ""孙晓""]",74,2012-03-03,[],音乐
+M000004,海风.mp4,MP4,4194304,周远,"[""李悦"", ""孙晓""]",111,2013-04-04,[],科幻
+M000005,旅程.mp3,MP3,5242880,林川,"[""周宁"", ""陈明""]",148,2014-05-05,"[""示例奖项""]",纪录片
+M000006,星河.wav,WAV,6291456,李宁,"[""王青"", ""周宁""]",185,2015-06-06,[],剧情
+M000007,归途.mp4,MP4,7340032,赵岚,"[""陈明"", ""王青""]",222,2016-07-07,[],音乐
+M000008,夜曲.mp3,MP3,8388608,周远,"[""陈明"", ""李悦""]",259,2017-08-08,[],科幻
+M000009,晨光.wav,WAV,9437184,林川,"[""王青"", ""孙晓""]",296,2018-09-09,"[""示例奖项""]",纪录片
+M000010,远山.mp4,MP4,10485760,李宁,"[""李悦"", ""孙晓""]",333,2019-10-10,[],剧情
+M000011,城市.mp3,MP3,11534336,赵岚,"[""周宁"", ""陈明""]",370,2020-11-11,[],音乐
+M000012,海风.wav,WAV,12582912,周远,"[""王青"", ""周宁""]",407,2021-12-12,[],科幻
+M000013,旅程.mp4,MP4,13631488,林川,"[""王青"", ""孙晓""]",444,2022-01-13,"[""示例奖项""]",纪录片
+M000014,星河.mp3,MP3,14680064,李宁,"[""陈明"", ""李悦""]",481,2023-02-14,[],剧情
+M000015,归途.wav,WAV,15728640,赵岚,"[""王青"", ""孙晓""]",17,2024-03-15,[],音乐
+M000016,夜曲.mp4,MP4,16777216,周远,"[""李悦"", ""孙晓""]",54,2010-04-16,[],科幻
+M000017,晨光.mp3,MP3,17825792,林川,"[""周宁"", ""陈明""]",91,2011-05-17,"[""示例奖项""]",纪录片
+M000018,远山.wav,WAV,18874368,李宁,"[""王青"", ""周宁""]",128,2012-06-18,[],剧情
+M000019,城市.mp4,MP4,19922944,赵岚,"[""陈明"", ""王青""]",165,2013-07-19,[],音乐
+M000020,海风.mp3,MP3,20971520,周远,"[""陈明"", ""李悦""]",202,2014-08-20,[],科幻
+M000021,旅程.wav,WAV,22020096,林川,"[""王青"", ""孙晓""]",239,2015-09-21,"[""示例奖项""]",纪录片
+M000022,星河.mp4,MP4,23068672,李宁,"[""李悦"", ""孙晓""]",276,2016-10-22,[],剧情
+M000023,归途.mp3,MP3,24117248,赵岚,"[""周宁"", ""陈明""]",313,2017-11-23,[],音乐
+M000024,夜曲.wav,WAV,25165824,周远,"[""王青"", ""周宁""]",350,2018-12-24,[],科幻
+M000025,晨光.mp4,MP4,26214400,林川,"[""王青"", ""孙晓""]",387,2019-01-25,"[""示例奖项""]",纪录片
+M000026,远山.mp3,MP3,27262976,李宁,"[""陈明"", ""李悦""]",424,2020-02-26,[],剧情
+M000027,城市.wav,WAV,28311552,赵岚,"[""王青"", ""孙晓""]",461,2021-03-27,[],音乐
+M000028,海风.mp4,MP4,29360128,周远,"[""李悦"", ""孙晓""]",498,2022-04-28,[],科幻
+M000029,旅程.mp3,MP3,30408704,林川,"[""周宁"", ""陈明""]",34,2023-05-01,"[""示例奖项""]",纪录片
+M000030,星河.wav,WAV,31457280,李宁,"[""王青"", ""周宁""]",71,2024-06-02,[],剧情
+M000031,Pygmalion.mp4,MP4,0,Asquith,"[""Leslie Howard"", ""Wendy Hiller"", ""Wilfrid Lawson"", ""Scott Sunderland"", ""Marie Lohr""]",0,1938-01-01,[],喜剧
+M000032,French Without Tears.mp4,MP4,0,Asquith,"[""Ray Milland"", ""Ellen Drew"", ""Guy Middleton"", ""Ronald Culver""]",0,1939-01-01,[],
+M000033,Quiet Wedding.mp4,MP4,0,Asquith,"[""Margaret Lockwood"", ""Derek Farr"", ""A.E. Matthews"", ""Marjorie Fielding"", ""Athene Seyler""]",0,1940-01-01,[],
+M000034,The Importance of Being Earnest.mp4,MP4,0,Asquith,"[""Michael Redgrave"", ""Michael Denison"", ""Edith Evans"", ""Margaret Rurtherford"", ""Jaen Greenwood""]",0,1951-01-01,[],喜剧
+M000035,Libel.mp4,MP4,0,Asquith,"[""Dirk Bogarde"", ""Olivia deHavilland"", ""Paul Massie"", ""Wilfrid Hyde White"", ""Robert Morley""]",0,1960-01-01,[],悬疑
+M000036,The Millionairess.mp4,MP4,0,Asquith,"[""Peter Sellers"", ""Sophia Loren"", ""Alastair Sim"", ""Vittorio deSics"", ""Dennis Price""]",0,1961-01-01,[],喜剧
+M000037,The VIPs.mp4,MP4,0,Asquith,"[""Richard Burton"", ""Elizabeth Taylor"", ""Maggie Smith"", ""Rod Taylor"", ""Margaret Rutherford""]",0,1963-01-01,[],剧情
+M000038,Sweet Liberty.mp4,MP4,0,Alda,"[""Alan Alda"", ""Michael Caine"", ""Michelle Pfeiffer"", ""Bob Hoskins"", ""Lise Hilboldt""]",0,1981-01-01,[],爱情
+M000039,Betsy's Wedding.mp4,MP4,0,Alda,"[""Molly Ringwald"", ""Alan Alda"", ""Joey Bishop"", ""Madeleine Kahn"", ""Ally Sheedy""]",0,1990-01-01,[],喜剧
+M000040,The Four Seasons.mp4,MP4,0,Alda,"[""Alan Alda"", ""Carol Burnett"", ""Len Cariou"", ""Sandy Dennis""]",0,1981-01-01,[],爱情
+M000041,Busman's Honeymoon.mp4,MP4,0,A.Woods,"[""Robert Montgomery"", ""Constance Cummings"", ""Seymour Hicks"", ""Leslie Banks"", ""Robert Newton""]",0,1940-01-01,[],喜剧
+M000042,I Bury the Living.mp4,MP4,0,Band,"[""Richard Boone"", ""Theodore Bikel""]",0,1957-01-01,[],恐怖
+M000043,Too Bad She's Bad.mp4,MP4,0,Blasetti,"[""Sophia Loren"", ""Vittorio deSica"", ""Marcello Mastroianni""]",0,1955-01-01,[],喜剧
+M000044,Real Life.mp4,MP4,0,A.Brooks,"[""Albert Brooks"", ""Frances Lee McCain"", ""Charles Grodin""]",0,1979-01-01,[],喜剧
+M000045,Modern Romance.mp4,MP4,0,A.Brooks,"[""Albert Brooks"", ""Super Dave Osborne""]",0,1981-01-01,[],
+M000046,Lost in America.mp4,MP4,0,A.Brooks,"[""Albert Brooks"", ""Julie Hagerty"", ""Garry K. Marshall"", ""Art Frankel""]",0,1985-01-01,[],剧情
+M000047,Defending Your Life.mp4,MP4,0,A.Brooks,"[""Albert Brooks"", ""Lee Grant"", ""Meryl Streep"", ""Rip Torn"", ""Shirley MacLaine""]",0,1991-01-01,[],喜剧
+M000048,The Great Impersonation.mp4,MP4,0,Crosland,"[""Edmund Lowe"", ""Valerie Hobson"", ""Vera Engels"", ""Henry Mollison"", ""Lumsden Hare""]",0,1935-01-01,[],
+M000049,Don Juan.mp4,MP4,0,Crosland,"[""John Barrymore"", ""Mary Astor"", ""Warner Oland"", ""Estelle Taylor"", ""Myrna loy""]",0,1926-01-01,[],剧情
+M000050,The Beloved Rogue.mp4,MP4,0,Crosland,"[""John Barrymore"", ""Conrad Veidt"", ""Marceline Day"", ""Mack Swain"", ""Slim Summerville""]",0,1927-01-01,[],
+M000051,In Old San Francisco.mp4,MP4,0,Crosland,"[""Anna May Wong"", ""Sojin""]",0,1927-01-01,[],
+M000052,The Jazz Singer.mp4,MP4,0,Crosland,"[""Al Jolson"", ""May McAvoy"", ""Warner Oland"", ""Eugenie Besserer"", ""Otto Lederer""]",0,1927-01-01,[],
+M000053,Glorious Betsy.mp4,MP4,0,Crosland,"[""Conrad Nagel"", ""Dolores Costello"", ""John Miljan"", ""Marc McDermott"", ""Betty Blythe""]",0,1928-01-01,[],
+M000054,Went the Day Well?.mp4,MP4,0,Cavalcanti,"[""Leslie Banks"", ""Elizabeth Allen"", ""Frank Lawton"", ""Basil Sidney"", ""Valerie Taylor""]",0,1942-01-01,[],剧情
+M000055,Dead of Night.mp4,MP4,0,Cavalcanti,"[""Mervyn Jones"", ""Roland Culver"", ""Mary Merrall"", ""Judy Kelly"", ""Anthony Baird""]",0,1945-01-01,[],恐怖
+M000056,Nicholas Nickleby.mp4,MP4,0,Cavalcanti,"[""Derek Bond"", ""Cedric Hardwicke"", ""Alfred Drayton"", ""Sybil Thorndyke"", ""Stanley Holloway""]",0,1947-01-01,[],
+M000057,I Can Take Care of Myself.mp4,MP4,0,Crosland~jr,"[""Myron McCormick"", ""Frankie Darro"", ""Linda Lawson"", ""Pat Harrington~jr."", ""Will Kuluva""]",0,1960-01-01,[],悬疑
+M000058,The Money.mp4,MP4,0,Crosland~jr,"[""Robert Loggia"", ""Doris Dowling"", ""Will Kuluva"", ""Wolfe Barzell"", ""Monica May""]",0,1960-01-01,[],悬疑
+M000059,The Man Who Found The Money.mp4,MP4,0,Crosland~jr,"[""Arthur Hill"", ""R.G. Armstrong"", ""Rod Cameron""]",0,1960-01-01,[],悬疑
+M000060,The Kiss Off.mp4,MP4,0,Crosland~jr,"[""Rip Torn"", ""Mary Munday"", ""Ken Patterson"", ""Florence McMichael"", ""Don Keefer""]",0,1961-01-01,[],悬疑
+M000061,Deathmate.mp4,MP4,0,Crosland~jr,"[""Lee Phillips"", ""Gia Scala"", ""Les Tremaye"", ""Ann Stanton"", ""Russell Collins""]",0,1961-01-01,[],悬疑
+M000062,Gratitude.mp4,MP4,0,Crosland~jr,"[""Peter Falk"", ""Paul Hartman"", ""Edmund Haskin"", ""John Dennis"", ""Bert Rensen""]",0,1961-01-01,[],悬疑
+M000063,Servant Problem.mp4,MP4,0,Crosland~jr,"[""John Emery"", ""Jo vanFleet"", ""Alice Frost""]",0,1961-01-01,[],悬疑
+M000064,The Hat Box.mp4,MP4,0,Crosland~jr,"[""Paul Ford"", ""Billy Gray"", ""Frank Maxwell""]",0,1961-01-01,[],悬疑
+M000065,Keep Me Company.mp4,MP4,0,Crosland~jr,"[""Anne Francis"", ""Edmund Hashim"", ""Jack Ging""]",0,1961-01-01,[],悬疑
+M000066,Beta Delta Gamma.mp4,MP4,0,Crosland~jr,"[""Duke Howard"", ""Burt Brinckerhoff""]",0,1961-01-01,[],悬疑
+M000067,The Right Kind of Medicine.mp4,MP4,0,Crosland~jr,"[""Robert Redford"", ""Russell Collins"", ""George Clarke"", ""Joby Baker"", ""Bernard Kates""]",0,1961-01-01,[],悬疑
+M000068,The Case of M.J.H..mp4,MP4,0,Crosland~jr,"[""Barbara Baxley"", ""Ted Newton"", ""Robert Loggia"", ""Richard Gaines""]",0,1962-01-01,[],悬疑
+M000069,The Woman Who Wanted to Live.mp4,MP4,0,Crosland~jr,"[""Lola Allbright"", ""Charles Bronson""]",0,1962-01-01,[],悬疑
+M000070,Apex.mp4,MP4,0,Crosland~jr,"[""Mark Miller"", ""Vivienne Segal"", ""Pat Breslin""]",0,1962-01-01,[],悬疑
+M000071,The Big Kick.mp4,MP4,0,Crosland~jr,"[""Brian Hutton"", ""Anne Helm"", ""Wayne Rogers""]",0,1962-01-01,[],悬疑
+M000072,The Night of the Owl.mp4,MP4,0,Crosland~jr,"[""Brian Keith"", ""Patricia Breslin"", ""Claudia Cravey""]",0,1962-01-01,[],悬疑
+M000073,House Guest.mp4,MP4,0,Crosland~jr,"[""Robert Sterling"", ""Billy Mumy"", ""MacDonald Carey"", ""Peggy McKay""]",0,1962-01-01,[],悬疑
+M000074,Last Seen Wearing Bluejeans.mp4,MP4,0,Crosland~jr,"[""Michael Wilding"", ""Anna Lee"", ""Katherine Crawford"", ""Randy Boone""]",0,1963-01-01,[],悬疑
+M000075,Les Amants de Verone.mp4,MP4,0,Cayatte,"[""Pierre Brasseur"", ""Anouk Aimee"", ""Serge Reggiani""]",0,1949-01-01,[],黑色电影
+M000076,Justice est Fait.mp4,MP4,0,Cayatte,"[""Claude Noiller"", ""Valentine Tessier""]",0,1950-01-01,[],剧情
+M000077,Verdict.mp4,MP4,0,Cayatte,"[""Jean Gabin"", ""Sophia Loren"", ""Henri Garcin"", ""Julien Bertheau""]",0,1974-01-01,[],剧情
+M000078,Aerograd.mp4,MP4,0,Dovzhenko,"[""Semyon Shaigada"", ""Stepan Shkurat"", ""Sergei Stolyarov""]",0,1935-01-01,[],
+M000079,The Memory of the Other.mp4,MP4,0,DegliAbbati,"[""Lyda Bonelli"", ""Mario Bonnard""]",0,1914-01-01,[],喜剧
+M000080,Ramrod.mp4,MP4,0,deToth,"[""Veronica Lake"", ""Joel McCrae"", ""Preston Foster"", ""Charles Ruggles"", ""Donald Crisp""]",0,1947-01-01,[],
+M000081,House of Wax.mp4,MP4,0,deToth,"[""Frank Lovejoy"", ""Phyllis Kirk"", ""Charles Buchinsky"", ""Carolyn Jones""]",0,1953-01-01,[],恐怖
+M000082,Dark Waters.mp4,MP4,0,deToth,"[""Merle Oberon"", ""Franchot Tone"", ""Elisha Cook~jr.""]",0,1944-01-01,[],恐怖
+M000083,The Love-Ins.mp4,MP4,0,Dreifuss,"[""Richard Todd"", ""Susan Oliver"", ""James MacArthur"", ""Joe Pyne"", ""Mark Goddard""]",0,1967-01-01,[],
+M000084,Robin Hood.mp4,MP4,0,Dwan,"[""Douglas Fairbanks"", ""Wallace Beery"", ""Alan Hale"", ""Enid Bennett""]",0,1922-01-01,[],
+M000085,The Iron Mask.mp4,MP4,0,Dwan,"[""Walter Abel"", ""Margot Grahame"", ""Miles Mander""]",0,1922-01-01,[],
+M000086,Manhandled.mp4,MP4,0,Dwan,"[""Gloria Swanson"", ""Tom Moore"", ""Frank Morgan"", ""Lilyan Tashman"", ""Ian Keith""]",0,1924-01-01,[],爱情
+M000087,Heidi.mp4,MP4,0,Dwan,"[""Shirley Temple"", ""Jean Hersholt"", ""Arthur Treacher"", ""Helen Westley"", ""Pauline Moore""]",0,1937-01-01,[],爱情
+M000088,Rebecca of Sunnybrook Farm.mp4,MP4,0,Dwan,"[""Shirley Temple"", ""Randolph Scott"", ""Jack Haley"", ""Gloria Stuart"", ""Phyllis Brooks""]",0,1938-01-01,[],剧情
+M000089,Suez.mp4,MP4,0,Dwan,"[""Tyrone Power"", ""Annabelle"", ""Loretta Young"", ""J. Edward Bromberg"", ""Joseph Schildkraut""]",0,1938-01-01,[],
+M000090,The Three Musketeers.mp4,MP4,0,Dwan,"[""Don Ameche"", ""The Ritz~Brothers"", ""Binnie Barnes"", ""Joseph Schildkraut"", ""Lionel Atwill""]",0,1939-01-01,[],
+M000091,Their Hero Son.mp4,MP4,0,Dwan,"[""J.Warren Kerrigan"", ""Jack Richardson"", ""George Periolat""]",0,1912-01-01,[],剧情
+M000092,Sands of Iwo Jima.mp4,MP4,0,Dwan,"[""John Wayne"", ""John Agar"", ""Forrest Tucker"", ""Artur Franz"", ""Julie Bishop""]",0,1949-01-01,[],
+M000093,Cattle Queen of Montana.mp4,MP4,0,Dwan,"[""Barbara Stanwyk"", ""Ronald Reagan"", ""Gene Evans"", ""Lance Fuller"", ""Anthony Caruso""]",0,1954-01-01,[],
+M000094,Passion.mp4,MP4,0,Dwan,"[""Cornel Wilde"", ""Yvonne deCarlo"", ""Raymond Burr"", ""Lon Chaney~jr"", ""Rodolfo Acosta""]",0,1954-01-01,[],
+M000095,Tennessee's Partner.mp4,MP4,0,Dwan,"[""John Payne"", ""Ronald Reagan"", ""Coleen Gray"", ""Rhonda Fleming"", ""Anthony caruso""]",0,1954-01-01,[],
+M000096,Pearl of the South Pacific.mp4,MP4,0,Dwan,"[""Virginia Mayo"", ""Dennis Morgan"", ""David Farrar"", ""Murvyn Vye"", ""Lance Fuller""]",0,1955-01-01,[],
+M000097,Slightly Scarlet.mp4,MP4,0,Dwan,"[""Arlene Dahl"", ""Rhonda Fleming"", ""John Payne"", ""Kent Taylor""]",0,1956-01-01,[],剧情
+M000098,"Un Soir, Un Train.mp4",MP4,0,Delvaux,"[""Ives Montand"", ""Anouk Aimee""]",0,1968-01-01,[],剧情
+M000099,Rendevous at Bray.mp4,MP4,0,Delvaux,"[""Mathieu Carriere"", ""Daniel Delorme"", ""Bulle Ogier"", ""Anna Karina""]",0,1973-01-01,[],剧情
+M000100,Belle.mp4,MP4,0,Delvaux,"[""JeanLuc Bideau"", ""Adriana Bogdan"", ""Daniele Delorme""]",0,1973-01-01,[],剧情
+M000101,Een Vrouw tussen Hond en Wolf.mp4,MP4,0,Delvaux,"[""MarieChristine Barrault"", ""Rutger Hauer"", ""Roger vanHool""]",0,1979-01-01,[],剧情
+M000102,Benvenuta.mp4,MP4,0,Delvaux,"[""Fanny Ardant"", ""Mathieu Carriere"", ""Francoise Fabian"", ""Vittorio Gassman""]",0,1983-01-01,[],爱情
+M000103,Babel Opera.mp4,MP4,0,Delvaux,"[""Jaques Sojcher"", ""Denise Debbaut""]",0,1983-01-01,[],音乐
+M000104,The Ghost Breaker.mp4,MP4,0,A.E.Green,"[""Wallace Reid"", ""Lila Lee"", ""Walter Heirs"", ""Arthur Edmund Carewe"", ""J.Farrell MacDonald""]",0,1922-01-01,[],
+M000105,Baby Face.mp4,MP4,0,A.E.Green,"[""Barbara Stanwyck"", ""Nat Pendleton""]",0,1933-01-01,[],剧情
+M000106,Dangerous.mp4,MP4,0,A.E.Green,"[""Bette Davis"", ""Franchot Tone"", ""Margaret Lindsay"", ""Alison Skipworth"", ""John Eldridge""]",0,1935-01-01,[],剧情
+M000107,The Gracie Allen Murder Case.mp4,MP4,0,A.E.Green,"[""Gracie Allen"", ""Warren Williams"", ""Donald McBride"", ""Kent Taylor"", ""Ellen drew""]",0,1935-01-01,[],
+M000108,The Jolson Story.mp4,MP4,0,A.E.Green,"[""Larry Parks"", ""Al Jolson"", ""William Demarest"", ""Evelyn Keyes"", ""Ludwig Donath""]",0,1946-01-01,[],
+M000109,The Eddie Cantor Story.mp4,MP4,0,A.E.Green,"[""Keefe Brasselle"", ""Eddie Cantor"", ""Marllyn Erskine"", ""Aline MacMahon"", ""Arthur Franz""]",0,1953-01-01,[],
+M000110,Putting Pants on Philip.mp4,MP4,0,A.E.Sutherland?,"[""Oliver Hardy"", ""Stan Laurel""]",0,1926-01-01,[],喜剧
+M000111,Follow the Boys.mp4,MP4,0,A.E.Sutherland,"[""George Raft"", ""Vera Zorina"", ""Charley Grapwin"", ""Grace MacDonald"", ""Charles Butterworth""]",0,1944-01-01,[],音乐
+M000112,It's the Old Army Game.mp4,MP4,0,A.E.Sutherland,"[""W.C. Fields"", ""Louise Brooks""]",0,1926-01-01,[],喜剧
+M000113,Diamond Jim.mp4,MP4,0,A.E.Sutherland,"[""Edward Arnold"", ""Jean Arthur"", ""Binnie Barnes"", ""Cesar Romero"", ""Eric Blore""]",0,1935-01-01,[],喜剧
+M000114,The Flying Deuces.mp4,MP4,0,A.E.Sutherland,"[""Oliver Hardy"", ""Stan Laurel"", ""Jean Parker"", ""Reginald Gardiner""]",0,1939-01-01,[],喜剧
+M000115,One Night in the Tropics.mp4,MP4,0,A.E.Sutherland,"[""Allan Jones"", ""Nancy Kelly"", ""Bud Abbott"", ""Lou Costello"", ""Bob Cummings""]",0,1939-01-01,[],
+M000116,Napoleon.mp4,MP4,0,Gance,"[""Albert Dieudonne"", ""Antonin Artaud"", ""Pierre Batcheff"", ""Conrad Veidt""]",0,1927-01-01,[],
+M000117,La Fin du Monde.mp4,MP4,0,Gance,"[""Abel Gance"", ""Colette Darfeuil"", ""Sylvia Grenade"", ""Victor Franceen""]",0,1930-01-01,[],剧情
+M000118,Napoleon.mp4,MP4,0,Gance,"[""Albert Dieudonne"", ""Antonin Artaud"", ""Pierre Batcheff""]",0,1934-01-01,[],
+M000119,Scampolo.mp4,MP4,0,Genina,"[""Carmen Boni"", ""Lia Crithi"", ""Hans Junkermann"", ""Max Schreck"", ""Carl Goetz""]",0,1928-01-01,[],喜剧
+M000120,The Last Dinosaur.mp4,MP4,0,Grasshoff,"[""Richard Boone"", ""Joan vanArk""]",0,1977-01-01,[],科幻
+M000121,Furia a Bahia pour OSS 117.mp4,MP4,0,Hunebelle,"[""Frederick Stafford"", ""Mylene Demongeot""]",0,1965-01-01,[],
+M000122,Boat People.mp4,MP4,0,Hui,"[""Lam ChiCheung"", ""Cora Miao""]",0,1983-01-01,[],
+M000123,The Adventures of Scaramouche.mp4,MP4,0,Isasmendi,"[""Gerald Barray"", ""Alberto deMendoza"", ""Gianna Maria Canale""]",0,1964-01-01,[],
+M000124,They Came to Rob Las Vegas.mp4,MP4,0,Isasmendi,"[""Gary Lockwood"", ""Elke Sommer""]",0,1969-01-01,[],
+M000125,A Chump at Oxford.mp4,MP4,0,A.Goulding,"[""Stan Laurel"", ""Oliver Hardy"", ""James Finlayson"", ""Forrester Harvey"", ""Wilfrid Lucas""]",0,1939-01-01,[],喜剧
+M000126,Klute.mp4,MP4,0,Pakula,"[""Jane Fonda"", ""Donald Sutherland"", ""Roy Scheider"", ""Charles Cioffi"", ""Rita Gam""]",0,1971-01-01,[],悬疑
+M000127,Presumed Innocent.mp4,MP4,0,Pakula,"[""Harrison Ford"", ""Bonnie Bedalla"", ""Raul Julia"", ""Greta Scacchi"", ""Brian Dennehy""]",0,1982-01-01,[],剧情
+M000128,Pelican Brief.mp4,MP4,0,Pakula,"[""Julia Roberts"", ""Denzel Washington"", ""Robert Culp"", ""Hume Cronyn"", ""John Litgow""]",0,1993-01-01,[],剧情
+M000129,The Devil's Own.mp4,MP4,0,Pakula,"[""Harrison Ford"", ""Brad Pitt"", ""Margaret Colin"", ""Ruben Blades"", ""Treat Williams""]",0,1997-01-01,[],
+M000130,All the President's Men.mp4,MP4,0,Pakula,"[""Robert Redford"", ""Dustin Hoffman"", ""Jason Robards~jr"", ""Martin Balsam"", ""Hal Holbrook""]",0,1976-01-01,[],传记
+M000131,Starting Over.mp4,MP4,0,Pakula,"[""Kevin Bacon"", ""Tony Romano""]",0,1980-01-01,[],爱情
+M000132,Sophie's Choice.mp4,MP4,0,Pakula,"[""Rita Karin"", ""Stephen d. Newman"", ""Josh Mostel""]",0,1982-01-01,[],剧情
+M000133,Love Letters.mp4,MP4,0,A.Jones,"[""Jamie Lee Curtis"", ""James Keach"", ""Matt Clark"", ""Bonnie Bartlett"", ""Amy Madigan""]",0,1983-01-01,[],爱情
+M000134,The Noose.mp4,MP4,0,Jacobson?,"[""Lina Basquette"", ""Richard Barthelmess"", ""Alice Joyce"", ""Thelma Todd""]",0,1927-01-01,[],
+M000135,Marius.mp4,MP4,0,A.Korda,"[""Pierre Fresnay"", ""Raimu"", ""Orane D\\'emazis""]",0,1931-01-01,[],剧情
+M000136,The Private Life of Henry VIII.mp4,MP4,0,A.Korda,"[""Charles Laughton"", ""Merle Oberon"", ""Binnie Barnes"", ""Wendy Barrie"", ""Elsa Lanchester""]",0,1933-01-01,[],
+M000137,That Hamilton Woman.mp4,MP4,0,A.Korda,"[""Vivien Leigh"", ""Laurence Oliver"", ""Alan Mowbray"", ""Sara Allgood"", ""Gladys Cooper""]",0,1941-01-01,[],
+M000138,The Match Factory Girl.mp4,MP4,0,Kaurismaki,"[""Kati Outinen"", ""Elina Salo"", ""Esko Nikkari"", ""Vesa Vierikko""]",0,1989-01-01,[],
+M000139,La Vie de Boh\`eme.mp4,MP4,0,Kaurismaki,"[""Andre Wilms"", ""Matti Pellon\\\""a\\\""A"", ""Kari V\\\""a\\\""ana\\\""anen"", ""Christine Murillo"", ""Evelyne Didi""]",0,1993-01-01,[],剧情
+M000140,Ariel.mp4,MP4,0,Kaurismaki,"[""Turo Pajala"", ""Susanna Haavisto"", ""Matti Pellonpaa""]",0,1983-01-01,[],喜剧
+M000141,Coming Home.mp4,MP4,0,Kjellin,"[""Crahan Denton"", ""Jeanette Nolan"", ""Susan Silo""]",0,1961-01-01,[],悬疑
+M000142,Captive Audience.mp4,MP4,0,Kjellin,"[""James Mason"", ""Angie Dickinson"", ""Ed Nelson""]",0,1962-01-01,[],悬疑
+M000143,The 31st of February.mp4,MP4,0,Kjellin,"[""David Wayne"", ""William Conrad""]",0,1963-01-01,[],悬疑
+M000144,A Tangled Web.mp4,MP4,0,Kjellin,"[""Zohra Lampert"", ""Robert Redford"", ""Barry Morse""]",0,1963-01-01,[],悬疑
+M000145,The Cadaver.mp4,MP4,0,Kjellin,"[""Michael Parks"", ""Joby Baker""]",0,1963-01-01,[],悬疑
+M000146,How to get Rid of Your Wife.mp4,MP4,0,Kjellin,"[""Bob Newhart"", ""Jane Withers""]",0,1963-01-01,[],悬疑
+M000147,Beyond the Sea of Death.mp4,MP4,0,Kjellin,"[""Diana Hyland"", ""Jeremy Slate"", ""Mildred Dunnock"", ""Abraham Sofaer""]",0,1964-01-01,[],悬疑
+M000148,Night Caller.mp4,MP4,0,Kjellin,"[""Felicia Farr"", ""Bruce Dern"", ""David White""]",0,1964-01-01,[],悬疑
+M000149,Isabel.mp4,MP4,0,Kjellin,"[""Bsarbara Barrie"", ""Bradford Dillman"", ""Dabney Coleman""]",0,1964-01-01,[],悬疑
+M000150,Where the Woodbine Twineth.mp4,MP4,0,Kjellin,"[""Margaret Leighton"", ""Carl Benton Reid""]",0,1965-01-01,[],悬疑
+M000151,Completely Foolproof.mp4,MP4,0,Kjellin,"[""J.D. Cannon"", ""Patricia Barry"", ""Geoffrey Horen""]",0,1965-01-01,[],悬疑
+M000152,Tovarich.mp4,MP4,0,Litvak,"[""Claudette Colbert"", ""Charles Boyer"", ""Basil Rathbone"", ""Anita Louise"", ""Melville Cooper""]",0,1937-01-01,[],爱情
+M000153,The Amazing Dr.Clitterhouse.mp4,MP4,0,Litvak,"[""Edward G. Robinson"", ""Claire Tevor"", ""Himphey Bogart"", ""Allen Jenkins"", ""Donald Crisp""]",0,1938-01-01,[],喜剧
+M000154,All This and Heaven Too.mp4,MP4,0,Litvak,"[""Charles Boyer"", ""Bette Davis"", ""Barbara ONeil"", ""Virginia Weidler"", ""Jeffrey Linn""]",0,1940-01-01,[],剧情
+M000155,Castle on the Hudson.mp4,MP4,0,Litvak,"[""John Garfield"", ""Pat OBrien"", ""Ann Sheridan"", ""Burgess Meredith"", ""Jerome Cowan""]",0,1940-01-01,[],剧情
+M000156,Confessions of a Nazi Spy.mp4,MP4,0,Litvak,"[""Edward G. Robinson"", ""Paul Lukas"", ""George Sanders"", ""James Stephenson"", ""Sig Rumann""]",0,1939-01-01,[],
+M000157,City for Conquest.mp4,MP4,0,Litvak,"[""Jimmy Cagney"", ""Ann Sheridan"", ""Frank Craven"", ""Donald Crisp"", ""Arthur Kennedy""]",0,1940-01-01,[],
+M000158,Sorry Wrong Number.mp4,MP4,0,Litvak,"[""Barbara Stanwyk"", ""Burt Lancaster"", ""Ann Richards"", ""Wendell Cory"", ""Ed Begley""]",0,1948-01-01,[],悬疑
+M000159,The Snake Pit.mp4,MP4,0,Litvak,"[""Olivia deHavilland"", ""Leo Glenn"", ""Mark stevens"", ""Celeste Holm"", ""Glenn Langan""]",0,1948-01-01,[],
+M000160,Anastasia.mp4,MP4,0,Litvak,"[""Ingrid Bergman"", ""Yul Brynner"", ""Helen Hayes"", ""Martita Hunt"", ""Akim Tamiroff""]",0,1956-01-01,[],传记
+M000161,The Journey.mp4,MP4,0,Litvak,"[""Yul Brynner"", ""Deborah Kerr"", ""Jason Robards~jr."", ""Anouk Aim\\'ee"", ""Robert Morley""]",0,1959-01-01,[],剧情
+M000162,Mayerling.mp4,MP4,0,Litvak,"[""Charles Boyer"", ""Danielle Darrieux""]",0,1936-01-01,[],
+M000163,The Moon and Sixpence.mp4,MP4,0,Lewin,"[""George Sanders"", ""Herbert Marshall"", ""Steve Geray"", ""Doris Dudley"", ""Elena Verdugo""]",0,1942-01-01,[],
+M000164,The Picture of Dorian Gray.mp4,MP4,0,Lewin \,"[""George Sanders"", ""Angela Lansbury"", ""Donna Reed"", ""Lowell Gilmore"", ""Peter Lawford""]",0,1944-01-01,[],
+M000165,Pandora and the Flying Dutchman.mp4,MP4,0,Lewin,"[""James Mason"", ""Ava Gardner"", ""Harold Warrender"", ""Nigel Patrick"", ""Sheila Sim""]",0,1951-01-01,[],
+M000166,Saadia.mp4,MP4,0,Lewin,"[""Cornel Wilde"", ""Mel Ferrer"", ""Rita Gam"", ""Michel Simon"", ""Wanda Rotha""]",0,1953-01-01,[],爱情
+M000167,The Wild Life.mp4,MP4,0,Linson,"[""Eric Stoltz"", ""Ilan MitchellSmith"", ""Jenny Wright""]",0,1984-01-01,[],喜剧
+M000168,Decoy.mp4,MP4,0,Laven,"[""Robert Horton"", ""Cara Williams"", ""Arnold Laven"", ""Jack Mullaney"", ""Phillip Coolidge""]",0,1956-01-01,[],悬疑
+M000169,The Return of Verge Likens.mp4,MP4,0,Laven,"[""Peter Fonda"", ""Robert Emhardt""]",0,1964-01-01,[],悬疑
+M000170,Ever in My Heart.mp4,MP4,0,Mayo,"[""Barbara Stanwyk"", ""Ralph Bellamy"", ""Otto Kruger""]",0,1931-01-01,[],
+M000171,The Petrified Forest.mp4,MP4,0,Mayo,"[""Leslie Howard"", ""Bette Davis"", ""Humphrey Bogart"", ""Genevieve Tobin"", ""Dick Foran""]",0,1936-01-01,[],剧情
+M000172,Gambling Lady.mp4,MP4,0,Mayo,"[""Barbara Stanwyk"", ""Joel McCrea"", ""Pat OBrien""]",0,1936-01-01,[],
+M000173,Black Legion.mp4,MP4,0,Mayo,"[""Humphrey Bogart"", ""Dick Foran"", ""Erin OBrienMoore"", ""Ann Sheridan"", ""Robert Barrat""]",0,1937-01-01,[],剧情
+M000174,Adventures of Marco Polo.mp4,MP4,0,Mayo,"[""Gary Cooper"", ""Basil Rathbone"", ""Sigreid Gurie"", ""Ernest Truex"", ""Binnie Barnes""]",0,1938-01-01,[],
+M000175,The House Across the Bay.mp4,MP4,0,Mayo,"[""George Raft"", ""Joan Bennett"", ""Walter Pidgeon"", ""Lloyd Nolan"", ""Gladys George""]",0,1940-01-01,[],剧情
+M000176,Charley's Aunt.mp4,MP4,0,Mayo,"[""Kay Francis"", ""James Ellison"", ""Anne Baxter"", ""Laird Cregar"", ""Edmund Gwenn""]",0,1941-01-01,[],
+M000177,Orchestra Wives.mp4,MP4,0,Mayo,"[""Ann Rutherford"", ""George Montgomery"", ""Lynn Bari"", ""Glenn Miller"", ""Carole Landis""]",0,1942-01-01,[],音乐
+M000178,A Night in Casablanca.mp4,MP4,0,Mayo,"[""Groucho Marx"", ""Chico Marx"", ""Harpo Marx"", ""Sig Rumann"", ""Lisette Verea""]",0,1945-01-01,[],
+M000179,Angel On My Shoulder.mp4,MP4,0,Mayo,"[""Paul Muni"", ""Claude Rains"", ""Anne Baxter"", ""Erskine Sanford"", ""Hardie allbright""]",0,1946-01-01,[],
+M000180,The Snow Devils.mp4,MP4,0,Dawson,"[""Jack Stuart"", ""Amber Collins"", ""Rene Baldwin"", ""Wilbert Bradley"", ""Giacomo RossiStuart""]",0,1965-01-01,[],科幻
+M000181,The Incredible Two-headed Monster.mp4,MP4,0,Lanza,"[""Bruce Dern"", ""Pat Priest"", ""Casey Kasem"", ""Barry Kroeger""]",0,1970-01-01,[],
+M000182,Prisoner of War.mp4,MP4,0,Marton,"[""Ronald reagan"", ""Oscar Homolka"", ""Steve Forrest"", ""Harry Morgan"", ""Darryl Hickman""]",0,1954-01-01,[],剧情
+M000183,Crack in the World.mp4,MP4,0,Marton,"[""Dana Andrews"", ""Janette Scott"", ""Kieron Moore"", ""Alexander Knox""]",0,1965-01-01,[],科幻
+M000184,Birds Do It.mp4,MP4,0,Marton,"[""Soupy Sales"", ""Beverly Adams"", ""Tab Hunter"", ""Arthur OConnell""]",0,1966-01-01,[],喜剧
+M000185,Around the World Under the Sea.mp4,MP4,0,Marton,"[""Lloyd Bridges"", ""Shirley Eaton"", ""Brian Kelly"", ""David McCallum"", ""Keenan Wynn""]",0,1966-01-01,[],科幻
+M000186,Night of the Cobra Woman.mp4,MP4,0,A.Meyer,"[""Joy Bang"", ""Marlene Clark"", ""Roger Garrett"", ""Slash Marks""]",0,1973-01-01,[],恐怖
+M000187,The Golden Arrow.mp4,MP4,0,Margheriti,"[""Tab Hunter"", ""Rossana Podesta""]",0,1962-01-01,[],
+M000188,Pasazerka.mp4,MP4,0,Munk,"[""Aleksandra Slaska"", ""Anna Ciepielewska""]",0,1963-01-01,[],剧情
+M000189,Hon Dansade en Sommar.mp4,MP4,0,Mattsson,"[""Folke Sundquist"", ""Ulla Jacobson""]",0,1951-01-01,[],爱情
+M000190,Steelyard Blues.mp4,MP4,0,Myerson,"[""Donald Sutherland"", ""Jane Fonda"", ""Peter Boyle"", ""Gordon Goodrow"", ""Howard Hesseman""]",0,1973-01-01,[],
+M000191,Too Much Too Soon.mp4,MP4,0,Napoleon,"[""Dorothy Malone"", ""Errol Flynn"", ""Efrem Zimbalist~jr"", ""Neva Patterson"", ""Martin Milner""]",0,1958-01-01,[],传记
+M000192,At.mp4,MP4,0,Ozgenturk,"[""Genco Erkal"", ""Harun Yesilyurt"", ""Ayberk Colok""]",0,1982-01-01,[],剧情
+M000193,Shoot the Moon.mp4,MP4,0,A.Parker,"[""Diane Keaton"", ""Albert Finney"", ""Karen Allen"", ""Peter Weller""]",0,1982-01-01,[],剧情
+M000194,Mississippi Burning.mp4,MP4,0,A.Parker,"[""Willem Dafoe"", ""Frances McDormand"", ""Brad Dourif"", ""Park Overall"", ""Stephen Tobolowsky""]",0,1988-01-01,[],
+M000195,Come See the Paradise.mp4,MP4,0,A.Parker,"[""Tamlyn Tomita"", ""Dennis Quaid""]",0,1990-01-01,[],
+M000196,The Commitments.mp4,MP4,0,A.Parker,"[""Robert Arkins"", ""Andrew Strong"", ""Angelina Ball"", ""Michael Aherne"", ""Bronagh Gallagher""]",0,1991-01-01,[],音乐
+M000197,Evita.mp4,MP4,0,A.Parker,"[""Madonna"", ""Antonio Banderas"", ""Jonathan Pryce"", ""Jimmy Nail""]",0,1996-01-01,[],
+M000198,Bugsy Malone.mp4,MP4,0,A.Parker,"[""Scott Baio"", ""Jodie Foster""]",0,1977-01-01,[],音乐
+M000199,Force of Evil.mp4,MP4,0,Polonsky,"[""John Garfield"", ""Thomas Gomez"", ""Beatrice Pearson"", ""Marie Windsor"", ""Anne Revere""]",0,1948-01-01,[],悬疑
+M000200,Rosemary's Baby.mp4,MP4,0,Polonsky,"[""Mia Farrow"", ""Ralph Bellamy""]",0,1968-01-01,[],恐怖
+M000201,Tell Them Willie Boy is Here.mp4,MP4,0,Polonsky,"[""Robert Redford"", ""Katharine Ross"", ""Robert Blake"", ""Susan Clark"", ""Barry Sullivan""]",0,1969-01-01,[],
+M000202,Dante's Inferno.mp4,MP4,0,Padovan,"[""Arturo Pirovani"", ""Guiseppe diLiguoro""]",0,1911-01-01,[],
+M000203,Raven Hawk.mp4,MP4,0,Pyun,"[""Rachel McLish"", ""John Enos"", ""Ed Lauter"", ""Matt Clark""]",0,1996-01-01,[],剧情
+M000204,Providence.mp4,MP4,0,Resnais,"[""John Gielgud"", ""Dirk Bogarde"", ""Ellen Busteyn"", ""David Warner"", ""Elaine Stritch""]",0,1976-01-01,[],黑色电影
+M000205,Hiroshima Mon Amour.mp4,MP4,0,Resnais,"[""Emmanu\\`elle Rivas"", ""Eiji Okada""]",0,1959-01-01,[],剧情
+M000206,Last Year at Marienbad.mp4,MP4,0,Resnais,"[""Delphine Seyrig"", ""Giorgio Albertazzi"", ""Sacha Pitoeff"", ""Wilhelm vonDeek"", ""Jean Lanier""]",0,1960-01-01,[],
+M000207,Stavisky.mp4,MP4,0,Resnais,"[""JeanPaul Belmondo"", ""Charles Boyer"", ""Anna Duperey"", ""Francois Perier"", ""Michel Lonsdale""]",0,1974-01-01,[],黑色电影
+M000208,Trans-Europe Express.mp4,MP4,0,RobbeGrillet,"[""JeanLouis Trintignant"", ""Nadine Verdier"", ""Daniel Emilfork"", ""Charles Millot"", ""Henri Lambert""]",0,1966-01-01,[],悬疑
+M000209,The Shakiest Gun in the West.mp4,MP4,0,Rafkin,"[""Don Knotts"", ""Barbara Rhoades"", ""Jackie Coogan"", ""Don Barry""]",0,1967-01-01,[],
+M000210,Choose Me.mp4,MP4,0,Rudolph,"[""Lesley Ann Warren"", ""Genevieve Bujold"", ""Rae Dawn Chong"", ""Keith Carradine"", ""John Laroquette""]",0,1984-01-01,[],爱情
+M000211,`L'Amour poursuite'.mp4,MP4,0,Rudolph,"[""Tom Berenger"", ""Ann Magnusson"", ""Elizabeth Perkins"", ""Anne Archer""]",0,1989-01-01,[],
+M000212,Afterglow.mp4,MP4,0,Rudolph,"[""Julie Christie"", ""Nick Nolte"", ""Lara Flynn Boyle"", ""Jonny Lee Miller""]",0,1997-01-01,[],
+M000213,Welcome to L.A..mp4,MP4,0,Rudolph,"[""Keith Carradine"", ""Sally Kellerman"", ""Geraldine Chaplin"", ""Harvey Keitel""]",0,1976-01-01,[],喜剧
+M000214,Carnival Boat.mp4,MP4,0,Rogell,"[""Bill Boyd"", ""Fred Kohler"", ""Gonger Rogers"", ""Hobart Bosworth"", ""Marie Prevost""]",0,1926-01-01,[],
+M000215,The Black Cat.mp4,MP4,0,Rogell,"[""Basil Rathbone"", ""Gladys Coioper"", ""Broderick Crawford"", ""Hugh Herbert"", ""Gale Sondergaard""]",0,1941-01-01,[],
+M000216,Body and Soul.mp4,MP4,0,Santell,"[""Charles Farrell"", ""Elissa Landi"", ""Humphrey Bogart"", ""Myrna Loy"", ""Donald Dillaway""]",0,1931-01-01,[],剧情
+M000217,Rebecca of Sunnybrook Farm.mp4,MP4,0,Santell,"[""Marian Nixan"", ""Ralph Bellamy"", ""Mae Marsh"", ""Louise Closser Hale"", ""Alan Hale""]",0,1932-01-01,[],剧情
+M000218,People Will Talk.mp4,MP4,0,Santell,"[""Cary Grant"", ""Hume Cronin"", ""Sidney Blackmer""]",0,1935-01-01,[],喜剧
+M000219,Winterset.mp4,MP4,0,Santell,"[""Burgess Meredith"", ""Margo""]",0,1936-01-01,[],剧情
+M000220,All The Way Home.mp4,MP4,0,A.Segal,"[""Robert Preston"", ""Jean Simmons"", ""Aline McMahon"", ""Pat Hingle"", ""Michael Kearney""]",0,1963-01-01,[],剧情
+M000221,"Alice, Sweet Alice.mp4",MP4,0,Sole,"[""Brooke Shields"", ""Linda Miller"", ""Paula Sheppard""]",0,1977-01-01,[],
+M000222,The Great Adventure.mp4,MP4,0,Sucksdorff,"[""Anders Norberg"", ""Kjell Sucksdorff"", ""Arne Sucksdorff""]",0,1953-01-01,[],
+M000223,Jonah Who Will Be 25 in the Year 2000.mp4,MP4,0,Tanner,"[""JeanLuc Bideau"", ""Raymond Bussieres""]",0,1976-01-01,[],喜剧
+M000224,A Flame in My Heart.mp4,MP4,0,Tanner,"[""Myriam Mezieres"", ""Aziz Khabouch"", ""Benoit Regent""]",0,1987-01-01,[],
+M000225,La Salamandre.mp4,MP4,0,Tanner,"[""Bulle Ogier"", ""JeanLuc Bideau"", ""Jacques Denis""]",0,1971-01-01,[],
+M000226,Scene of the Crime.mp4,MP4,0,Techine,"[""Catherine Deneuve"", ""Wadeck Stanczak"", ""Danielle Darrieux"", ""Nicolas Giraudi"", ""Claire Nebout""]",0,1987-01-01,[],
+M000227,Les Voleurs.mp4,MP4,0,Techine,"[""Daniel Auteuil"", ""Didier Bezac"", ""Laurence cote"", ""Catherine Deneuve""]",0,1996-01-01,[],悬疑
+M000228,Barocco.mp4,MP4,0,Techine,"[""Isabelle Adjani"", ""Gerard Depardieu""]",0,1977-01-01,[],
+M000229,Bandolero!.mp4,MP4,0,McLaglen,"[""James Stewart"", ""Dean Martin"", ""Raquel Welch"", ""George Kennedy"", ""Andrew Prine""]",0,1968-01-01,[],
+M000230,The Undefeated.mp4,MP4,0,McLaglen,"[""John Wayne"", ""Rock Hudson"", ""Lee Meriwether"", ""Tony Aguilar"", ""Roman Gabriel""]",0,1969-01-01,[],
+M000231,Hellfighters.mp4,MP4,0,McLaglen,"[""John Wayne"", ""Jin Hutton"", ""Katherine Ross"", ""Vera Miles"", ""Bruce cabot""]",0,1971-01-01,[],
+M000232,The Abductors.mp4,MP4,0,McLaglen,"[""Victor McLaglen"", ""Gavin Muir"", ""George Macready""]",0,1956-01-01,[],剧情
+M000233,The Wild Geese.mp4,MP4,0,McLaglen,"[""Roger Moore"", ""Richard Burton"", ""Richard Harris"", ""Hardy Kruger"", ""Stewart Granger""]",0,1978-01-01,[],
+M000234,The Way West.mp4,MP4,0,McLaglen,"[""Kirk Douglas"", ""Robert Mitchum""]",0,1966-01-01,[],
+M000235,"Die T\""ur mit den Sieben Schl\:ossern.mp4",MP4,0,Vohrer,"[""Klaus Kinski"", ""Heinz Drache"", ""Ady Berber"", ""Sabine Sesselman""]",0,1962-01-01,[],恐怖
+M000236,Innocent Sorcerers.mp4,MP4,0,Wajda,"[""Tadeusz Lomnicki"", ""Krystyna Stypulnicki""]",0,1960-01-01,[],爱情
+M000237,Everything for Sale.mp4,MP4,0,Wajda,"[""Andrzej Lapicki"", ""Bogumil Kobiela"", ""Daniel Olbrychiski""]",0,1967-01-01,[],
+M000238,Birch Wood.mp4,MP4,0,Wajda,"[""Olgierd Lukaszewicz"", ""Daniel Olbrychiski""]",0,1970-01-01,[],爱情
+M000239,Man of Marble.mp4,MP4,0,Wajda,"[""Krystyna Janda"", ""Jerzy Radziwilowicz""]",0,1977-01-01,[],
+M000240,Orchestra Conductor.mp4,MP4,0,Wajda,"[""Krystyna Janda"", ""John Gielgud"", ""Andrzej Seweryn""]",0,1980-01-01,[],
+M000241,Man of Iron.mp4,MP4,0,Wajda,"[""Jerzy Radziwilowicz"", ""Krystyna Janda"", ""Lech Walesa""]",0,1980-01-01,[],
+M000242,Danton.mp4,MP4,0,Wajda,"[""Gerard Depardieu"", ""Wojciek Pszoniak"", ""Patrice Chereau"", ""Roger Planchon""]",0,1983-01-01,[],剧情
+M000243,A Love in Germany.mp4,MP4,0,Wajda,"[""Hanna Schygulla"", ""Piotr Lysak"", ""Armin MuellerStahl""]",0,1983-01-01,[],
+M000244,The Possessed.mp4,MP4,0,Wajda,"[""Jerzy Radziwilowicz"", ""Isabelle Huppert"", ""Bernard Blier"", ""Lambert Wilson"", ""Omar Sharif""]",0,1988-01-01,[],
+M000245,Chronicle of a Love Affair.mp4,MP4,0,Wajda,"[""Piotr Wawrzynczak"", ""Tadeus Konwicki""]",0,1990-01-01,[],爱情
+M000246,A Generation.mp4,MP4,0,Wajda,"[""Tadeusz Lomnicki"", ""Tadeusz Janczar""]",0,1954-01-01,[],剧情
+M000247,A Private Function.mp4,MP4,0,A.Bennett,"[""Michael Palin"", ""Maggie Smith"", ""Denholm Elliott"", ""Richard Griffiths"", ""Tony Haygarth""]",0,1984-01-01,[],喜剧
+M000248,Il processo Clemenceau.mp4,MP4,0,deAntoni,"[""Francesca Bertini"", ""Gustavo Serena"", ""Alfredo DeAntoni"", ""Lido Manetti"", ""Nella Montagna""]",0,1917-01-01,[],剧情
+M000249,Ms.~45.mp4,MP4,0,Ferrara,"[""Zoe Tamerlis"", ""Jack Thibeau"", ""Peter Yellen""]",0,1981-01-01,[],
+M000250,Bad Luitenant.mp4,MP4,0,Ferrara,"[""Harvey Keitel"", ""Zoe Lund"", ""Frankie Thorn""]",0,1992-01-01,[],
+M000251,Dangerous Game.mp4,MP4,0,Ferrara,"[""Madonna"", ""Harvey Keitel"", ""James Russo""]",0,1993-01-01,[],
+M000252,Body Snatchers.mp4,MP4,0,Ferrara,"[""Gabrielle Anwar"", ""Terry Kinney"", ""Meg Tilly"", ""Reilly Murphy""]",0,1994-01-01,[],
+M000253,The Constant Nymph.mp4,MP4,0,Brunel,"[""Ivor Novello"", ""Mary Clare"", ""Mabel Poulton"", ""Benita Hume""]",0,1927-01-01,[],爱情
+M000254,Fatal Attraction.mp4,MP4,0,Lyne,"[""Michael Douglas"", ""Glenn Close"", ""Anne Archer"", ""Ellen Hamilton Latzen"", ""Stuart Pankin""]",0,1988-01-01,[],爱情
+M000255,Jacob's Ladder.mp4,MP4,0,Lyne,"[""Tim Robbins"", ""Elizabeth Pena"", ""Danny Aiello"", ""Patricia Kalember""]",0,1990-01-01,[],剧情
+M000256,Indecent Proposal.mp4,MP4,0,Lyne,"[""Woody Harrison"", ""Demi Moore"", ""Robert Redford"", ""Tommy Rile"", ""Oliver Platt""]",0,1993-01-01,[],剧情
+M000257,Lolita.mp4,MP4,0,Lyne,"[""Jeremy Irons"", ""Dominique Swain"", ""Melanie Griffith"", ""Frank Langella"", ""Ben Silverstone""]",0,1997-01-01,[],剧情
+M000258,Flashdance.mp4,MP4,0,Lyne,"[""Jennifer Beale"", ""Michael Nouri"", ""Lilia Skala"", ""Sunny Johnson"", ""Kyle T. Hefner""]",0,1983-01-01,[],音乐
+M000259,Nine 1/2 Weeks.mp4,MP4,0,Lyne,"[""Kim Basinger"", ""Mickey Rourke"", ""Margaret Whitton"", ""Karen Young"", ""Roderick Cook""]",0,1986-01-01,[],
+M000260,Rashomon.mp4,MP4,0,Kurosawa,"[""Toshiro Mifune"", ""Kyo Machiko"", ""Masayuki Mori"", ""Takashi Shimura""]",0,1950-01-01,[],
+M000261,Ugetsu.mp4,MP4,0,Kurosawa,"[""Kenji Mizoguchi"", ""Kinuyo Tanaka"", ""Machiko Kyo""]",0,1951-01-01,[],剧情
+M000262,Shichinin no Samurai.mp4,MP4,0,Kurosawa,"[""Toshiro Mifune"", ""Takashi Shimura"", ""Kuninori Kodo"", ""Daisuke Kato"", ""Minoru Chaiki""]",0,1954-01-01,[],
+M000263,High and Low.mp4,MP4,0,Kurosawa,"[""Toshiro Mifune"", ""Tasuya Nkadai""]",0,1963-01-01,[],悬疑
+M000264,Ran.mp4,MP4,0,Kurosawa,"[""Mieko Harada"", ""Tatsuya Nakadai"", ""Peter"", ""Hisahi Ikawa"", ""Satoshi Terao""]",0,1986-01-01,[],
+M000265,Akira Kurosawa Dreams.mp4,MP4,0,Kurosawa,"[""Akira Terao"", ""Mieko Harada"", ""Martin Scorsese"", ""Chishu Ryu""]",0,1990-01-01,[],喜剧
+M000266,Rhapsody in August.mp4,MP4,0,Kurosawa,"[""Richard Gere"", ""Sachiko Murase""]",0,1991-01-01,[],剧情
+M000267,Drunken Angel.mp4,MP4,0,Kurosawa,"[""Toshiro Mifune"", ""Takashi Shimura""]",0,1948-01-01,[],
+M000268,Dracula vs. Frankenstein.mp4,MP4,0,Adamson,"[""J.Carrol Naish"", ""Lon Chaney~jr."", ""Zandor Vorkov"", ""Regina Carrol"", ""Angelo Rossito""]",0,1969-01-01,[],恐怖
+M000269,Dracula's Dog.mp4,MP4,0,Bano,"[""Reggie Nalder"", ""Michael Pataki"", ""Jose Ferrer""]",0,1978-01-01,[],恐怖
+M000270,Tous Les Matins Du Monde.mp4,MP4,0,Corneau,"[""Gerard Depardieu"", ""Anne Brochet"", ""JeanPiere Marielle"", ""Caroline Sihol"", ""Carole Richert""]",0,1992-01-01,[],
+M000271,The Doctor Takes a Wife.mp4,MP4,0,A.Hall,"[""Loretta Young"", ""Ray Milland"", ""Edmund Gwenn"", ""Reginald Gardiner"", ""Charles Halton""]",0,1940-01-01,[],
+M000272,Here Comes Mr.~Jordan.mp4,MP4,0,A.Hall,"[""Robert Montgomery"", ""Edward Everett Horton"", ""Evelyn Keyes"", ""Claude Rains"", ""James Gleason""]",0,1941-01-01,[],爱情
+M000273,Once Upon A Time.mp4,MP4,0,A.Hall,"[""Cary Grant"", ""Janet Blair"", ""James Gleason"", ""Ted Donaldson"", ""William Demarest""]",0,1944-01-01,[],
+M000274,Let's do it Again.mp4,MP4,0,A.Hall,"[""Jane Wyman"", ""Ray Milland"", ""Aldo Ray""]",0,1953-01-01,[],
+M000275,To Be or Not To Be.mp4,MP4,0,A.Johnson,"[""Anne Bancroft"", ""Mel Brooks"", ""Tim Matheson"", ""Christopher Lloyd"", ""Jose Ferrer""]",0,1983-01-01,[],喜剧
+M000276,The Photographer and the Undertaker.mp4,MP4,0,March,"[""Jack Cassidy"", ""Harry Townes"", ""Jocelyn Lane""]",0,1965-01-01,[],悬疑
+M000277,The Eyes of Youth.mp4,MP4,0,Albert~Parker,"[""Clara Kimball Young"", ""Gareth Hughes"", ""Pauline Starke"", ""Sam Sothern"", ""Milton Sills""]",0,1919-01-01,[],剧情
+M000278,Saint Louis Blues.mp4,MP4,0,A.Reisner,"[""Nat King Cole"", ""Eartha Kitt"", ""Pearl Bailey"", ""Cab Calloway"", ""Ella Fitzgerald""]",0,1958-01-01,[],
+M000279,Dual Alibi.mp4,MP4,0,Travers,"[""Herbert Lom"", ""Phyllis Dixey"", ""Ronald Frankau"", ""Terence deMarmey"", ""Abraham safaer""]",0,1947-01-01,[],剧情
+M000280,The House of Rothschild.mp4,MP4,0,Werker,"[""George Arliss"", ""Loretta Young"", ""Boris Karloff"", ""Robert Young"", ""C.Aubrey Smith""]",0,1934-01-01,[],
+M000281,The Adventures of Sherlock Holmes.mp4,MP4,0,Werker,"[""Basil Rathbone"", ""Nigel Bruce"", ""George Zucco"", ""Ida Lupino"", ""Alan Marshall""]",0,1939-01-01,[],
+M000282,On Her Bed of Roses.mp4,MP4,0,Zugsmith,"[""Sandra Lynn"", ""Ric Marlowe"", ""Stephen Long""]",0,1966-01-01,[],
+M000283,College Confidential.mp4,MP4,0,Zugsmith,"[""Steve Allen"", ""Jayne Meadows"", ""Mamie vanDoren"", ""Conway Twitty"", ""Walter Winchell""]",0,1960-01-01,[],
+M000284,Sex Kittens go to College.mp4,MP4,0,Zugsmith,"[""Mamie vanDoren"", ""Tuesday Weld"", ""Mijanou Bardot"", ""Mickey Shaughnessy"", ""Louis Nye""]",0,1960-01-01,[],
+M000285,Fast Times at Ridgemont High.mp4,MP4,0,Heckerling,"[""Sean Penn"", ""Phoebe Cates"", ""Jennifer Jason Leigh"", ""Brian Backus"", ""Robert Romanus""]",0,1982-01-01,[],喜剧
+M000286,National Lampoon's European Vacation.mp4,MP4,0,Heckerling,"[""Chevy Chase"", ""Beverly DAngelo"", ""Jason Lively"", ""Dana Hill"", ""Eric Idle""]",0,1985-01-01,[],喜剧
+M000287,The Freshman.mp4,MP4,0,A.Bergman,"[""Matthew Broderick"", ""Marlon Brando"", ""Penelope Ann Miller"", ""Bruno Kirby"", ""Paul Benedict""]",0,1990-01-01,[],喜剧
+M000288,Striptease.mp4,MP4,0,A.Bergman,"[""Demi Moore"", ""Burt Reynolds""]",0,1996-01-01,[],
+M000289,Honeymoon in Vegas.mp4,MP4,0,A.Bergman,"[""Nichalos Cage"", ""Sarah Jessica Parker"", ""James Caan""]",0,1981-01-01,[],喜剧
+M000290,L'Uomo Meccanico.mp4,MP4,0,Deed,"[""Andre Deed"", ""Valentina Frascaroli"", ""Mathilde Lambert"", ""Gabriel Moreau"", ""Fernando VivasMay""]",0,1921-01-01,[],
+M000291,The Furies.mp4,MP4,0,Ant.Mann,"[""Barbara Stanwyck"", ""Walter Huston"", ""Wendell Corey"", ""Judith Anderson"", ""Gilbert Roland""]",0,1950-01-01,[],
+M000292,Bend of the River.mp4,MP4,0,Ant.Mann,"[""James Stewart"", ""Julia Adams"", ""Arthur Kennedy""]",0,1951-01-01,[],
+M000293,The Naked Spur.mp4,MP4,0,Ant.Mann,"[""James Stewart"", ""Robert Ryan""]",0,1953-01-01,[],
+M000294,The Glenn Miller Story.mp4,MP4,0,Ant.Mann,"[""James Stewart"", ""June Allyson"", ""Harry Morgan"", ""Charles Drake"", ""Frances Langford""]",0,1954-01-01,[],
+M000295,Strategic Air Command.mp4,MP4,0,Ant.Mann,"[""James Stewart"", ""June Allyson"", ""Stan Musial"", ""James Millican"", ""Frank Lovejoy""]",0,1955-01-01,[],
+M000296,Serenade.mp4,MP4,0,Ant.Mann,"[""Mario Lanza"", ""Joan Fontaine"", ""Sarita Montiel"", ""Vincent Price"", ""Joseph Calleia""]",0,1955-01-01,[],
+M000297,Cimarron.mp4,MP4,0,Ant.Mann,"[""Glenn Ford"", ""Maria Schell"", ""Anne Baxter"", ""Lili Darvas"", ""Russ Tamblyn""]",0,1960-01-01,[],
+M000298,El Cid.mp4,MP4,0,Ant.Mann,"[""Charlton Heston"", ""Sophia Loren"", ""Raf Vallone"", ""Geraldine Page"", ""John Fraser""]",0,1961-01-01,[],
+M000299,The Fall of the Roman Empire.mp4,MP4,0,Ant.Mann,"[""Alec Guiness"", ""Christopher Plummer"", ""Stephen Boyd"", ""James Mason"", ""Sophia Loren""]",0,1964-01-01,[],
+M000300,Middlemarch.mp4,MP4,0,A.Page,"[""Robert Hardy"", ""Michael Hodern"", ""Mary Garth"", ""Fred Vincy"", ""Peter Jeffrey""]",0,1979-01-01,[],剧情
+M000301,I Never Promised You a Rose Garden.mp4,MP4,0,A.Page,"[""Bibi Anderson"", ""Kathleen Quinlan"", ""Sylvia Sidney"", ""Diane Varsi"", ""Susan Tyrrell""]",0,1977-01-01,[],剧情
+M000302,The Lady Vanishes.mp4,MP4,0,A.Page,"[""Cybill Shepherd"", ""Elliott Gould"", ""Angela Lansbury"", ""Herbert Lom"", ""Arthur Lowe""]",0,1979-01-01,[],
+M000303,The Great Victor Herbert.mp4,MP4,0,And.Stone,"[""Walter Connolly"", ""Allan Jones"", ""Mary Martin"", ""Suasanna Foster"", ""Lee Bowman""]",0,1942-01-01,[],
+M000304,Julie.mp4,MP4,0,And.Stone,"[""Doris Day"", ""Louis Jourdan""]",0,1956-01-01,[],
+M000305,Stormy Weather.mp4,MP4,0,And.Stone,"[""Bojangles Robinson"", ""Fats Waller"", ""Cab Calloway"", ""Lena Horne"", ""Dooley Wilson""]",0,1942-01-01,[],
+M000306,The Great Waltz.mp4,MP4,0,And.Stone,"[""Horst Buchholz"", ""Mary Costa"", ""Rossano Brazzi"", ""Yvonne Mitchell"", ""Nigel Patrick""]",0,1972-01-01,[],音乐
+M000307,Solaris.mp4,MP4,0,Tarkovsky,"[""Natalya Bondartchuk"", ""Donatas Banionis"", ""Yury Yarvet""]",0,1972-01-01,[],
+M000308,Flight to the East.mp4,MP4,0,Hiller,"[""Gary Merrill"", ""Patricia Cutts"", ""Konstantin Shayne"", ""Anthony George"", ""Harvey Stevens""]",0,1958-01-01,[],悬疑
+M000309,Disappearing Trick.mp4,MP4,0,Hiller,"[""Robert Horton"", ""Betsy vonFurstenberg""]",0,1958-01-01,[],悬疑
+M000310,The Festive Season.mp4,MP4,0,Hiller,"[""Carmen Mathews"", ""Richard Waring"", ""Edmon Ryan"", ""Benny Baker""]",0,1958-01-01,[],悬疑
+M000311,Post-Mortem.mp4,MP4,0,Hiller,"[""Steve Forrest"", ""Joanna Moore"", ""James Gregory"", ""Fred Robbins""]",0,1958-01-01,[],悬疑
+M000312,The Voice in the Night.mp4,MP4,0,Hiller,"[""James Donald"", ""Barbara Rush""]",0,1958-01-01,[],
+M000313,The Jokester.mp4,MP4,0,Hiller,"[""Albert Salmi"", ""Roscoe Ates""]",0,1958-01-01,[],悬疑
+M000314,And the Desert Shall Blossom.mp4,MP4,0,Hiller,"[""William Demarest"", ""Roscoe Ates"", ""Ben Johnson"", ""Mike Kellin""]",0,1958-01-01,[],悬疑
+M000315,Mrs.~Herman and Mrs.~Fenimore.mp4,MP4,0,Hiller,"[""Mary Astor"", ""Doro Merande"", ""Russell Collins"", ""Wesley Lou""]",0,1958-01-01,[],悬疑
+M000316,The Morning of the Bride.mp4,MP4,0,Hiller,"[""Barbara BelGeddes"", ""Don Dubbins"", ""Pat Hitchcock"", ""Helen Conrad""]",0,1959-01-01,[],悬疑
+M000317,The Right Price.mp4,MP4,0,Hiller,"[""Allyn Joslyn"", ""Jane Dulo"", ""Eddie Foy~jr""]",0,1959-01-01,[],悬疑
+M000318,Not the Running Type.mp4,MP4,0,Hiller,"[""Paul Hartman"", ""Robert Bray"", ""Bert Freed"", ""Wendell Holmes""]",0,1960-01-01,[],悬疑
+M000319,Across the Threshold.mp4,MP4,0,Hiller,"[""Patricia Collinge"", ""George Grizzard"", ""Barbara Baxley""]",0,1960-01-01,[],悬疑
+M000320,Forty Detectives Later.mp4,MP4,0,Hiller,"[""James Franciscus"", ""George Munroe"", ""George Mitchell"", ""Arlene McQuade"", ""Robert Kelljian""]",0,1960-01-01,[],悬疑
+M000321,The Doubtful Doctor.mp4,MP4,0,Hiller,"[""Dick York"", ""John Zaremba"", ""Gena Rowlands"", ""Michael Burns"", ""Joe Julia""]",0,1960-01-01,[],
+M000322,The Baby Blue Expression.mp4,MP4,0,Hiller,"[""Richard Gaines"", ""Peter Walker"", ""Sarah Marshall""]",0,1960-01-01,[],悬疑
+M000323,A Woman's Help.mp4,MP4,0,Hiller,"[""Scott McKay"", ""Geraldine Fitzgerald"", ""Antoinette Bower"", ""Lillian OMalley"", ""Leon Lontok""]",0,1961-01-01,[],悬疑
+M000324,Make my Deathbed.mp4,MP4,0,Hiller,"[""Diana vanderVlis"", ""James Best"", ""Madeleine Sherwood"", ""Joe Flynn""]",0,1961-01-01,[],悬疑
+M000325,The Out-of-Towners.mp4,MP4,0,Hiller,"[""Jack Lemmon"", ""Sandy Dennis"", ""Carlos Montalban""]",0,1970-01-01,[],喜剧
+M000326,Love Story.mp4,MP4,0,Hiller,"[""Ryan ONeal"", ""Ali MacGraw"", ""Tommy Lee Jones""]",0,1970-01-01,[],
+M000327,The Hospital.mp4,MP4,0,Hiller,"[""George C. Scott"", ""Diana Rigg"", ""Barnard Hughes"", ""Richard Dysart"", ""Nancy Marchand""]",0,1971-01-01,[],
+M000328,Silver Streak.mp4,MP4,0,Hiller,"[""Jill Clayburgh"", ""Gene Wilder"", ""Richard Pryor""]",0,1977-01-01,[],
+M000329,The In-Laws.mp4,MP4,0,Hiller,"[""Peter Falk"", ""Alan Arkin"", ""Richard Libertini"", ""Penny Peyser"", ""Nancy Dussault""]",0,1979-01-01,[],喜剧
+M000330,"Author, Author.mp4",MP4,0,Hiller,"[""Al Pacino"", ""Dyan Cannon"", ""Tuesday Weld"", ""Andre Gregory"", ""Bob""]",0,1982-01-01,[],剧情
+M000331,Teacher.mp4,MP4,0,Hiller,"[""Nick Nolte"", ""JoBeth Williams"", ""Judd Hirsch"", ""Ralph Macchio"", ""Richard Mulligan""]",0,1984-01-01,[],喜剧
+M000332,"See No Evil, Hear No Evil.mp4",MP4,0,Hiller,"[""Gene Wilder"", ""Richard Pryor"", ""Joan Severance"", ""Kevin Spacey"", ""Anthony Zerbe""]",0,1989-01-01,[],喜剧
+M000333,The Babe.mp4,MP4,0,Hiller,"[""John Goodman"", ""Trini Alvarado"", ""Kelly McGinnis""]",0,1992-01-01,[],传记
+M000334,Risky Business.mp4,MP4,0,Lubin,"[""Dorothea Kent"", ""Eduardo Cianelli""]",0,1938-01-01,[],
+M000335,Black Friday.mp4,MP4,0,Lubin,"[""Boris Karloff"", ""Bela Lugosi"", ""Stanley Ridges"", ""Anne Nagel"", ""Anne Gwynne""]",0,1940-01-01,[],恐怖
+M000336,San Francisco Docks.mp4,MP4,0,Lubin,"[""Burgess Meredith"", ""Irene Hervey"", ""Raymond Walburn"", ""Barry Fitzgerald"", ""Robert Armstrong""]",0,1941-01-01,[],剧情
+M000337,Buck Privates.mp4,MP4,0,Lubin,"[""Bud Abbott"", ""Lou Costello"", ""Lee Bowman"", ""Alan Curtis"", ""Jane Frazee""]",0,1941-01-01,[],喜剧
+M000338,Hold That Ghost.mp4,MP4,0,Lubin,"[""Bud Abbott"", ""Lou Costello"", ""Joan Davis"", ""The Andrews~Sisters"", ""Richard Carlson""]",0,1941-01-01,[],喜剧
+M000339,The Phantom of the Opera.mp4,MP4,0,Lubin,"[""Claude Rains"", ""Susanna Foster"", ""Nelson Eddy"", ""Hume Cronyn"", ""Edgar Barrier""]",0,1943-01-01,[],恐怖
+M000340,The Spider Woman Strikes Back.mp4,MP4,0,Lubin,"[""Gale Sondergard"", ""Brenda Joyce"", ""Rondo Hatton"", ""Milburn Stone""]",0,1946-01-01,[],悬疑
+M000341,Thief of Bagdad.mp4,MP4,0,Lubin,"[""Steve Reeves"", ""Georgia Moll"", ""Arturo Dominici""]",0,1961-01-01,[],
+M000342,The Left Handed Gun.mp4,MP4,0,A.Penn,"[""Paul Newman"", ""Hurd Hatfield"", ""Lita Milan"", ""John Dehner"", ""Denver Pyle""]",0,1958-01-01,[],
+M000343,Little Big Man.mp4,MP4,0,A.Penn,"[""Dustin Hoffman"", ""Faye Dunaway"", ""Martin Balsam"", ""Chief Dan George"", ""Richard Mulligan""]",0,1970-01-01,[],
+M000344,Night Moves.mp4,MP4,0,A.Penn,"[""Gene Hackman"", ""Susan Clark"", ""Edward Binns"", ""Harris Yulin"", ""Kenneth Mars""]",0,1975-01-01,[],
+M000345,The Missouri Breaks.mp4,MP4,0,A.Penn,"[""Marlon Brando"", ""Jack Nicholson"", ""Randy Quaid"", ""Kathleen Lloyd"", ""Frederic Forrest""]",0,1976-01-01,[],
+M000346,The Chase.mp4,MP4,0,A.Penn,"[""Marlon Brando"", ""Jane Fonda"", ""James Fox"", ""Robert Duvall"", ""Robert Redford""]",0,1966-01-01,[],
+M000347,Bonnie and Clyde.mp4,MP4,0,A.Penn,"[""Warren Beatty"", ""Faye Dunaway"", ""Gene Hackman"", ""Estelle Parsons"", ""Michael J. Pollard""]",0,1967-01-01,[],
+M000348,The Informer.mp4,MP4,0,Robinson,"[""Lars Hansen"", ""Lya dePutti""]",0,1929-01-01,[],
+M000349,Cat Women of the Moon.mp4,MP4,0,Hilton,"[""Sonny Tufts"", ""Victor Jory"", ""Marie Windsor""]",0,1953-01-01,[],
+M000350,Thunder Road.mp4,MP4,0,Ripley,"[""Robert Mitchum"", ""James Mitchum"", ""Keely Smith"", ""Gene Barry"", ""Sandra Knight""]",0,1958-01-01,[],
+M000351,The Vampire Dancer.mp4,MP4,0,Blom,"[""Carl Schenstrom"", ""Clara Wieth"", ""Robert Dinesen"", ""Julie Hendriksen""]",0,1911-01-01,[],剧情
+M000352,Hold That Hypnotist.mp4,MP4,0,Jewell,"[""The Bowery Boys"", ""Mel Wells"", ""Stanley Clements""]",0,1957-01-01,[],喜剧
+M000353,A Cold Wind in August.mp4,MP4,0,A.Singer,"[""Lola Albright"", ""Scott Marlowe"", ""Joe deSantis"", ""Hershel Bernardi""]",0,1961-01-01,[],剧情
+M000354,Tragedy of a Ridiculous Man.mp4,MP4,0,Bertolucci,"[""Ugo Tognazzi"", ""Anouk Aimee""]",0,1981-01-01,[],剧情
+M000355,The Last Emperor.mp4,MP4,0,Bertolucci,"[""John Lone"", ""Joan Chen"", ""Peter OToole"", ""Jade Go"", ""Vivian Wu""]",0,1987-01-01,[],传记
+M000356,The Sheltering Sky.mp4,MP4,0,Bertolucci,"[""Debra Winger"", ""John Malkovich"", ""Campbell Scott"", ""Jill Bennett"", ""Timothy Spall""]",0,1990-01-01,[],剧情
+M000357,The Little Buddha.mp4,MP4,0,Bertolucci,"[""Keanu Reeves"", ""Jane Fonda"", ""Chris Isaak""]",0,1994-01-01,[],剧情
+M000358,"Murder, Incorporated.mp4",MP4,0,Burt~Balaban,"[""Stuart Whitman"", ""Mai Britt"", ""Henry Morgan"", ""Peter Falk"", ""David J. Stewart""]",0,1957-01-01,[],剧情
+M000359,The Spider's Stratagem.mp4,MP4,0,Bertolucci,"[""Giulio Brogi"", ""Alida Valli"", ""Tino Scotti"", ""Pino Campaninin""]",0,1970-01-01,[],剧情
+M000360,Il Conformista.mp4,MP4,0,Bertolucci,"[""JeanLouis Trintignant"", ""Stefani Sandrelli"", ""Dominique Sanda"", ""Pierre Clementi"", ""Gastoni Moschin""]",0,1971-01-01,[],剧情
+M000361,Last Tango in Paris.mp4,MP4,0,Bertolucci,"[""Marlon Brando"", ""Maria Schneider"", ""JaenPierre Leaud"", ""Massimo Girotti"", ""Catherine Allegret""]",0,1972-01-01,[],爱情
+M000362,Novecento.mp4,MP4,0,Bertolucci,"[""Burt Lancaster"", ""Robert deNiro"", ""Gerard Depardieu"", ""Dominique Sanda"", ""Donald Sutherland""]",0,1976-01-01,[],
+M000363,Luna.mp4,MP4,0,Bertolucci,"[""Jill Clayburgh"", ""Matthew Barry""]",0,1977-01-01,[],
+M000364,Dona Flor and Her Two Husbands.mp4,MP4,0,B.Barreto,"[""Sonia Braga"", ""Jose Wilker"", ""Mauro Mendonco""]",0,1976-01-01,[],
+M000365,One Tough Cop.mp4,MP4,0,B.Barreto,"[""Stephen Baldwin"", ""Chris Penn""]",0,1998-01-01,[],
+M000366,The Goldiggers of 1935.mp4,MP4,0,Berkeley,"[""Dick Powell"", ""Adolphe Menjou"", ""Gloria Stuart"", ""Alice Brady"", ""Glenda Farrell""]",0,1935-01-01,[],音乐
+M000367,Strike Up the Band.mp4,MP4,0,Berkeley,"[""Judy Garland"", ""Mickey Rooney"", ""Paul Whiteman"", ""June Preisser"", ""Ann Shoemaker""]",0,1940-01-01,[],音乐
+M000368,Babes on Broadway.mp4,MP4,0,Berkeley,"[""Judy Garland"", ""Mickey Rooney"", ""Richard Quine"", ""Ray McDonald"", ""James Gleason""]",0,1941-01-01,[],音乐
+M000369,For Me and My Gal.mp4,MP4,0,Berkeley,"[""Gene Kelly"", ""Judy Garland""]",0,1942-01-01,[],音乐
+M000370,The Gang's All Here.mp4,MP4,0,Berkeley,"[""Alice Faye"", ""Carmen Miranda"", ""Phil Baker"", ""Benny Goodman"", ""Eugene Pallette""]",0,1943-01-01,[],音乐
+M000371,Take Me Out To The Ball Game.mp4,MP4,0,Berkeley,"[""Gene Kelly"", ""Frank Sinatra"", ""Esther Williams"", ""Betty Garrett"", ""Jules Munshin""]",0,1949-01-01,[],
+M000372,The Tall T.mp4,MP4,0,Boetticher,"[""Randolph Scott"", ""Richard Boone""]",0,1957-01-01,[],
+M000373,Tatoo.mp4,MP4,0,B.Brooks,"[""Bruce Dern"", ""Maud Adams""]",0,1980-01-01,[],
+M000374,Bruce Brown's The Endless Summer II.mp4,MP4,0,Br.Brown,"[""Robert Weaver"", ""Patrick OConnell""]",0,1966-01-01,[],爱情
+M000375,Murder by Decree.mp4,MP4,0,B.Clark,"[""Christopher Plummer"", ""James Mason"", ""Donald Sutherland"", ""Anthony Quayle"", ""David Hemmings""]",0,1979-01-01,[],
+M000376,Tribute.mp4,MP4,0,B.Clark,"[""Jack Lemmon"", ""Lee Remick"", ""Colleen Dewhurst"", ""Kim Catrall"", ""John Marley""]",0,1979-01-01,[],剧情
+M000377,The Tenth Man.mp4,MP4,0,Hurst,"[""John Lodge"", ""Antoinette Celier"", ""Aileen Marson"", ""Clifford Evans"", ""George Graves""]",0,1936-01-01,[],剧情
+M000378,Scrooge.mp4,MP4,0,Hurst,"[""Alastair Simms"", ""Mervyn Johns"", ""Michael Hodern"", ""Francis deWolff"", ""Michael Dolan""]",0,1950-01-01,[],剧情
+M000379,Escape.mp4,MP4,0,Dean,"[""Gerald duMaurier"", ""Edna Best"", ""Madeleine Carroll"", ""Gordon Harker"", ""Felix Aylmer""]",0,1932-01-01,[],剧情
+M000380,The Constant Nymph.mp4,MP4,0,Dean,"[""Brian Aherne"", ""Victoria Hopper"", ""Leonora Corbett"", ""Lyn Harding"", ""Mary Clare""]",0,1933-01-01,[],爱情
+M000381,The Pink Panther.mp4,MP4,0,B.Edwards,"[""David Niven"", ""Peter Sellers"", ""Capucine"", ""Claudia Cardinale"", ""Robert Wagner""]",0,1963-01-01,[],喜剧
+M000382,A Shot in the Dark.mp4,MP4,0,B.Edwards,"[""Peter Sellers"", ""Elke Sommer"", ""George Sanders""]",0,1964-01-01,[],喜剧
+M000383,The Party.mp4,MP4,0,B.Edwards,"[""Peter Sellers"", ""Claudine Longet"", ""Marge Champion"", ""Steve Franken"", ""Buddy Lester""]",0,1968-01-01,[],喜剧
+M000384,The Return of the Pink Panther.mp4,MP4,0,B.Edwards,"[""Peter Sellers"", ""Herbert Lom"", ""Colin Blakely"", ""Leonard Rossiter"", ""Lesley-Ann Down""]",0,1974-01-01,[],喜剧
+M000385,The Pink Panther Strikes Again.mp4,MP4,0,B.Edwards,"[""Peter Sellers"", ""Burt Kwouk"", ""Lesley-Ann Down"", ""Colin Blakely"", ""Dick Crockett""]",0,1976-01-01,[],喜剧
+M000386,Revenge of the Pink Panther.mp4,MP4,0,B.Edwards,"[""Peter Sellers"", ""Herbert Lom""]",0,1978-01-01,[],喜剧
+M000387,10.mp4,MP4,0,B.Edwards,"[""Bo Derek"", ""Dudley Moore"", ""Julie Andrews"", ""Robert Webber"", ""Dee Wallace""]",0,1979-01-01,[],
+M000388,Victor/Victoria.mp4,MP4,0,B.Edwards,"[""Julie Andrews"", ""Robert Preston"", ""James Garner"", ""Lesley Ann Warren"", ""Alex Karras""]",0,1982-01-01,[],音乐
+M000389,Trail of the Pink Panther.mp4,MP4,0,B.Edwards,"[""Peter Sellers"", ""Joanna Lumley"", ""Herbert Lom"", ""David Niven"", ""Richard Mulligan""]",0,1982-01-01,[],喜剧
+M000390,Curse of the Pink Panther.mp4,MP4,0,B.Edwards,"[""Peter Sellers"", ""Herbert Lom"", ""Ted Wass"", ""David Niven"", ""Capucine""]",0,1983-01-01,[],喜剧
+M000391,The Man Who Loved Women.mp4,MP4,0,B.Edwards,"[""Burt Reynolds"", ""Julie Andrews"", ""Kim Basinger"", ""Marilu Henner"", ""Cynthia Sikes""]",0,1983-01-01,[],喜剧
+M000392,This Happy Feeling.mp4,MP4,0,B.Edwards,"[""Debbie Reynolds"", ""Curt Jurgens"", ""John Saxon"", ""Alexis Smith"", ""Mary Astor""]",0,1958-01-01,[],
+M000393,Skin Deep.mp4,MP4,0,B.Edwards,"[""John Ritter"", ""Vincent Gardenia"", ""Alyson Reed"", ""Joel Brooks"", ""Julianne Phillips""]",0,1989-01-01,[],喜剧
+M000394,Switch.mp4,MP4,0,B.Edwards,"[""Ellen Barkin"", ""Jimmy Smits"", ""Tony Roberts"", ""JoBeth Williams"", ""Lorraine Bracco""]",0,1991-01-01,[],喜剧
+M000395,Holy Mischief.mp4,MP4,0,B.Edwards,"[""Christopher Reeves"", ""Roxanne Bross"", ""Brockford"", ""Ben Mag""]",0,1992-01-01,[],喜剧
+M000396,Son of the Pink Panther.mp4,MP4,0,B.Edwards,"[""Matt Freeman"", ""Roberto Benigngi""]",0,1993-01-01,[],喜剧
+M000397,Breakfast at Tiffany's.mp4,MP4,0,B.Edwards,"[""Audrey Hepburn"", ""George Peppard"", ""Patricia Neal"", ""Mickey Rooney"", ""Buddy Ebsen""]",0,1961-01-01,[],喜剧
+M000398,Days of Wine and Roses.mp4,MP4,0,B.Edwards,"[""Jack Lemmon"", ""Lee Remick"", ""Charles Bickford"", ""Jack Klugman"", ""Alan hewitt""]",0,1962-01-01,[],
+M000399,Experiment in Terror.mp4,MP4,0,B.Edwards,"[""Glenn Ford"", ""Lee Remick"", ""Ross Martin""]",0,1962-01-01,[],悬疑
+M000400,Sweet Charity.mp4,MP4,0,Fosse,"[""Shirley MacLaine"", ""Ricardo Montalban"", ""John McMartin"", ""Chita Rivera"", ""Paula Kelly""]",0,1968-01-01,[],
+M000401,Cabaret.mp4,MP4,0,Fosse,"[""Liza Minnelli"", ""Michael York"", ""Helmut Griem"", ""Joel Grey"", ""Fritz Wepper""]",0,1972-01-01,[],
+M000402,All That Jazz.mp4,MP4,0,Fosse,"[""Roy Scheider"", ""Jessica Lange"", ""Ann Reinking"", ""Leland Palmer"", ""Ben Vereen""]",0,1979-01-01,[],音乐
+M000403,Star 80.mp4,MP4,0,Fosse,"[""Mariel Hemingway"", ""Eric Roberts"", ""Cliff Robertson"", ""Carroll Baker"", ""Roger Rees""]",0,1983-01-01,[],
+M000404,Whistle Down the Wind.mp4,MP4,0,B.Forbes,"[""Alan Bates"", ""Bernard Lee"", ""Norman Bird"", ""Hayley Mills"", ""Elsie Wagstaff""]",0,1962-01-01,[],剧情
+M000405,The Stepford Wives.mp4,MP4,0,B.Forbes,"[""Katharine Ross"", ""Paula Prentiss"", ""Nanette Newman"", ""Peter Masterson"", ""Mary Stuart Masterson""]",0,1974-01-01,[],剧情
+M000406,The Slipper and The Rose.mp4,MP4,0,B.Forbes,"[""Richard Chamberlain"", ""Gemma Craven"", ""Kenneth Moore"", ""Michael Hodern"", ""Edith Evans""]",0,1976-01-01,[],
+M000407,High Road to China.mp4,MP4,0,B.Hutton,"[""Tom Selleck"", ""Bess Armstrong"", ""Jack Weston"", ""Robert Morley"", ""Brian Blessed""]",0,1983-01-01,[],
+M000408,Profit-Sharing Plan.mp4,MP4,0,B.Girard,"[""Henry Jones"", ""Ruth Storey""]",0,1962-01-01,[],悬疑
+M000409,Ten O'clock Tiger.mp4,MP4,0,B.Girard,"[""Frankie Darro"", ""Robert Keith"", ""Karl Lukas"", ""Syl Lamont"", ""And Romano""]",0,1962-01-01,[],悬疑
+M000410,The Matched Pearl.mp4,MP4,0,B.Girard,"[""Emile Genest"", ""John Ireland"", ""Ernest Truex"", ""Sharan Farrell"", ""Michael King""]",0,1962-01-01,[],悬疑
+M000411,A Piece of the Action.mp4,MP4,0,B.Girard,"[""Gig Young"", ""Robert Redford""]",0,1962-01-01,[],悬疑
+M000412,Ride the Nightmare.mp4,MP4,0,B.Girard,"[""Hugh O'Brien"", ""Gena Rowlands""]",0,1962-01-01,[],悬疑
+M000413,Hangover.mp4,MP4,0,B.Girard,"[""Tony Randall"", ""Jayne Mansfield""]",0,1962-01-01,[],悬疑
+M000414,An out for Oscar.mp4,MP4,0,B.Girard,"[""Larry Storch"", ""Linda Christian"", ""Henry Silva""]",0,1963-01-01,[],悬疑
+M000415,Run for Doom.mp4,MP4,0,B.Girard,"[""John gavin"", ""Diana Dors""]",0,1963-01-01,[],悬疑
+M000416,Blood Bargain.mp4,MP4,0,B.Girard,"[""Richard Kiley"", ""Ricard long"", ""Anne Francis""]",0,1963-01-01,[],悬疑
+M000417,The Dividing Wall.mp4,MP4,0,B.Girard,"[""Chris Robinson"", ""James Gregory"", ""Norman Fell""]",0,1963-01-01,[],悬疑
+M000418,Water's Edge.mp4,MP4,0,B.Girard,"[""John Cassavetes"", ""Ann Sothern""]",0,1964-01-01,[],悬疑
+M000419,Ganja and Hess.mp4,MP4,0,Gunn,"[""Duane Jones"", ""Marlene Clark"", ""Bill Gunn"", ""Sam Waymon""]",0,1973-01-01,[],
+M000420,"Krakatoa, East of Java.mp4",MP4,0,Kowalski,"[""Maximilian Schell"", ""Diane Baker"", ""Brian Keith"", ""Roassoano Brazzi"", ""Barbara Werle""]",0,1968-01-01,[],
+M000421,Diner.mp4,MP4,0,B.Levinson,"[""Kathryn Dowling"", ""Ellen Barkin"", ""Paul Reiser""]",0,1982-01-01,[],剧情
+M000422,Avalon.mp4,MP4,0,B.Levinson,"[""Joan Plowright"", ""Armin MuellerStahl"", ""Aidan Quinn"", ""Elizabeth Perkins"", ""Kevin Pollack""]",0,1990-01-01,[],
+M000423,Bugsy.mp4,MP4,0,B.Levinson,"[""Warren Beatty"", ""Annette Bening"", ""Harvey Keitel"", ""Ben Kingsley"", ""Joe Mantegna""]",0,1991-01-01,[],
+M000424,Toys.mp4,MP4,0,B.Levinson,"[""Robin Williams"", ""Michael Gambon"", ""Donald OConnor"", ""Joan Cusack"", ""Robin Wright""]",0,1992-01-01,[],喜剧
+M000425,Jimmy Hollywood.mp4,MP4,0,B.Levinson,"[""Joe Pesci"", ""Christian Slater"", ""Victoria Abril""]",0,1994-01-01,[],喜剧
+M000426,Disclosure.mp4,MP4,0,B.Levinson,"[""Michael Douglas"", ""Demi Moore"", ""Catherine Alvarez"", ""Dennis Miller"", ""Nick Sadler""]",0,1994-01-01,[],喜剧
+M000427,Wag the Dog.mp4,MP4,0,B.Levinson,"[""Dustin Hoffman"", ""Robert deNiro"", ""Anne Heche"", ""Rene Leahy"", ""Woody Harrelson""]",0,1998-01-01,[],喜剧
+M000428,Sphere.mp4,MP4,0,B.Levinson,"[""Dustin Hoffman"", ""Sharon Stone"", ""Samuel L. Jackson"", ""Peter Coyote"", ""Liev Schreiber""]",0,1998-01-01,[],科幻
+M000429,Rain Man.mp4,MP4,0,B.Levinson,"[""Dustin Hoffman"", ""Tom Cruise"", ""Valerie Golino""]",0,1988-01-01,[],剧情
+M000430,Five Easy Pieces.mp4,MP4,0,Rafelson,"[""Jack Nicholson"", ""Karen Black"", ""Karen Anspach"", ""Lorna Thayer"", ""Billy \""Green\"" Bush""]",0,1970-01-01,[],爱情
+M000431,King of Marvin Gardens.mp4,MP4,0,Rafelson,"[""Jack Nicholson"", ""Bruce Dern"", ""Scatman Crother"", ""Ellen Bursteyn"", ""Julia Anne Robinson""]",0,1972-01-01,[],剧情
+M000432,Mountains of the Moon.mp4,MP4,0,Rafelson,"[""Patrick Bergin"", ""Iain Glen"", ""Fiona Shaw"", ""Bernard Hill"", ""Richard Grant""]",0,1990-01-01,[],
+M000433,Man Trouble.mp4,MP4,0,Rafelson,"[""Ellen Barkin"", ""Jack Nicholson"", ""Helen Stanton"", ""Beverly DAngelo""]",0,1992-01-01,[],爱情
+M000434,Wet.mp4,MP4,0,Rafelson,"[""Arliss Howard"", ""Cynda Williams"", ""Kathleen Wilhoite""]",0,1993-01-01,[],爱情
+M000435,Blood & Wine.mp4,MP4,0,Rafelson,"[""Jack Nicholson"", ""Judy Davis"", ""Stephen Dorff"", ""Michael Caine"", ""Jennifer Lopez""]",0,1997-01-01,[],悬疑
+M000436,Stay Hungry.mp4,MP4,0,Rafelson,"[""Jeff Bridges"", ""Sally Field"", ""Arnold Schwarzenegger"", ""R.G. Armstrong"", ""Robert Englund""]",0,1976-01-01,[],剧情
+M000437,Barfly.mp4,MP4,0,Schroeder,"[""Mickey Rourke"", ""Faye Dunaway"", ""Alice Krige"", ""Jack Nance"", ""J.C. Quinn""]",0,1987-01-01,[],传记
+M000438,Reversal of Fortune.mp4,MP4,0,Schroeder,"[""Jeremy Irons"", ""Glenn Close"", ""Ron Silver"", ""Stephen Mailer"", ""Christine Baranski""]",0,1990-01-01,[],传记
+M000439,Single White Female.mp4,MP4,0,Schroeder,"[""Bridget Fonda"", ""Jennifer Jason Leigh"", ""Steven Weber"", ""Peter Friedman"", ""Stephen Tobolowsky""]",0,1992-01-01,[],悬疑
+M000440,Before and After.mp4,MP4,0,Schroeder,"[""Meryl Streep"", ""Liam Neeson"", ""Edward Furlong"", ""Alfred Molina"", ""Wesley Addy""]",0,1996-01-01,[],剧情
+M000441,Dial M for Murder.mp4,MP4,0,B.Segal,"[""Christopher Plummer"", ""Ron Moody"", ""Anthony Quayle"", ""Michael Parks"", ""Angie Dickinson""]",0,1981-01-01,[],悬疑
+M000442,Night Gallery.mp4,MP4,0,B.Segal,"[""Walter Matthau"", ""RSichard Kiely""]",0,1981-01-01,[],悬疑
+M000443,The Mirror Has Two Faces.mp4,MP4,0,Streisand,"[""Barbra Streisand"", ""Jeff Bridges"", ""Lauren Bacll"", ""Mimi Roger"", ""Pierre Brosnan""]",0,1996-01-01,[],爱情
+M000444,Prince of Tides.mp4,MP4,0,Streisand,"[""Barbra Streisand"", ""Nick Nolte"", ""Blythe Danner"", ""Jeroen Krabb\\'e"", ""Jason Gould""]",0,1991-01-01,[],剧情
+M000445,The Adventurers of the Sierra Leone.mp4,MP4,0,Schulz,"[""John Masrley"", ""Simon McCorkingdale""]",0,1982-01-01,[],
+M000446,'Round Midnight.mp4,MP4,0,Tavernier,"[""Dexter Gordon"", ""Francois Cluzet"", ""Herbie Hancock"", ""Sandra Reaves Phillips"", ""Lonette McKee""]",0,1986-01-01,[],
+M000447,La Vie et Rien d'Autre.mp4,MP4,0,Tavernier,"[""Sabine Azema"", ""Philippe Noiret"", ""Pascale Vignal""]",0,1990-01-01,[],剧情
+M000448,Daddy Nostalgia.mp4,MP4,0,Tavernier,"[""Dirk Bogarde"", ""Jane Birkin""]",0,1990-01-01,[],剧情
+M000449,Les Enfants G\^at\'es.mp4,MP4,0,Tavernier,"[""Michel Piccoli"", ""Christine Pascal""]",0,1977-01-01,[],剧情
+M000450,Female Jungle.mp4,MP4,0,VeSota,"[""Jayne Mansfield"", ""Lawrence Tierney"", ""John Carradine"", ""Kathleen Cworlwy""]",0,1955-01-01,[],
+M000451,The Man from Yesterday.mp4,MP4,0,Viertel,"[""Claudette Colbert"", ""Clive Brook"", ""Charles Boyer"", ""Andy Devine"", ""Alan Mowbray""]",0,1932-01-01,[],剧情
+M000452,Bury Me Dead.mp4,MP4,0,Vorhaus,"[""Cathy ODonnell"", ""June Lockhart"", ""Hugh Beaumont""]",0,1947-01-01,[],恐怖
+M000453,Stalag 17.mp4,MP4,0,B.Wilder,"[""William Holden"", ""Don Taylor"", ""Peter Graves"", ""Robert Strauss"", ""Harvey Lembeck""]",0,1953-01-01,[],喜剧
+M000454,Sabrina.mp4,MP4,0,B.Wilder,"[""Audrey Hepburn"", ""Humphrey Bogart"", ""William Holden"", ""John Williams"", ""Walter Hampden""]",0,1954-01-01,[],爱情
+M000455,The Seven Year Itch.mp4,MP4,0,B.Wilder,"[""Marilyn Monroe"", ""Tom Ewell"", ""Evelyn Keyes"", ""Sonny Tufts"", ""Victor Moore""]",0,1955-01-01,[],
+M000456,Love In The Afternoon.mp4,MP4,0,B.Wilder,"[""Audrey Hepburn"", ""Maurice Chevalier"", ""Gary Cooper"", ""John McGiver""]",0,1957-01-01,[],爱情
+M000457,Witness for the Prosecution.mp4,MP4,0,B.Wilder,"[""Charles Laughton"", ""Tyrone Power"", ""Marlene Dietrich"", ""Elsa Lancaster""]",0,1958-01-01,[],剧情
+M000458,Some Like It Hot.mp4,MP4,0,B.Wilder,"[""Tony Curtis"", ""Jack Lemmon"", ""Marilyn Monroe"", ""Joe E. Brown"", ""George Raft""]",0,1959-01-01,[],喜剧
+M000459,The Apartment.mp4,MP4,0,B.Wilder,"[""Jack Lemmon"", ""Shirley MacLaine"", ""Fred MacMurray"", ""Jack Kruschen"", ""Joe Dobisch""]",0,1960-01-01,[],
+M000460,"One, Two, Three.mp4",MP4,0,B.Wilder,"[""Jimmy Cagney"", ""Arlene Francis"", ""Pamela Tiffin"", ""Horst Bucholz"", ""Hans Lothar""]",0,1961-01-01,[],喜剧
+M000461,Irma la Douce.mp4,MP4,0,B.Wilder,"[""Shirley Maclaine"", ""Jack Lemmon"", ""Lou Jacobi"", ""Hershel Benardi"", ""Joan Shawlee""]",0,1963-01-01,[],
+M000462,The Major and the Minor.mp4,MP4,0,B.Wilder,"[""Ray Milland"", ""Ginger Rogers"", ""Robert Benchley"", ""Rita Johnson"", ""Frankie Thomas""]",0,1942-01-01,[],爱情
+M000463,Kiss Me Stupid.mp4,MP4,0,B.Wilder,"[""Dean Martin"", ""Kim Novak"", ""Cliff Osmond""]",0,1964-01-01,[],
+M000464,The Private Life of Sherlock Holmes.mp4,MP4,0,B.Wilder,"[""Robert Stephens"", ""Colin Blake"", ""Christopher Lee"", ""Genevieve Page""]",0,1970-01-01,[],悬疑
+M000465,Five Graves to Cairo.mp4,MP4,0,B.Wilder,"[""Erich vonStroheim"", ""Franchot Tone"", ""Anne Baxter"", ""Peter vanEyck"", ""Akim Tamiroff""]",0,1943-01-01,[],剧情
+M000466,Buddy Buddy.mp4,MP4,0,B.Wilder,"[""Walter Matthau"", ""Jack Lemmon"", ""Paula Prentiss"", ""Klaus Kinski""]",0,1981-01-01,[],喜剧
+M000467,Double Indemnity.mp4,MP4,0,B.Wilder,"[""Fred MacMurray"", ""Barbara Stanwyk"", ""none"", ""Edward G. Robinson"", ""Jean Heather""]",0,1944-01-01,[],剧情
+M000468,The Lost Weekend.mp4,MP4,0,B.Wilder,"[""Ray Milland"", ""Frank Faylen"", ""Howard daSilva"", ""Jane Wyman"", ""Doris Dowling""]",0,1945-01-01,[],剧情
+M000469,A Foreign Affair.mp4,MP4,0,B.Wilder,"[""Marlene Dietrich"", ""John Lund"", ""Jean Arthur"", ""Millard Mitchell"", ""Freddie Steele""]",0,1948-01-01,[],
+M000470,Sunset Boulevard.mp4,MP4,0,B.Wilder,"[""William Holden"", ""Gloria Swanson"", ""Erich vonStroheim"", ""Nancy Olson"", ""Fred Clark""]",0,1950-01-01,[],剧情
+M000471,The Big Carnival.mp4,MP4,0,B.Wilder,"[""Kirk Douglas"", ""Jan Sterling"", ""Porter Hall"", ""Richard Benedict"", ""Bob Arthur""]",0,1951-01-01,[],剧情
+M000472,The Blue Lamp.mp4,MP4,0,B.Dearden,"[""Jack Warden"", ""Jimmy Hanley"", ""Dirk Bogarde"", ""Meredith Edwards"", ""Robert Flemyng""]",0,1950-01-01,[],悬疑
+M000473,Who Done It.mp4,MP4,0,B.Dearden,"[""Benny Hill"", ""Belinda Lee"", ""David Kosoff"", ""Garry Marsh"", ""Ernest Thesiger""]",0,1956-01-01,[],喜剧
+M000474,The League of Gentlemen.mp4,MP4,0,B.Dearden,"[""Jack Hawkins"", ""Richard Attenborough"", ""Roger Livesey"", ""Nigel Patrick"", ""Bryan Forbes""]",0,1960-01-01,[],喜剧
+M000475,All Night Long.mp4,MP4,0,B.Dearden,"[""Patrick McGoohan"", ""Richard Attenborough"", ""Keith Mitchell"", ""Betsy Blair"", ""Marti Stevens""]",0,1961-01-01,[],
+M000476,Victim.mp4,MP4,0,B.Dearden,"[""Dirk Bogarde"", ""Sylvia Sims"", ""Peter McEnery"", ""Dennis Price"", ""Hilton Edwards""]",0,1961-01-01,[],悬疑
+M000477,Masquerade.mp4,MP4,0,B.Dearden,"[""Cliff Robertson"", ""Jack Hawkins"", ""Charles Gray"", ""Bill Fraser"", ""Marissa Mell""]",0,1965-01-01,[],悬疑
+M000478,The Man who Haunted Himself.mp4,MP4,0,B.Dearden,"[""Roger Moore"", ""Hildegarde Neil"", ""Olga GeorgesPicot"", ""Anton Rodgers"", ""Freddie Jones""]",0,1970-01-01,[],悬疑
+M000479,American Dream.mp4,MP4,0,Kopple,"[""Jim Guyette"", ""Ray Rodgers"", ""Lewie Anderson"", ""John Morrison""]",0,1992-01-01,[],
+M000480,Cool Breeze.mp4,MP4,0,B.Pollack,"[""Thalmus Rasulala"", ""Judy Pace"", ""Jim Watkins"", ""Raymond StJacques"", ""Lincoln Kirkpatrick""]",0,1972-01-01,[],剧情
+M000481,Phantom of The Paradise.mp4,MP4,0,B.dePalma,"[""Paul Williams"", ""William Finley"", ""Jessica Harper"", ""Gearge Memmoli"", ""Gerrit Graham""]",0,1974-01-01,[],音乐
+M000482,Obsession.mp4,MP4,0,B.dePalma,"[""Cliff Robertson"", ""Genevieve Bujold"", ""John Lithgow"", ""Sylvia Williams"", ""Wanda Blackman""]",0,1976-01-01,[],悬疑
+M000483,Carrie.mp4,MP4,0,B.dePalma,"[""Sissy Spacek"", ""Piper Laurie"", ""Amy Irving"", ""Nancy Allen"", ""William Katt""]",0,1976-01-01,[],恐怖
+M000484,The Fury.mp4,MP4,0,B.dePalma,"[""Kirk Douglas"", ""John Cassavetes"", ""Andrew Stevens"", ""Amy Irving"", ""Carrie Snodgrass""]",0,1979-01-01,[],
+M000485,Dressed to Kill.mp4,MP4,0,B.dePalma,"[""Michael Caine"", ""Angie Dickinson"", ""Nancy Allen"", ""Keith Gordon"", ""Dennis Franz""]",0,1980-01-01,[],
+M000486,Blow Out.mp4,MP4,0,B.dePalma,"[""John Travolta"", ""Nancy Allen""]",0,1981-01-01,[],剧情
+M000487,Scarface.mp4,MP4,0,B.dePalma,"[""Al Pacino"", ""Steven Bauer"", ""Michelle Pfeiffer"", ""Mary Elizabeth Mastrantonio"", ""Robert Loggia""]",0,1983-01-01,[],
+M000488,Body Double.mp4,MP4,0,B.dePalma,"[""Craig Wesson"", ""Melanie Griffith"", ""Gregg Henry"", ""Barbara Crampton"", ""Windsor Taylor Randolph""]",0,1984-01-01,[],
+M000489,Wise Guys.mp4,MP4,0,B.dePalma,"[""Danny deVito"", ""Joe Picopo"", ""Harvey Keitel"", ""Ray Sharkey"", ""Ken Wahl""]",0,1984-01-01,[],
+M000490,The Untouchables.mp4,MP4,0,B.dePalma,"[""Sean Connery"", ""Robert deNiro"", ""Kevin Karson"", ""Kevin Costner"", ""Andy Garcia""]",0,1987-01-01,[],
+M000491,"Hi, Mom!.mp4",MP4,0,B.dePalma,"[""Robert deNiro"", ""Jennifer Salt"", ""Allan Garfield"", ""Lara Parker"", ""Gerrit Graham""]",0,1970-01-01,[],喜剧
+M000492,Casualties of War.mp4,MP4,0,B.dePalma,"[""Michael J. Fox"", ""Sean Penn"", ""Erik King"", ""Don Harvey"", ""Thuy Thu Le""]",0,1989-01-01,[],剧情
+M000493,The Bonfire of the Vanities.mp4,MP4,0,B.dePalma,"[""Tom Hanks"", ""Melanie Griffith"", ""Bruce Willis"", ""John Hancock"", ""Alan King""]",0,1990-01-01,[],剧情
+M000494,Raising Cain.mp4,MP4,0,B.dePalma,"[""John Lithgow"", ""John Litgow"", ""Lolita Davidovich"", ""Steven Bauer"", ""Gregg Henry""]",0,1992-01-01,[],
+M000495,Carlito's Way.mp4,MP4,0,B.dePalma,"[""Al Pacino"", ""Sean Penn"", ""Penelope Ann Miller"", ""Jon Leguizamo"", ""Luis Guzman""]",0,1993-01-01,[],剧情
+M000496,Mission Impossible.mp4,MP4,0,dePalma,"[""Tom Cruise"", ""Jon Voigt"", ""Henry Czerny"", ""Emmanuelle Beart"", ""Jean Reno""]",0,1996-01-01,[],
+M000497,Snake Eyes.mp4,MP4,0,dePalma,"[""Nicolas Cage"", ""Gary Sinise"", ""Carla Gugino"", ""John Heard""]",0,1998-01-01,[],悬疑
+M000498,Inspector Clouseau.mp4,MP4,0,Bud~Yorkin,"[""Alan Arkin"", ""Delia Bocardo"", ""Frank Finlay"", ""Patrick Cargill"", ""Beryl Reid""]",0,1968-01-01,[],喜剧
+M000499,The Thief Who Came to Dinner.mp4,MP4,0,Bud~Yorkin,"[""Ryan ONeal"", ""Jacqueline Bisset"", ""Warren Oates"", ""Jill Clayburgh"", ""Austin Pendleton""]",0,1973-01-01,[],
+M000500,The Scoundrel.mp4,MP4,0,Hecht,"[""Noel Coward"", ""Alexander Wolcott"", ""Julie Haydon"", ""Stanley Ridges"", ""Helen Hayes""]",0,1935-01-01,[],
+M000501,Angels over Broadway.mp4,MP4,0,Hecht,"[""John Qualen"", ""Thomas Mitchell"", ""Rita Hayworth"", ""Douglas Fairbanks~jr""]",0,1940-01-01,[],剧情
+M000502,The Visit.mp4,MP4,0,Wicki,"[""Ingrid Bergman"", ""Anthony Quinn"", ""Paolo Stoppa"", ""HansChristian Blech"", ""Valentina Cortesa""]",0,1964-01-01,[],剧情
+M000503,"The Saboteur, Code Name Morituri.mp4",MP4,0,Wicki,"[""Yul Brynner"", ""Marlon Brando"", ""Trevor Howard"", ""Janet Margolin""]",0,1965-01-01,[],剧情
+M000504,Local Hero.mp4,MP4,0,B.Forsyth,"[""Burt Lancaster"", ""Peter Riegert"", ""Dennis Lawson"", ""Peter Capaldi"", ""Fulton Mackay""]",0,1983-01-01,[],喜剧
+M000505,Being Human.mp4,MP4,0,B.Forsyth,"[""Robin Williams"", ""John Turtorro"", ""Anna Galiena"", ""Theresa Russell""]",0,1994-01-01,[],剧情
+M000506,Ma Barker's Killer Brood.mp4,MP4,0,Karn,"[""Lurene Tuttle"", ""Tris Coffin"", ""Paul Dubov"", ""Myrna Dell"", ""Nelson Leigh""]",0,1960-01-01,[],
+M000507,Olivia in Concert.mp4,MP4,0,B.Grant,"[""Oliva NewtonJohn"", ""John Farrar""]",0,1983-01-01,[],
+M000508,Sweet Poison.mp4,MP4,0,B.Grant,"[""Patricia Healey"", ""Steven Bauer"", ""Edward Herrmann""]",0,1991-01-01,[],
+M000509,Love Kills.mp4,MP4,0,B.Grant,"[""Virginia Madsen"", ""Kate Hodge"", ""Erich Anderson"", ""Jim Metzler"", ""Lenny VonDohlen""]",0,1991-01-01,[],悬疑
+M000510,Meatballs 4.mp4,MP4,0,B.Logan,"[""Corey Feldman"", ""Jack Nance"", ""Bojesse Christopher"", ""Christy Thom"", ""Sarah Douglas""]",0,1981-01-01,[],
+M000511,Maria.mp4,MP4,0,Sagal,"[""Norman Lloyd"", ""Venue deMars"", ""Nita Talbot"", ""Ed Hashim""]",0,1961-01-01,[],悬疑
+M000512,The Test.mp4,MP4,0,Sagal,"[""Brian Keith"", ""Rod Laurem"", ""Eduardo Cianelli""]",0,1962-01-01,[],悬疑
+M000513,The Big Score.mp4,MP4,0,Sagal,"[""Evans Evans"", ""Philip Reed"", ""Tom Gilleran"", ""Raphael Campos""]",0,1962-01-01,[],悬疑
+M000514,The Helicopter Spies.mp4,MP4,0,Sagal,"[""Robert Vaughn"", ""David McCallum"", ""Leo G. McCarroll""]",0,1968-01-01,[],
+M000515,The Omega Man.mp4,MP4,0,Sagal,"[""Charlton Heston"", ""Anthony Zerbe"", ""Rosalind Cash""]",0,1971-01-01,[],科幻
+M000516,"Rich Man, Poor Man.mp4",MP4,0,Sagal,"[""Nick Nolte"", ""Susan Blakely"", ""Peter Strauss""]",0,1976-01-01,[],剧情
+M000517,Elvira Madigan.mp4,MP4,0,Widerberg,"[""Thommy Berggren"", ""Pia Degermark"", ""Eva Henning""]",0,1967-01-01,[],
+M000518,Joe Hill.mp4,MP4,0,Widerberg,"[""Thommy Bergren"", ""Anja Schmidt""]",0,1971-01-01,[],
+M000519,Driving Miss Daisy.mp4,MP4,0,Beresford,"[""Jessica Tandy"", ""Morgan Freeman"", ""Dan Ackroyd"", ""Patty Luponi""]",0,1989-01-01,[],爱情
+M000520,Mister Johnson.mp4,MP4,0,Beresford,"[""Maynard Eziashi"", ""Pierce Brosnan"", ""Edward Woodward"", ""Femi Fatoba"", ""Beartie Edney""]",0,1991-01-01,[],爱情
+M000521,Black Robe.mp4,MP4,0,Beresford,"[""Lothaire Bluteau"", ""August Schellenberg"", ""Sandrine Holt"", ""Aden Young"", ""Tantoo Cardinal""]",0,1991-01-01,[],剧情
+M000522,Breaker Morant.mp4,MP4,0,Beresford,"[""Edward Woodward"", ""Jack Thompson"", ""John Waters"", ""Charles Tingwell"", ""Bryan Brown""]",0,1979-01-01,[],
+M000523,The Karate Killers.mp4,MP4,0,Shear,"[""Robert Vaughn"", ""David McCallum"", ""Leo G. McCarroll""]",0,1967-01-01,[],
+M000524,The Enforcer.mp4,MP4,0,Windust,"[""Humphrey Bogart"", ""Everett Sloane"", ""Zero Mostel"", ""Ted deCorsica"", ""Roy Roberts""]",0,1951-01-01,[],
+M000525,The Avon Emeralds.mp4,MP4,0,Windust,"[""Roger Moore"", ""Hazel Court"", ""Alan Napier"", ""Gertrude Flynn"", ""Richard Lupino""]",0,1959-01-01,[],悬疑
+M000526,Cheap is Cheap.mp4,MP4,0,Almond,"[""Dennis Day"", ""Alice Backer"", ""Fred Essler"", ""Lack Lambert"", ""Gage Clarke""]",0,1959-01-01,[],悬疑
+M000527,Casino Royale.mp4,MP4,0,Windust,"[""Barry Nelson"", ""Peter Lorre"", ""Linda Christian""]",0,1954-01-01,[],
+M000528,June Bride.mp4,MP4,0,Windust,"[""Bette Davis"", ""Robert Montgomery"", ""Fay Bainter"", ""Betty Lynn"", ""Jerome Cowan""]",0,1949-01-01,[],爱情
+M000529,Cops.mp4,MP4,0,Keaton,"[""Buster Keaton"", ""Virginia Fox""]",0,1922-01-01,[],
+M000530,The Baloonatic.mp4,MP4,0,Keaton,"[""Buster Keaton"", ""Phylllis Haver""]",0,1923-01-01,[],

@@ -1,0 +1,12 @@
+{
+  "main.html": {
+    "bytes": 1691285,
+    "sha256": "578eb52d8a48b9572f172c3b66e1ba0b9149b9d01350b204d4c4b5e74162959b",
+    "complete": false
+  },
+  "casts.html": {
+    "bytes": 1646229,
+    "sha256": "e1a58436911f919c9d854f11120116591671a1a72ed5b38ea17f6c2193b05d09",
+    "complete": false
+  }
+}

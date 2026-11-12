@@ -1,0 +1,2 @@
+# 保持不完整来源快照的原始字节，以匹配记录的 SHA-256。
+source/*.html -text -diff
