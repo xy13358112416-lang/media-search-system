@@ -1,0 +1,17 @@
+rows=530 Qt=6.8.3 platform=offscreen runs=5
+media_to_search run=1 sync_ms=22635 total_ms=22643.7 columnCalls=6360 itemHints=3370800
+search_to_media run=1 sync_ms=21788.6 total_ms=21793.4 columnCalls=6360 itemHints=3370800
+media_to_search run=2 sync_ms=22400.4 total_ms=22407.3 columnCalls=6360 itemHints=3370800
+search_to_media run=2 sync_ms=22497.1 total_ms=22501.6 columnCalls=6360 itemHints=3370800
+media_to_search run=3 sync_ms=22347.4 total_ms=22352.2 columnCalls=6360 itemHints=3370800
+search_to_media run=3 sync_ms=22361.9 total_ms=22366.3 columnCalls=6360 itemHints=3370800
+media_to_search run=4 sync_ms=22392.7 total_ms=22397.3 columnCalls=6360 itemHints=3370800
+search_to_media run=4 sync_ms=22357.5 total_ms=22361.9 columnCalls=6360 itemHints=3370800
+media_to_search run=5 sync_ms=22677.1 total_ms=22681.5 columnCalls=6360 itemHints=3370800
+search_to_media run=5 sync_ms=22823.9 total_ms=22828.7 columnCalls=6360 itemHints=3370800
+invalid_save run=1 prompt_ms=21043 addCalls=1 loadCalls=1 dataChanged=2120 columnCalls=6360 itemHints=3370800 errorSeen=1 formKept=1 csvUnchanged=1 sequenceUnchanged=0
+invalid_save run=2 prompt_ms=21442.8 addCalls=1 loadCalls=1 dataChanged=2120 columnCalls=6360 itemHints=3370800 errorSeen=1 formKept=1 csvUnchanged=1 sequenceUnchanged=0
+invalid_save run=3 prompt_ms=21392.5 addCalls=1 loadCalls=1 dataChanged=2120 columnCalls=6360 itemHints=3370800 errorSeen=1 formKept=1 csvUnchanged=1 sequenceUnchanged=0
+invalid_save run=4 prompt_ms=20985.1 addCalls=1 loadCalls=1 dataChanged=2120 columnCalls=6360 itemHints=3370800 errorSeen=1 formKept=1 csvUnchanged=1 sequenceUnchanged=0
+invalid_save run=5 prompt_ms=20965.1 addCalls=1 loadCalls=1 dataChanged=2120 columnCalls=6360 itemHints=3370800 errorSeen=1 formKept=1 csvUnchanged=1 sequenceUnchanged=0
+median media_to_search_ms=22407.3 search_to_media_ms=22366.3 invalid_prompt_ms=21043

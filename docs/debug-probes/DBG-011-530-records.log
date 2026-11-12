@@ -1,0 +1,7 @@
+baseline rows=530 empty_search_ms=0.1925 search_results=530
+media_to_search rows=530->530 sync_ms=5884 total_ms=5885 dataChanged=2120 columnCalls=6360 column_ms=5842.06 itemHints=3370800
+search_to_media rows=530->530 sync_ms=5857 total_ms=5859 dataChanged=2120 columnCalls=6360 column_ms=5820.57 itemHints=3370800
+media_to_search_posted_layout rows=530->530 sync_ms=4 total_ms=5 dataChanged=2120 columnCalls=3 column_ms=2.8939 itemHints=1590
+search_to_recommend rows=530->5 sync_ms=3 total_ms=5 dataChanged=20 columnCalls=12 column_ms=2.9244 itemHints=1635
+recommend_to_search rows=5->530 sync_ms=4 total_ms=11 dataChanged=2120 columnCalls=12 column_ms=8.3801 itemHints=4785
+search_to_media_fixed_width rows=530->530 sync_ms=1 total_ms=2 dataChanged=2120 columnCalls=0 column_ms=0 itemHints=0
