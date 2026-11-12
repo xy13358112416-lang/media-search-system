@@ -5,6 +5,7 @@
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QCompleter>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -21,11 +22,16 @@
 #include <QLocale>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QProgressBar>
+#include <QGridLayout>
+#include <algorithm>
+#include <array>
 #include <QScrollArea>
 #include <QSet>
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QStackedWidget>
+#include <QStringListModel>
 #include <QTabBar>
 #include <QTableWidget>
 #include <QUuid>
@@ -136,40 +142,90 @@ void showPerformance(QWidget* parent)
 {
     QDialog dialog(parent);
     dialog.setWindowTitle(QStringLiteral("检索性能对照"));
-    dialog.resize(850, 340);
+    dialog.resize(720, 350);
     auto* layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(24, 22, 24, 22);
+    layout->setSpacing(12);
+
     auto* context = new QLabel(QStringLiteral(
         "10 万条合成记录 · 每种策略测量 31 次 · Windows 11 / Qt 6.8.3 / MinGW 13.1 / Release"));
+    context->setObjectName(QStringLiteral("muted"));
     context->setWordWrap(true);
     layout->addWidget(context);
 
-    const QList<QStringList> rows{
-        {QStringLiteral("稀有演员"), QStringLiteral("9169.1"), QStringLiteral("2458.6"),
-         QStringLiteral("2451.3"), QStringLiteral("50163 → 101")},
-        {QStringLiteral("稀有类型"), QStringLiteral("12693.2"), QStringLiteral("4785.7"),
-         QStringLiteral("2778.8"), QStringLiteral("50163 → 101")},
-        {QStringLiteral("热门条件"), QStringLiteral("27571.0"), QStringLiteral("7676.5"),
-         QStringLiteral("7428.9"), QStringLiteral("50163 → 50163")},
-        {QStringLiteral("无结果"), QStringLiteral("9206.7"), QStringLiteral("5.5"),
-         QStringLiteral("1.6"), QStringLiteral("50163 → 0")}
+    struct Scenario {
+        QString name;
+        std::array<double, 3> timings; // Query medians in microseconds, in strategy order.
+        QString candidates;           // First-step counts for fixed order and short list first.
     };
-    auto* table = new QTableWidget(static_cast<int>(rows.size()), 5);
-    table->setHorizontalHeaderLabels({QStringLiteral("查询场景"), QStringLiteral("逐条扫描（µs）"),
-        QStringLiteral("固定顺序索引（µs）"), QStringLiteral("短列表优先（µs）"),
-        QStringLiteral("首步候选数：固定 → 优先")});
-    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table->setAlternatingRowColors(true);
-    table->verticalHeader()->hide();
-    table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    for (int row = 0; row < table->rowCount(); ++row)
-        for (int column = 0; column < table->columnCount(); ++column)
-            table->setItem(row, column, new QTableWidgetItem(rows.at(row).at(column)));
-    layout->addWidget(table);
+    const std::array<Scenario, 4> scenarios{{
+        {QStringLiteral("稀有演员"), {9169.1, 2458.6, 2451.3}, QStringLiteral("50,163 → 101")},
+        {QStringLiteral("稀有类型"), {12693.2, 4785.7, 2778.8}, QStringLiteral("50,163 → 101")},
+        {QStringLiteral("热门条件"), {27571.0, 7676.5, 7428.9}, QStringLiteral("50,163 → 50,163")},
+        {QStringLiteral("无结果"), {9206.7, 5.5, 1.6}, QStringLiteral("50,163 → 0")}
+    }};
+    const QStringList strategies{QStringLiteral("逐条扫描"), QStringLiteral("固定顺序索引"),
+                                 QStringLiteral("短列表优先")};
+    const QStringList styles{QStringLiteral("linearBar"), QStringLiteral("fixedBar"),
+                             QStringLiteral("shortBar")};
 
+    auto* selector = new QComboBox;
+    for (const auto& scenario : scenarios)
+        selector->addItem(scenario.name);
+    auto* controls = new QHBoxLayout;
+    auto* scenarioLabel = new QLabel(QStringLiteral("查询场景"));
+    scenarioLabel->setBuddy(selector);
+    controls->addWidget(scenarioLabel);
+    controls->addWidget(selector);
+    controls->addStretch();
+    controls->addWidget(new QLabel(QStringLiteral("查询耗时中位数（µs）")));
+    layout->addLayout(controls);
+
+    auto* chart = new QGridLayout;
+    chart->setHorizontalSpacing(12);
+    chart->setVerticalSpacing(12);
+    chart->setColumnStretch(1, 1);
+    std::array<QProgressBar*, 3> bars{};
+    std::array<QLabel*, 3> values{};
+    for (int row = 0; row < static_cast<int>(bars.size()); ++row) {
+        bars[row] = new QProgressBar;
+        bars[row]->setObjectName(styles.at(row));
+        bars[row]->setRange(0, 10000);
+        bars[row]->setTextVisible(false);
+        values[row] = new QLabel;
+        values[row]->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        chart->addWidget(new QLabel(strategies.at(row)), row, 0);
+        chart->addWidget(bars[row], row, 1);
+        chart->addWidget(values[row], row, 2);
+    }
+    layout->addLayout(chart);
+
+    auto* candidates = new QLabel;
+    candidates->setObjectName(QStringLiteral("resultCount"));
+    layout->addWidget(candidates, 0, Qt::AlignLeft);
     auto* note = new QLabel(QStringLiteral(
-        "耗时为查询中位数。索引构建约 162 ms。数据来源：retrieval/REPORT_NOTES.md。"));
+        "同一场景的条长使用相同比例。索引构建约 162 ms。数据来源：retrieval/REPORT_NOTES.md。"));
+    note->setObjectName(QStringLiteral("muted"));
     note->setWordWrap(true);
     layout->addWidget(note);
+    layout->addStretch();
+
+    const auto refresh = [&](int index) {
+        const auto& scenario = scenarios.at(index);
+        const auto largest = *std::max_element(scenario.timings.begin(), scenario.timings.end());
+        for (std::size_t i = 0; i < bars.size(); ++i) {
+            const auto timing = scenario.timings[i];
+            bars[i]->setValue(qRound(timing / largest * bars[i]->maximum()));
+            values[i]->setText(QLocale().toString(timing, 'f', 1));
+            bars[i]->setAccessibleName(strategies.at(i));
+            bars[i]->setAccessibleDescription(values[i]->text() + QStringLiteral(" µs"));
+        }
+        candidates->setText(QStringLiteral("首步候选数（固定顺序 → 短列表优先）  %1")
+                                .arg(scenario.candidates));
+    };
+    QObject::connect(selector, &QComboBox::currentIndexChanged, &dialog, refresh);
+    refresh(selector->currentIndex());
+
     auto* close = new QPushButton(QStringLiteral("关闭"));
     layout->addWidget(close, 0, Qt::AlignRight);
     QObject::connect(close, &QPushButton::clicked, &dialog, &QDialog::accept);
@@ -222,8 +278,26 @@ public:
         toolbar->addStretch();
 
         auto* searchControls = new QWidget;
-        auto* searchBar = new QHBoxLayout(searchControls);
-        searchBar->setContentsMargins(0, 0, 0, 0);
+        auto* searchLayout = new QVBoxLayout(searchControls);
+        searchLayout->setContentsMargins(0, 0, 0, 0);
+        searchLayout->setSpacing(8);
+        auto* keywordBar = new QHBoxLayout;
+        auto* keywordLabel = new QLabel(QStringLiteral("文件名关键词"));
+        keywordLabel->setBuddy(keywordInput_);
+        keywordInput_->setPlaceholderText(QStringLiteral("输入片名的一部分，例如 海风"));
+        keywordBar->addWidget(keywordLabel);
+        keywordBar->addWidget(keywordInput_, 1);
+        searchLayout->addLayout(keywordBar);
+
+        auto* suggestions = new QCompleter(&keywordSuggestions_, keywordInput_);
+        suggestions->setCaseSensitivity(Qt::CaseInsensitive);
+        suggestions->setFilterMode(Qt::MatchContains);
+        suggestions->setMaxVisibleItems(8);
+        suggestions->popup()->setObjectName(QStringLiteral("keywordSuggestions"));
+        keywordInput_->setCompleter(suggestions);
+
+        auto* searchBar = new QHBoxLayout;
+        searchLayout->addLayout(searchBar);
         director_->setPlaceholderText(QStringLiteral("完整姓名"));
         actor_->setPlaceholderText(QStringLiteral("完整姓名"));
         searchType_->setPlaceholderText(QStringLiteral("例如 MP4"));
@@ -334,9 +408,27 @@ public:
         splitter->setStretchFactor(1, 1);
         layout->addWidget(splitter, 1);
         trace_->setObjectName(QStringLiteral("tracePanel"));
-        trace_->setWordWrap(true);
-        trace_->setTextFormat(Qt::PlainText);
-        trace_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        trace_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+        auto* traceLayout = new QVBoxLayout(trace_);
+        traceLayout->setContentsMargins(12, 9, 12, 10);
+        traceLayout->setSpacing(7);
+        auto* traceHeading = new QLabel(QStringLiteral("检索过程"));
+        traceHeading->setObjectName(QStringLiteral("sectionTitle"));
+        traceLayout->addWidget(traceHeading);
+        traceStatus_->setObjectName(QStringLiteral("muted"));
+        traceStatus_->setTextFormat(Qt::PlainText);
+        traceStatus_->setWordWrap(true);
+
+        auto* steps = new QHBoxLayout;
+        for (auto*& card : traceCards_) {
+            card = new QLabel;
+            card->setObjectName(QStringLiteral("traceStep"));
+            card->setTextFormat(Qt::RichText);
+            card->setWordWrap(true);
+            steps->addWidget(card, 1);
+        }
+        traceLayout->addLayout(steps);
+        traceLayout->addWidget(traceStatus_);
         trace_->hide();
         layout->addWidget(trace_);
 
@@ -357,17 +449,24 @@ public:
         });
         const auto submitSearch = [this] {
             query_ = {director_->text(), actor_->text(), searchType_->text()};
+            keyword_ = keywordInput_->text().trimmed();
             showSearchResults();
         };
         connect(searchButton, &QPushButton::clicked, this, submitSearch);
-        for (auto* input : {director_, actor_, searchType_})
+        for (auto* input : {keywordInput_, director_, actor_, searchType_})
             connect(input, &QLineEdit::returnPressed, this, submitSearch);
+        connect(suggestions, qOverload<const QString&>(&QCompleter::activated), this,
+                [this, submitSearch](const QString& fileName) {
+                    keywordInput_->setText(fileName);
+                    submitSearch();
+                });
         connect(clearButton, &QPushButton::clicked, this, [this, submitSearch] {
+            keywordInput_->clear();
             director_->clear();
             actor_->clear();
             searchType_->clear();
             submitSearch();
-            director_->setFocus();
+            keywordInput_->setFocus();
         });
 
         connect(filter_, &QComboBox::currentIndexChanged, this, [this] { refresh(); });
@@ -579,6 +678,13 @@ private:
         const int index = filter_->findData(type);
         filter_->setCurrentIndex(index < 0 ? 0 : index);
         refresh(selectedId);
+
+        QStringList names;
+        for (const auto& record : library_.records())
+            names.append(record.fileName);
+        names.removeDuplicates();
+        names.sort(Qt::CaseInsensitive);
+        keywordSuggestions_.setStringList(names);
     }
     // Apply the selected file type and display the date order returned by the library.
     void refresh(const QString& selectedId = {})
@@ -596,22 +702,30 @@ private:
         const QSet<QString> matched(ids.cbegin(), ids.cend());
         QList<MediaRecord> results;
         for (const auto& record : library_.records()) {
-            if (matched.contains(record.id))
+            if (matched.contains(record.id) &&
+                (keyword_.isEmpty() || record.fileName.contains(keyword_, Qt::CaseInsensitive)))
                 results.append(record);
         }
         populateTable(results);
-        count_->setText(QStringLiteral("命中 %1 条").arg(ids.size()));
+        count_->setText(QStringLiteral("命中 %1 条").arg(results.size()));
 
-        QStringList lines{QStringLiteral("检索过程 · 短列表优先")};
-        if (trace.steps.isEmpty())
-            lines.append(QStringLiteral("未填写条件，显示全部记录。"));
-        for (qsizetype i = 0; i < trace.steps.size(); ++i) {
-            const auto& step = trace.steps.at(i);
-            lines.append(QStringLiteral("第 %1 步：%2 · 单项命中 %3 条 · 剩余候选 %4 条")
-                             .arg(i + 1).arg(fieldName(step.field))
-                             .arg(step.postingCount).arg(step.remainingCount));
+        const bool hasKeyword = !keyword_.isEmpty();
+        traceStatus_->setText(hasKeyword
+            ? QStringLiteral("文件名包含「%1」 · 筛选后剩余 %2 条").arg(keyword_).arg(results.size())
+            : QStringLiteral("未填写条件，显示全部记录。"));
+        traceStatus_->setVisible(hasKeyword || trace.steps.isEmpty());
+        for (std::size_t i = 0; i < traceCards_.size(); ++i) {
+            auto* card = traceCards_[i];
+            if (i >= static_cast<std::size_t>(trace.steps.size())) {
+                card->hide();
+                continue;
+            }
+            const auto& step = trace.steps.at(static_cast<qsizetype>(i));
+            card->setText(QStringLiteral("<b>%1. %2</b><br>单项命中 %3 条 · <b>剩余 %4 条</b>")
+                              .arg(i + 1).arg(fieldName(step.field))
+                              .arg(step.postingCount).arg(step.remainingCount));
+            card->show();
         }
-        trace_->setText(lines.join(QLatin1Char('\n')));
     }
 
     // Refresh available preferences while preserving choices that still exist.
@@ -719,11 +833,16 @@ private:
     QStackedWidget* controls_ = new QStackedWidget; // Controls for the selected tab.
     QLineEdit* director_ = new QLineEdit; // Director full-name query.
     QLineEdit* actor_ = new QLineEdit; // Actor full-name query.
+    QString keyword_; // Last submitted file-name keyword.
+    QStringListModel keywordSuggestions_; // Current library file names for completion.
+    QLineEdit* keywordInput_ = new QLineEdit; // Partial file-name query.
     QLineEdit* searchType_ = new QLineEdit; // File extension query.
     QComboBox* categoryPreference_ = new QComboBox; // Preferred category.
     QComboBox* typePreference_ = new QComboBox; // Preferred extension.
     QLabel* order_ = new QLabel; // Current table ordering.
-    QLabel* trace_ = new QLabel; // Actual index steps of the submitted query.
+    QFrame* trace_ = new QFrame; // Search trace panel.
+    QLabel* traceStatus_ = new QLabel; // Explanation when there are no query conditions.
+    std::array<QLabel*, 3> traceCards_{}; // One card for each possible index step.
     QComboBox* filter_ = new QComboBox; // File type filter with an empty value for all types.
     QPushButton* add_ = new QPushButton(QStringLiteral("新增")); // Open the record form.
     QPushButton* remove_ = new QPushButton(QStringLiteral("删除")); // Delete the selected row.

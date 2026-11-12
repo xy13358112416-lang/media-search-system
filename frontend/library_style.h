@@ -15,8 +15,14 @@ inline QString libraryStyle()
         QLabel#fieldLabel { color: #536680; }
         QLabel#resultCount { color: #244c8d; background: #e3edff; border-radius: 9px;
                              padding: 5px 11px; font-weight: 700; }
-        QLabel#tracePanel { color: #314b70; background: #eaf1fc;
-                            border: 1px solid #d4e2f8; border-radius: 10px; padding: 11px 14px; }
+        QFrame#tracePanel { background: #eaf1fc; border: 1px solid #d4e2f8; border-radius: 10px; }
+        QLabel#traceStep { background: #ffffff; color: #314b70; border: 1px solid #d4e2f8;
+                           border-radius: 8px; padding: 7px 10px; }
+        QProgressBar { background: #e1eaf6; border: none; border-radius: 7px; min-height: 14px; }
+        QProgressBar::chunk { border-radius: 7px; }
+        QProgressBar#linearBar::chunk { background: #667b98; }
+        QProgressBar#fixedBar::chunk { background: #4177c0; }
+        QProgressBar#shortBar::chunk { background: #007c70; }
         QFrame#detailCard { background: #ffffff; border: 1px solid #d7e1ef; border-radius: 12px; }
         QWidget#detailBody { background: #ffffff; }
         QScrollArea#detailScroll { border: none; background: transparent; }
@@ -32,16 +38,18 @@ inline QString libraryStyle()
         QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right;
                               width: 24px; border: none; background: transparent; }
         QComboBox::down-arrow { image: url(:/chevron-down.png); width: 16px; height: 16px; }
-        QComboBox QAbstractItemView {
+        QComboBox QAbstractItemView, QAbstractItemView#keywordSuggestions {
             background-color: #ffffff; color: #182942;
             border: 1px solid #c9d6e8; padding: 3px; outline: 0;
             selection-background-color: #244f91; selection-color: #ffffff;
         }
-        QComboBox QAbstractItemView::item { min-height: 26px; padding: 3px 8px; }
-        QComboBox QAbstractItemView::item:hover:!selected {
+        QComboBox QAbstractItemView::item, QAbstractItemView#keywordSuggestions::item { min-height: 26px; padding: 3px 8px; }
+        QComboBox QAbstractItemView::item:hover:!selected,
+        QAbstractItemView#keywordSuggestions::item:hover:!selected {
             background-color: #eaf1fc; color: #182942;
         }
-        QComboBox QAbstractItemView::item:selected {
+        QComboBox QAbstractItemView::item:selected,
+        QAbstractItemView#keywordSuggestions::item:selected {
             background-color: #244f91; color: #ffffff;
         }
         QPushButton { background: #ffffff; border: 1px solid #c9d6e8;
