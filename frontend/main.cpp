@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <array>
 #include <QScrollArea>
+#include <QScopeGuard>
 #include <QSet>
 #include <QSignalBlocker>
 #include <QSplitter>
@@ -557,6 +558,15 @@ private:
                                      QStringLiteral("请填写文件名和文件类型，类型无需带点。"));
                 return;
             }
+            const auto supportedTypes = MediaLibrary::supportedFileTypes();
+            if (!supportedTypes.contains(record.fileType)) {
+                QMessageBox::warning(&dialog, QStringLiteral("检查输入"),
+                                     QStringLiteral("不支持的文件类型。支持类型：%1")
+                                         .arg(supportedTypes.join(QStringLiteral("、"))));
+                type.setFocus();
+                type.selectAll();
+                return;
+            }
             if (!record.releaseDate.isValid() || record.releaseDate.toString(Qt::ISODate) != dateText) {
                 QMessageBox::warning(&dialog, QStringLiteral("检查输入"),
                                      QStringLiteral("请输入有效的发行日期，格式为 YYYY-MM-DD。"));
@@ -731,6 +741,21 @@ private:
                        bool recommended = false)
     {
         const QSignalBlocker blockSelection(table_);
+        auto* header = table_->horizontalHeader();
+        QList<QHeaderView::ResizeMode> resizeModes;
+        for (int column = 0; column < table_->columnCount(); ++column)
+            resizeModes.append(header->sectionResizeMode(column));
+        const bool updatesEnabled = table_->updatesEnabled();
+        const auto restoreLayout = qScopeGuard([&] {
+            // Restoring automatic modes schedules one resize after the batch.
+            for (int column = 0; column < resizeModes.size(); ++column)
+                header->setSectionResizeMode(column, resizeModes.at(column));
+            table_->setUpdatesEnabled(updatesEnabled);
+        });
+        table_->setUpdatesEnabled(false);
+        // Blocking widget signals or painting alone does not stop model dataChanged
+        // from triggering ResizeToContents scans for every replaced cell.
+        header->setSectionResizeMode(QHeaderView::Fixed);
         table_->clearSelection();
         records_ = records;
         table_->setHorizontalHeaderLabels({QStringLiteral("文件名"), QStringLiteral("类型"),
