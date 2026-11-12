@@ -1,6 +1,7 @@
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 add_executable(media_library_qt WIN32 main.cpp)
+qt_add_resources(media_library_qt frontend_icons PREFIX / FILES chevron-down.png)
 target_link_libraries(media_library_qt PRIVATE media_business Qt6::Widgets)
 target_compile_options(media_library_qt PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
