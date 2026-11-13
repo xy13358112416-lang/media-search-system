@@ -1,6 +1,9 @@
 #include "medialibrary.h"
 #include "mediarecommendation.h"
 #include "library_style.h"
+#include "account_dialog.h"
+#include "account_frontend.h"
+#include "personalrecommendation_contract.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -268,7 +271,11 @@ void showPerformance(QWidget* parent)
 
 class LibraryWindow final : public QWidget {
 public:
-    explicit LibraryWindow(MediaLibrary& library) : library_(library)
+    explicit LibraryWindow(MediaLibrary& library,
+                           account_contract::AccountHistoryService* accounts = nullptr,
+                           recommendation_contract::PersonalRecommendationService* recommendations = nullptr)
+        : library_(library), accounts_(accounts), recommendations_(recommendations),
+          identity_(accounts ? accounts->currentUser() : std::nullopt)
     {
         setWindowTitle(QStringLiteral("多媒体文件管理及检索系统"));
         setObjectName(QStringLiteral("libraryWindow"));
@@ -284,6 +291,23 @@ public:
         auto* heading = new QLabel(QStringLiteral("多媒体文件管理及检索系统"));
         heading->setObjectName(QStringLiteral("appTitle"));
         bannerLayout->addWidget(heading);
+        bannerLayout->addStretch();
+        if (identity_) {
+            auto* identityLabel = new QLabel(QStringLiteral("%1 · %2").arg(identity_->username,
+                canManage() ? QStringLiteral("管理员") : QStringLiteral("普通用户")));
+            identityLabel->setTextFormat(Qt::PlainText);
+            identityLabel->setStyleSheet(QStringLiteral("color: white;"));
+            bannerLayout->addWidget(identityLabel);
+            auto* logout = new QPushButton(QStringLiteral("退出登录"));
+            bannerLayout->addWidget(logout);
+            connect(logout, &QPushButton::clicked, this, [this] {
+                accounts_->logout();
+                if (auto* session = qobject_cast<QDialog*>(parentWidget()))
+                    session->accept();
+                else
+                    close();
+            });
+        }
         layout->addWidget(banner);
         add_->setObjectName(QStringLiteral("primary"));
         remove_->setObjectName(QStringLiteral("danger"));
@@ -305,6 +329,8 @@ public:
         toolbar->addWidget(filter_);
         toolbar->addWidget(add_);
         toolbar->addWidget(remove_);
+        add_->setVisible(canManage());
+        remove_->setVisible(canManage());
         toolbar->addStretch();
 
         auto* searchControls = new QWidget;
@@ -375,6 +401,11 @@ public:
         controls_->addWidget(recommendationControls);
         controls_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
         layout->addWidget(controls_);
+        recommendationReason_->setTextFormat(Qt::PlainText);
+        recommendationReason_->setWordWrap(true);
+        recommendationReason_->setObjectName(QStringLiteral("muted"));
+        recommendationReason_->hide();
+        layout->addWidget(recommendationReason_);
 
         auto* summary = new QHBoxLayout;
         summary->addWidget(count_);
@@ -465,6 +496,7 @@ public:
         connect(tabs_, &QTabBar::currentChanged, this, [this](int index) {
             controls_->setCurrentIndex(index);
             trace_->setVisible(index == 1);
+            recommendationReason_->setVisible(index == 2 && !recommendationReason_->text().isEmpty());
             order_->setText(index == 2 ? QStringLiteral("按推荐顺序")
                                        : QStringLiteral("发行日期：从近到远"));
             if (index == 2) {
@@ -500,6 +532,13 @@ public:
         });
 
         connect(filter_, &QComboBox::currentIndexChanged, this, [this] { refresh(); });
+        connect(table_, &QTableWidget::cellClicked, this, [this](int row) {
+            if (!accounts_ || !identity_ || row < 0 || row >= records_.size())
+                return;
+            const auto status = accounts_->recordMediaView(identity_->userId, records_.at(row).id);
+            if (!status.ok())
+                QMessageBox::warning(this, QStringLiteral("保存浏览记录失败"), status.message);
+        });
         connect(table_, &QTableWidget::currentCellChanged, this,
                 [this](int row) { showDetail(row); });
         connect(add_, &QPushButton::clicked, this, [this] { addRecord(); });
@@ -508,9 +547,16 @@ public:
     }
 
 private:
+    bool canManage() const
+    {
+        return !accounts_ || (identity_ && identity_->role == account_contract::UserRole::Admin);
+    }
+
     // Collect a record and keep the form open if validation or saving fails.
     void addRecord()
     {
+        if (!canManage())
+            return;
         QDialog dialog(this);
         dialog.setWindowTitle(QStringLiteral("新增媒体记录"));
         dialog.setMinimumWidth(420);
@@ -578,13 +624,26 @@ private:
                 return;
             }
 
-            const auto result = library_.addNew(record);
-            const QString id = record.id;
-            if (!result.success) {
-                recoverAfterError(&dialog, QStringLiteral("新增失败"), result.error);
-                MediaRecord saved;
-                if (!library_.find(id, saved))
-                    return;
+            QString id;
+            if (accounts_) {
+                const auto result = accounts_->addMedia(record);
+                if (!result.status.ok()) {
+                    if (!result.persisted) {
+                        QMessageBox::warning(&dialog, QStringLiteral("新增失败"), result.status.message);
+                        return;
+                    }
+                    recoverAfterError(&dialog, QStringLiteral("媒体已保存，索引更新失败"), result.status.message);
+                }
+                id = result.mediaId;
+            } else {
+                const auto result = library_.addNew(record);
+                id = record.id;
+                if (!result.success) {
+                    recoverAfterError(&dialog, QStringLiteral("新增失败"), result.error);
+                    MediaRecord saved;
+                    if (!library_.find(id, saved))
+                        return;
+                }
             }
 
             // If another file type was selected, switch to the new record's type.
@@ -599,6 +658,8 @@ private:
     // Confirm the selected record and delete it by ID through the business layer.
     void removeRecord()
     {
+        if (!canManage())
+            return;
         const int row = table_->currentRow();
         if (row < 0 || row >= records_.size())
             return;
@@ -613,10 +674,21 @@ private:
         if (confirmation.exec() != QMessageBox::Yes)
             return;
 
-        const auto result = library_.remove(record.id);
-        if (!result.success) {
-            recoverAfterError(this, QStringLiteral("删除失败"), result.error);
-            return;
+        if (accounts_) {
+            const auto result = accounts_->removeMedia(record.id);
+            if (!result.status.ok()) {
+                if (result.persisted)
+                    recoverAfterError(this, QStringLiteral("媒体已删除，索引更新失败"), result.status.message);
+                else
+                    QMessageBox::warning(this, QStringLiteral("删除失败"), result.status.message);
+                return;
+            }
+        } else {
+            const auto result = library_.remove(record.id);
+            if (!result.success) {
+                recoverAfterError(this, QStringLiteral("删除失败"), result.error);
+                return;
+            }
         }
         refreshTypes(filter_->currentData().toString());
     }
@@ -698,34 +770,62 @@ private:
     void refreshPreferences(const QList<MediaRecord>& records)
     {
         QStringList categories;
-        for (const auto& record : records)
-            if (!record.category.isEmpty() && !categories.contains(record.category))
-                categories.append(record.category);
+        for (const auto& record : records) {
+            const auto category = record.category.trimmed();
+            if (!category.isEmpty() && !categories.contains(category))
+                categories.append(category);
+        }
         categories.sort();
         fillPreferences(categoryPreference_, categories);
         fillPreferences(typePreference_, library_.fileTypes());
     }
 
     // Populate a preference control with an empty option followed by available choices.
-    static void fillPreferences(QComboBox* combo, const QStringList& choices)
+    void fillPreferences(QComboBox* combo, const QStringList& choices)
     {
         const QSignalBlocker block(combo);
+        using recommendation_contract::PreferenceMode;
         const auto previous = combo->currentData();
+        const auto previousMode = combo->currentData(Qt::UserRole + 1);
         combo->clear();
-        combo->addItem(QStringLiteral("不限"), QString());
+        const auto add = [combo](const QString& label, PreferenceMode mode, const QString& value = {}) {
+            combo->addItem(label, value);
+            combo->setItemData(combo->count() - 1, static_cast<int>(mode), Qt::UserRole + 1);
+        };
+        if (accounts_)
+            add(QStringLiteral("自动"), PreferenceMode::Auto);
+        add(QStringLiteral("不限"), PreferenceMode::Any);
         for (const auto& choice : choices)
-            combo->addItem(choice, choice);
-        const int index = combo->findData(previous);
+            add(choice, PreferenceMode::Explicit, choice);
+        const int index = previousMode.isValid() && previous.toString().isEmpty()
+            ? combo->findData(previousMode, Qt::UserRole + 1) : combo->findData(previous);
         combo->setCurrentIndex(index < 0 ? 0 : index);
     }
 
     // Preserve the rank returned by the recommendation function in the shared table.
     void showRecommendations(const QList<MediaRecord>& records)
     {
-        RecommendationOptions options;
-        options.preferredCategory = categoryPreference_->currentData().toString();
-        options.preferredFileType = typePreference_->currentData().toString();
-        const auto ids = recommendMedia(records, options);
+        QStringList ids;
+        QString reason;
+        if (accounts_) {
+            using namespace recommendation_contract;
+            const auto choice = [](const QComboBox* combo) -> PreferenceSelection {
+                return {static_cast<PreferenceMode>(combo->currentData(Qt::UserRole + 1).toInt()),
+                        combo->currentData().toString()};
+            };
+            const auto result = identity_ && recommendations_
+                ? recommendations_->recommend({identity_->userId, choice(categoryPreference_), choice(typePreference_)})
+                : RecommendationResult{false, QStringLiteral("个性化推荐服务暂不可用。"), {}, {}};
+            ids = result.success ? result.mediaIds : QStringList();
+            reason = result.success ? result.reason : result.error;
+        } else {
+            RecommendationOptions options;
+            options.preferredCategory = categoryPreference_->currentData().toString();
+            options.preferredFileType = typePreference_->currentData().toString();
+            ids = recommendMedia(records, options);
+        }
+        recommendationReason_->setText(reason);
+        recommendationReason_->setVisible(!reason.isEmpty());
         QList<MediaRecord> results;
         for (const auto& id : ids) {
             MediaRecord record;
@@ -785,8 +885,9 @@ private:
     // Update the details from the record associated with the current table row.
     void showDetail(int row)
     {
-        remove_->setEnabled(row >= 0 && row < records_.size());
-        if (!remove_->isEnabled()) {
+        const bool validRow = row >= 0 && row < records_.size();
+        remove_->setEnabled(validRow && canManage());
+        if (!validRow) {
             for (auto* value : detailValues_)
                 value->setText(displayText({}));
             return;
@@ -803,6 +904,10 @@ private:
             detailValues_.at(i)->setText(displayText(values.at(i)));
     }
 
+    account_contract::AccountHistoryService* accounts_;
+    recommendation_contract::PersonalRecommendationService* recommendations_;
+    const std::optional<account_contract::UserIdentity> identity_;
+    QLabel* recommendationReason_ = new QLabel;
     MediaLibrary& library_;            // Loaded business service, owned by main.
     QList<MediaRecord> records_;       // Visible records in table row order.
     QList<QLabel*> detailValues_;      // Detail value labels in form order.
@@ -829,6 +934,39 @@ private:
 };
 
 } // namespace
+
+// Entry point for the account-backed frontend once the concrete services are wired.
+int runAccountFrontend(QApplication& app, MediaLibrary& library,
+                       account_contract::AccountHistoryService& accounts,
+                       recommendation_contract::PersonalRecommendationService& recommendations,
+                       const QString& databasePath)
+{
+    const auto initialized = accounts.initializeDatabase(databasePath);
+    if (!initialized.ok()) {
+        QMessageBox::critical(nullptr, QStringLiteral("账户数据库初始化失败"), initialized.message);
+        return 1;
+    }
+
+    // Closing the library on logout must not quit before the next login dialog opens.
+    const bool quitOnClose = app.quitOnLastWindowClosed();
+    app.setQuitOnLastWindowClosed(false);
+    while (account_ui::signIn(accounts) && accounts.currentUser()) {
+        QDialog session;
+        session.setWindowTitle(QStringLiteral("多媒体文件管理及检索系统"));
+        session.resize(1120, 710);
+        auto* layout = new QVBoxLayout(&session);
+        layout->setContentsMargins(0, 0, 0, 0);
+        auto* window = new LibraryWindow(library, &accounts, &recommendations);
+        layout->addWidget(window);
+        session.exec();
+        const bool loggedOut = !accounts.currentUser();
+        accounts.logout();
+        if (!loggedOut)
+            break;
+    }
+    app.setQuitOnLastWindowClosed(quitOnClose);
+    return 0;
+}
 
 int main(int argc, char* argv[])
 {
