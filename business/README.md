@@ -15,7 +15,17 @@ Qt 和编译器的安装路径由开发环境提供；Windows 下 Qt 的 DLL 必
 
 `AccountHistoryServiceImpl` 位于 `include/account_history_service.h`，由应用创建并传入 CSV 路径；可调用 `initializeDefaultDatabase()` 在 `QStandardPaths::AppLocalDataLocation` 初始化默认数据库，或调用 `initializeDatabase(dbPath)` 指定路径，再调用 `needsInitialAdmin()` 等共享接口。接口必须从所属线程调用；在一次媒体操作中，`MediaMutationResult.persisted` 表示 CSV 是否已经改变，不能把索引同步失败当作可盲目重试的普通失败。
 
-**集成边界：**本次实现的账户服务会检查当前会话和管理员角色；现有 Qt 界面仍调用旧版 `MediaLibrary`，还没有接入账户或历史接口。Qt 接入时必须把新增、删除和主动点击改为调用账户服务，并在保存成功后同步其持有的检索索引；接入之前不能认为现有界面已经具备角色限制。`MediaLibrary` 和 `CsvMediaRepository` 是底层数据组件，旧入口本身不检查登录角色。
+**集成边界：**账户服务检查当前会话和管理员角色。Qt 已有账户模式的界面入口，但当前程序的 `main()` 仍启动旧口令模式；在接通新入口之前，不能认为正常启动程序已经具备账户权限控制。`MediaLibrary` 和 `CsvMediaRepository` 是底层数据组件，直接调用它们不会检查登录角色。
+
+账户模式可让界面和账户服务使用同一份媒体库与索引，避免配置两份 CSV 路径：
+
+```cpp
+MediaLibrary library(csvPath, {}); // csvPath 指向界面要使用的 CSV。
+const auto loaded = library.load(); // 失败时向界面返回 loaded.error，不继续启动。
+AccountHistoryServiceImpl accounts(library);
+```
+
+初始化成功后，将 `library` 和 `accounts` 传给账户界面，并以 `library.records()` 作为推荐模块的当前媒体来源；数据库路径仍由应用初始化流程决定。`library` 由调用方持有，必须比 `accounts` 活得久。通过账户服务增删成功后，同一实例的记录和检索索引随之更新；界面仍须刷新表格。`MediaMutationResult` 可能报告已保存但索引同步失败，此时应按结果处理并恢复，不能直接重试写入。原来的 CSV 路径构造方式继续可用，但会持有独立快照，需要调用方在变更后重新加载自己的媒体库。两种方式均不支持多个进程同时写入同一 CSV。
 
 当前使用 SQLite `user_version=1`。若检测到包含 `users` 或 `media_history` 的未版本化数据库，将拒绝修改并提示先迁移，不自动覆盖旧数据；迁移方案需结合实际旧表确认。
 若 MSYS2 安装位置不同，可用 `. .\business\dev-env.ps1 -MsysRoot D:\msys64`。脚本默认将当前终端 TEMP/TMP 指向 `C:\tmp`，以避免某些 g++ 版本无法处理中文用户临时目录；其他平台应配置自己的 Qt 6 工具链。

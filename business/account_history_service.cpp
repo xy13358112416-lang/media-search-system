@@ -64,6 +64,9 @@ bool hasRequiredChecks(QSqlDatabase& db, const QString& table, const QString& fr
 AccountHistoryServiceImpl::AccountHistoryServiceImpl(QString csvPath)
     : connectionName_(QUuid::createUuid().toString(QUuid::WithoutBraces)), csvPath_(std::move(csvPath)) {}
 
+AccountHistoryServiceImpl::AccountHistoryServiceImpl(MediaLibrary& library)
+    : connectionName_(QUuid::createUuid().toString(QUuid::WithoutBraces)), sharedLibrary_(&library) {}
+
 AccountHistoryServiceImpl::~AccountHistoryServiceImpl() {
     session_.reset(); library_.reset();
     if (db_.isValid()) db_.close();
@@ -198,11 +201,15 @@ Status AccountHistoryServiceImpl::checkAdmin() const {
     if (session_->role != UserRole::Admin) return failure(ErrorCode::PermissionDenied, QStringLiteral("仅管理员可修改媒体"));
     return {};
 }
+MediaLibrary* AccountHistoryServiceImpl::activeLibrary() const {
+    return sharedLibrary_ ? sharedLibrary_ : library_.get();
+}
+
 Status AccountHistoryServiceImpl::ensureLibrary() {
-    if (csvPath_.isEmpty()) return failure(ErrorCode::StorageError, QStringLiteral("尚未配置媒体库路径"));
-    if (!library_) library_ = std::make_unique<MediaLibrary>(csvPath_, QString());
+    if (!sharedLibrary_ && csvPath_.isEmpty()) return failure(ErrorCode::StorageError, QStringLiteral("尚未配置媒体库路径"));
+    if (!sharedLibrary_ && !library_) library_ = std::make_unique<MediaLibrary>(csvPath_, QString());
     // 主程序其他模块可能修改 CSV；每次业务操作之前重新加载并重建本服务索引。
-    const auto result = library_->load();
+    const auto result = activeLibrary()->load();
     if (!result.success) return failure(ErrorCode::StorageError, result.error);
     return {};
 }
@@ -213,7 +220,7 @@ MediaMutationResult AccountHistoryServiceImpl::addMedia(const MediaRecord& recor
     if (!validation.success) return {failure(ErrorCode::InvalidArgument, validation.error), false, {}};
     status = ensureLibrary(); if (!status.ok()) return {status, false, {}};
     MediaRecord candidate = record;
-    const auto result = library_->addNew(candidate);
+    const auto result = activeLibrary()->addNew(candidate);
     if (!result.success) return {failure(result.persisted ? ErrorCode::IndexSyncError : ErrorCode::StorageError, result.error), result.persisted, result.persisted ? candidate.id : QString()};
     return {{}, true, candidate.id};
 }
@@ -222,8 +229,8 @@ MediaMutationResult AccountHistoryServiceImpl::removeMedia(const QString& mediaI
     if (mediaId.trimmed().isEmpty()) return {failure(ErrorCode::InvalidArgument, QStringLiteral("媒体 ID 为空")), false, {}};
     status = ensureLibrary(); if (!status.ok()) return {status, false, {}};
     MediaRecord record;
-    if (!library_->find(mediaId, record)) return {failure(ErrorCode::MediaNotFound, QStringLiteral("媒体不存在")), false, {}};
-    const auto result = library_->remove(mediaId);
+    if (!activeLibrary()->find(mediaId, record)) return {failure(ErrorCode::MediaNotFound, QStringLiteral("媒体不存在")), false, {}};
+    const auto result = activeLibrary()->remove(mediaId);
     if (!result.success) return {failure(result.persisted ? ErrorCode::IndexSyncError : ErrorCode::StorageError, result.error), result.persisted, result.persisted ? mediaId : QString()};
     return {{}, true, mediaId};
 }
@@ -233,7 +240,7 @@ Status AccountHistoryServiceImpl::recordMediaView(qint64 userId, const QString& 
     if (mediaId.trimmed().isEmpty()) return failure(ErrorCode::InvalidArgument, QStringLiteral("媒体 ID 为空"));
     status = ensureLibrary(); if (!status.ok()) return status;
     MediaRecord record;
-    if (!library_->find(mediaId, record)) return failure(ErrorCode::MediaNotFound, QStringLiteral("媒体不存在"));
+    if (!activeLibrary()->find(mediaId, record)) return failure(ErrorCode::MediaNotFound, QStringLiteral("媒体不存在"));
     QSqlQuery q(db_);
     q.prepare(QStringLiteral("INSERT INTO media_history(user_id,media_id,view_count,last_viewed_at) VALUES(?,?,1,?) ON CONFLICT(user_id,media_id) DO UPDATE SET view_count=view_count+1,last_viewed_at=excluded.last_viewed_at WHERE view_count<9223372036854775807"));
     q.addBindValue(userId); q.addBindValue(mediaId); q.addBindValue(QDateTime::currentSecsSinceEpoch());
