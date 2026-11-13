@@ -627,12 +627,13 @@ private:
             QString id;
             if (accounts_) {
                 const auto result = accounts_->addMedia(record);
-                if (!result.status.ok()) {
-                    if (!result.persisted) {
-                        QMessageBox::warning(&dialog, QStringLiteral("新增失败"), result.status.message);
-                        return;
-                    }
-                    recoverAfterError(&dialog, QStringLiteral("媒体已保存，索引更新失败"), result.status.message);
+                if (!result.persisted) {
+                    QMessageBox::warning(&dialog, QStringLiteral("新增失败"), result.status.message);
+                    return;
+                }
+                if (!reloadAfterAccountMutation(&dialog, result, QStringLiteral("新增"))) {
+                    dialog.accept();
+                    return;
                 }
                 id = result.mediaId;
             } else {
@@ -676,13 +677,8 @@ private:
 
         if (accounts_) {
             const auto result = accounts_->removeMedia(record.id);
-            if (!result.status.ok()) {
-                if (result.persisted)
-                    recoverAfterError(this, QStringLiteral("媒体已删除，索引更新失败"), result.status.message);
-                else
-                    QMessageBox::warning(this, QStringLiteral("删除失败"), result.status.message);
+            if (!reloadAfterAccountMutation(this, result, QStringLiteral("删除")))
                 return;
-            }
         } else {
             const auto result = library_.remove(record.id);
             if (!result.success) {
@@ -691,6 +687,28 @@ private:
             }
         }
         refreshTypes(filter_->currentData().toString());
+    }
+
+    // The account service owns a separate MediaLibrary. Reload the UI snapshot
+    // after a committed write, including writes that reported an index error.
+    bool reloadAfterAccountMutation(QWidget* parent,
+                                    const account_contract::MediaMutationResult& result,
+                                    const QString& action)
+    {
+        if (!result.persisted) {
+            QMessageBox::warning(parent, action + QStringLiteral("失败"), result.status.message);
+            return false;
+        }
+
+        const auto reload = library_.load();
+        if (!reload.success) {
+            QMessageBox::warning(parent, action + QStringLiteral("已保存"),
+                QStringLiteral("媒体库刷新失败，请重新打开程序。\n") + reload.error);
+        } else if (!result.status.ok()) {
+            QMessageBox::warning(parent, action + QStringLiteral("已保存，媒体库已刷新"),
+                                 result.status.message);
+        }
+        return reload.success;
     }
 
     // Reload the current snapshot in case a write succeeded before indexing failed.
