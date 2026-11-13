@@ -10,6 +10,14 @@ ctest --test-dir build --output-on-failure
 ```
 
 Qt 和编译器的安装路径由开发环境提供；Windows 下 Qt 的 DLL 必须在 PATH 中。CMake 构建 `media_business` 库以及检索库。Qt 界面程序可链接 `media_business`，包含 `medialibrary.h`。
+
+账户服务还需要 Qt 6 Sql、SQLite 驱动和 libsodium（通过 pkg-config 查找）。MSYS2 UCRT64 下可安装 `mingw-w64-ucrt-x86_64-libsodium`、`mingw-w64-ucrt-x86_64-pkgconf` 和 `mingw-w64-ucrt-x86_64-qt6-base`。发布程序时须同时部署 Qt SQL SQLite 驱动和 libsodium 运行库。
+
+`AccountHistoryServiceImpl` 位于 `include/account_history_service.h`，由应用创建并传入 CSV 路径；可调用 `initializeDefaultDatabase()` 在 `QStandardPaths::AppLocalDataLocation` 初始化默认数据库，或调用 `initializeDatabase(dbPath)` 指定路径，再调用 `needsInitialAdmin()` 等共享接口。接口必须从所属线程调用；在一次媒体操作中，`MediaMutationResult.persisted` 表示 CSV 是否已经改变，不能把索引同步失败当作可盲目重试的普通失败。
+
+**集成边界：**本次实现的账户服务会检查当前会话和管理员角色；现有 Qt 界面仍调用旧版 `MediaLibrary`，还没有接入账户或历史接口。Qt 接入时必须把新增、删除和主动点击改为调用账户服务，并在保存成功后同步其持有的检索索引；接入之前不能认为现有界面已经具备角色限制。`MediaLibrary` 和 `CsvMediaRepository` 是底层数据组件，旧入口本身不检查登录角色。
+
+当前使用 SQLite `user_version=1`。若检测到包含 `users` 或 `media_history` 的未版本化数据库，将拒绝修改并提示先迁移，不自动覆盖旧数据；迁移方案需结合实际旧表确认。
 若 MSYS2 安装位置不同，可用 `. .\business\dev-env.ps1 -MsysRoot D:\msys64`。脚本默认将当前终端 TEMP/TMP 指向 `C:\tmp`，以避免某些 g++ 版本无法处理中文用户临时目录；其他平台应配置自己的 Qt 6 工具链。
 
 ```cpp

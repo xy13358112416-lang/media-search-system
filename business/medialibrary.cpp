@@ -50,12 +50,12 @@ RepositoryResult MediaLibrary::persistRecord(const MediaRecord& record) {
     if (!check.success) return check;
     auto result = repository_.add(record);
     if (!result.success) return result;
-    try { search_.addRecord(record); records_.append(record); return {true, {}}; }
+    try { search_.addRecord(record); records_.append(record); return {true, {}, true}; }
     catch (const std::exception&) {
         loaded_ = false;
         auto recovery = load();
         return {false, recovery.success ? QStringLiteral("数据已保存，索引已重建，请刷新界面") :
-                       QStringLiteral("数据已保存，索引重建失败，请重新加载：") + recovery.error};
+                       QStringLiteral("数据已保存，索引重建失败，请重新加载：") + recovery.error, true};
     }
 }
 
@@ -69,12 +69,12 @@ RepositoryResult MediaLibrary::remove(const QString& id) {
         search_.removeRecord(id);
         for (qsizetype i = 0; i < records_.size(); ++i)
             if (records_[i].id == id) { records_.removeAt(i); break; }
-        return {true, {}};
+        return {true, {}, true};
     } catch (const std::exception&) {
         loaded_ = false;
         auto recovery = load();
         return {false, recovery.success ? QStringLiteral("数据已删除，索引已重建，请刷新界面") :
-                       QStringLiteral("数据已删除，索引重建失败，请重新加载：") + recovery.error};
+                       QStringLiteral("数据已删除，索引重建失败，请重新加载：") + recovery.error, true};
     }
 }
 

@@ -1,12 +1,12 @@
 # 账户、权限与浏览历史：三方接口约定
 
-本文件及 `include/account_history_contract.h` 记录共享接口；**尚未实现账户、SQLite、权限、密码哈希或浏览历史**。后续 PR 需提交实现和行为测试。
+本文件及 `include/account_history_contract.h` 记录共享接口。账户、SQLite、权限及浏览历史的服务实现位于 `business/account_history_service.cpp`，对应测试位于 `business/account_history_tests.cpp`；Qt 界面接入和推荐算法由各自同学完成。
 
 ## 职责和文件
 
 | 负责方 | 工作和建议文件 |
 |---|---|
-| 主逻辑（我们） | 已有草案 `include/account_history_contract.h`。确认后建议新增 `business/account_service.cpp`、`business/database_migrations.cpp`、`business/history_repository.cpp` 及相应头文件和 `business/account_history_tests.cpp`；调整 `business/CMakeLists.txt` 与 `include/medialibrary.h` / `business/medialibrary.cpp` 的业务入口。媒体依然使用 CSV。具体拆分可由实现阶段调整。 |
+| 主逻辑（我们） | `include/account_history_contract.h` 定义共享接口，`include/account_history_service.h` 和 `business/account_history_service.cpp` 提供实现，`business/account_history_tests.cpp` 测试。媒体依然使用 CSV。 |
 | Qt 同学 | 以现有 `frontend/main.cpp` 为接入位置，按需拆分界面文件：实现登录、注册、创建管理员，依据角色控制按钮；只在主动点击时调用历史接口；展示推荐结果。 |
 | 推荐同学 | 以现有 `include/mediarecommendation.h`、`retrieval/mediarecommendation.cpp` 和对应测试为接入位置，确定 `PreferenceMode` / 请求和返回类型，根据 `loadMediaHistory(currentUser.userId)` 推断偏好并返回 ID 和原因；维护检索索引同步接口。 |
 
@@ -37,7 +37,7 @@ CREATE TABLE media_history (
 );
 ```
 
-每个 SQLite 连接启用外键检查。媒体记录存在 CSV 中，`media_id` 无法由 SQLite 外键校验，写入历史前由业务层确认；媒体删除后遗留的历史由推荐方按当前媒体库过滤。真实迁移脚本和数据库版本在接口确认后实现。
+每个 SQLite 连接启用外键检查。媒体记录存在 CSV 中，`media_id` 无法由 SQLite 外键校验，写入历史前由业务层确认；媒体删除后遗留的历史由推荐方按当前媒体库过滤。当前初始化新数据库为版本 1；含账户或历史表的未版本化数据库拒绝自动修改，需另行制定迁移方案。
 
 ## 接口行为
 
@@ -59,7 +59,7 @@ CREATE TABLE media_history (
 | `recordMediaView` | 当前用户 ID、媒体 ID；返回状态 | 未登录、用户不匹配、媒体不存在、数据库失败 |
 | `loadMediaHistory` | 当前用户 ID；返回历史列表（可为空） | 未登录、用户不匹配、数据库失败 |
 
-## 确认后实现时的验收
+## 验收范围
 
 - 空库首次创建管理员；重复创建失败；普通注册不能指定管理员；重复用户名规范化后拒绝。
 - 中英文口令注册、登录；错误口令失败；哈希含盐且不存明文；数据库错误可见。
@@ -67,4 +67,4 @@ CREATE TABLE media_history (
 - 主动点击更新当前用户的次数和时间；错误用户、无效媒体及数据库失败均返回错误；切换账号不读取旧账号历史。
 - 重启后用户、历史和权限仍正确；Qt 自动选中、刷新或切页不重复记为主动点击（需 Qt 同学配合）。
 
-草案编译验证仅证明头文件与 C++17/Qt 兼容，不证明上述行为已实现。对外 PR 必须包含实现和对应行为测试，不能只提交空接口。
+账户和历史的测试在 `business/account_history_tests.cpp`；完整界面的主动点击与切换账号仍需 Qt 同学接入后联调。CSV 已持久化但索引同步失败的恢复分支尚未通过故障注入测试。
