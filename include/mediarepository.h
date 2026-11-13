@@ -8,6 +8,7 @@
 struct RepositoryResult {
     bool success = false;  // 操作是否成功
     QString error;         // 失败原因；成功时为空
+    bool persisted = false; // 此操作是否已经改变 CSV。
 };
 
 // 数据持久化接口；具体 CSV 实现将在后续提交中提供。
