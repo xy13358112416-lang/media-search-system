@@ -177,6 +177,73 @@ private slots:
         QCOMPARE(f.table->rowCount(), 30);
     }
 
+    void accountMutationsRefreshIndependentSnapshot() {
+        struct Accounts final : account_contract::AccountHistoryService {
+            MediaLibrary writer;
+            explicit Accounts(const QString& path) : writer(path, {}) {}
+            account_contract::Status initializeDatabase(const QString&) override { return {}; }
+            account_contract::Result<bool> needsInitialAdmin() override { return {{}, false}; }
+            account_contract::Status createInitialAdmin(const QString&, const QString&) override { return {}; }
+            account_contract::Status registerUser(const QString&, const QString&) override { return {}; }
+            account_contract::Result<account_contract::UserIdentity> login(const QString&, const QString&) override {
+                return {{}, currentUser()};
+            }
+            std::optional<account_contract::UserIdentity> currentUser() const override {
+                return account_contract::UserIdentity{1, QStringLiteral("admin"), account_contract::UserRole::Admin};
+            }
+            void logout() override {}
+            account_contract::Status recordMediaView(qint64, const QString&) override { return {}; }
+            account_contract::Result<QList<account_contract::MediaHistoryEntry>> loadMediaHistory(qint64) override {
+                return {{}, QList<account_contract::MediaHistoryEntry>{}};
+            }
+            account_contract::MediaMutationResult addMedia(const MediaRecord& record) override {
+                auto copy = record;
+                const auto result = writer.addNew(copy);
+                return {status(result), result.success, copy.id};
+            }
+            account_contract::MediaMutationResult removeMedia(const QString& id) override {
+                const auto result = writer.remove(id);
+                return {status(result), result.success, id};
+            }
+            static account_contract::Status status(const RepositoryResult& result) {
+                return {result.success ? account_contract::ErrorCode::None
+                                       : account_contract::ErrorCode::StorageError, result.error};
+            }
+        };
+
+        Fixture f(QString::fromUtf8(SAMPLE_CSV));
+        Accounts accounts(f.csvPath);
+        QVERIFY(accounts.writer.load().success);
+        f.window = std::make_unique<LibraryWindow>(f.library, &accounts);
+        f.window->show();
+        auto* table = f.window->findChild<QTableWidget*>();
+        const SearchQuery query{QStringLiteral("回归导演"), {}, {}};
+
+        QTimer::singleShot(0, [&] {
+            auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            if (!dialog) return;
+            f.fillAddForm(dialog, QStringLiteral("MP4"));
+            dialog->findChild<QDialogButtonBox*>()->button(QDialogButtonBox::Save)->click();
+            if (dialog->isVisible()) dialog->reject();
+        });
+        button(f.window.get(), QStringLiteral("新增"))->click();
+        QCOMPARE(table->rowCount(), 31);
+        const auto ids = f.library.search(query);
+        QCOMPARE(ids.size(), 1);
+        QCOMPARE(f.detail(QStringLiteral("编号")), ids.first());
+        QCOMPARE(table->item(table->currentRow(), 0)->text(), QStringLiteral("回归新增.mp4"));
+
+        QTimer::singleShot(0, [] {
+            if (auto* confirmation = qobject_cast<QMessageBox*>(QApplication::activeModalWidget()))
+                confirmation->done(QMessageBox::Yes);
+        });
+        button(f.window.get(), QStringLiteral("删除"))->click();
+        QCOMPARE(table->rowCount(), 30);
+        QVERIFY(f.library.search(query).isEmpty());
+        MediaRecord removed;
+        QVERIFY(!f.library.find(ids.first(), removed));
+    }
+
     void externalChangeStillRecovers() {
         Fixture f(QString::fromUtf8(SAMPLE_CSV));
         const auto removed = f.library.records().first();
