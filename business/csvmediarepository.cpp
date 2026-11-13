@@ -83,6 +83,15 @@ QStringList CsvMediaRepository::supportedFileTypes() {
     return {"AAC", "AVI", "FLAC", "FLV", "M4A", "MKV", "MOV", "MP3", "MP4", "OGG", "WAV", "WEBM", "WMV"};
 }
 
+RepositoryResult CsvMediaRepository::validateNewRecord(const MediaRecord& record) {
+    if (!supportedFileTypes().contains(record.fileType))
+        return fail(QStringLiteral("不支持的文件类型，请选择支持的音视频扩展名"));
+    MediaRecord candidate = record;
+    candidate.id = QStringLiteral("M000001"); // 新增时 ID 由业务层分配。
+    if (!validRecord(candidate)) return fail(QStringLiteral("记录字段无效"));
+    return {true, {}};
+}
+
 RepositoryResult CsvMediaRepository::ensureSequence(const QList<MediaRecord>& records) {
     return updateSequence(records, false, nullptr);
 }
