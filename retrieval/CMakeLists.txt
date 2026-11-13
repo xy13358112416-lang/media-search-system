@@ -30,7 +30,8 @@ if(BUILD_TESTING)
     add_test(NAME search_updates COMMAND media_search_tests indexFollowsAddRemoveAndRebuild invalidUpdatesDoNotChangeResults)
     add_test(NAME search_optimization COMMAND media_search_tests shortestListReducesInitialCandidates missingConditionStopsEarly)
 
-    add_executable(media_recommendation_tests mediarecommendation_tests.cpp)
+    add_executable(media_recommendation_tests mediarecommendation_tests.cpp
+                   personalrecommendation_contract_compile.cpp)
     set_target_properties(media_recommendation_tests PROPERTIES AUTOMOC ON)
     target_link_libraries(media_recommendation_tests PRIVATE media_search Qt6::Test)
     add_test(NAME recommendation COMMAND media_recommendation_tests)
