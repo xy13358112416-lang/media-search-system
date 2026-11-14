@@ -18,3 +18,5 @@ if(BUILD_TESTING)
     target_compile_options(warehouse_protocol_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
     add_test(NAME warehouse_protocol_tests COMMAND warehouse_protocol_tests)
 endif()
+
+include(${CMAKE_CURRENT_LIST_DIR}/llm_recommendation.cmake)
