@@ -61,6 +61,9 @@ inline QString libraryStyle()
         QPushButton#primary { color: #ffffff; background: #244f91; border-color: #244f91; }
         QPushButton#primary:hover { background: #1a3e75; }
         QPushButton#primary:focus { border: 1px solid #98b7ff; }
+        QPushButton#avatarButton { background: #173253; border: 1px solid transparent;
+                                   border-radius: 22px; padding: 0; }
+        QPushButton#avatarButton:hover, QPushButton#avatarButton:focus { border-color: #98b7ff; }
         QPushButton#danger { color: #9d2c41; }
         QPushButton:disabled, QPushButton#danger:disabled { color: #7d8ba0; background: #f2f5f9; }
         QTableWidget { background: #ffffff; alternate-background-color: #f5f8fd;

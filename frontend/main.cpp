@@ -2,6 +2,7 @@
 #include "mediarecommendation.h"
 #include "library_style.h"
 #include "account_dialog.h"
+#include "avatar_button.h"
 #include "account_frontend.h"
 #include "account_history_service.h"
 #include "personalrecommendation_service.h"
@@ -186,7 +187,8 @@ public:
     explicit LibraryWindow(MediaLibrary& library,
                            account_contract::AccountHistoryService* accounts = nullptr,
                            recommendation_contract::PersonalRecommendationService* recommendations = nullptr,
-                           recommendation_contract::TodayRecommendationService* today = nullptr)
+                           recommendation_contract::TodayRecommendationService* today = nullptr,
+                           const QString& accountDatabasePath = {})
         : library_(library), accounts_(accounts), recommendations_(recommendations), today_(today),
           identity_(accounts ? accounts->currentUser() : std::nullopt)
     {
@@ -206,6 +208,9 @@ public:
         bannerLayout->addWidget(heading);
         bannerLayout->addStretch();
         if (identity_) {
+            if (!accountDatabasePath.isEmpty())
+                bannerLayout->addWidget(account_ui::createAvatarButton(
+                    accountDatabasePath, identity_->userId, identity_->username));
             auto* identityLabel = new QLabel(QStringLiteral("%1 · %2").arg(identity_->username,
                 canManage() ? QStringLiteral("管理员") : QStringLiteral("普通用户")));
             identityLabel->setTextFormat(Qt::PlainText);
@@ -1015,7 +1020,7 @@ int runAccountFrontend(QApplication& app, MediaLibrary& library,
         session.resize(1120, 710);
         auto* layout = new QVBoxLayout(&session);
         layout->setContentsMargins(0, 0, 0, 0);
-        auto* window = new LibraryWindow(library, &accounts, &recommendations, today);
+        auto* window = new LibraryWindow(library, &accounts, &recommendations, today, databasePath);
         layout->addWidget(window);
         session.exec();
         const bool loggedOut = !accounts.currentUser();
