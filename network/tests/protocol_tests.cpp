@@ -4,6 +4,8 @@
 #include <QJsonArray>
 #include <QtTest>
 #include <limits>
+#include <type_traits>
+#include <utility>
 
 class ProtocolTests : public QObject {
     Q_OBJECT
@@ -19,6 +21,17 @@ private slots:
         warehouse_contract::WarehouseRecommendationResult result;
         QVERIFY(!result.fallback);
         QVERIFY(result.items.isEmpty());
+        QVERIFY(result.message.isEmpty());
+        using Service = warehouse_contract::WarehouseService;
+        using Request = warehouse_contract::WarehouseRecommendationRequest;
+        using Result = warehouse_contract::WarehouseRecommendationResult;
+        static_assert(std::is_same_v<
+            decltype(std::declval<Service&>().recommendResources(
+                std::declval<const Request&>(), std::declval<warehouse_contract::Callback<Result>>())),
+            warehouse_contract::RecommendationHandle>);
+        static_assert(std::is_same_v<
+            decltype(std::declval<Service&>().cancelRecommendation(
+                std::declval<const warehouse_contract::RecommendationHandle&>())), bool>);
     }
     void mediaRoundTrip() {
         MediaRecord input;
