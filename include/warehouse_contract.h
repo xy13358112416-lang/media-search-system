@@ -19,7 +19,9 @@ struct WarehouseDetail { WarehouseSummary warehouse; QList<WarehouseItem> items;
 // 创建仓库时 targetWarehouseId 为空；编辑仓库时提供其编号。服务器确定可访问的候选。
 struct WarehouseRecommendationRequest { QString query; std::optional<qint64> targetWarehouseId; int limit = 5; };
 struct WarehouseRecommendationItem { qint64 warehouseId = 0; qint64 itemId = 0; MediaRecord media; QString reason; };
-struct WarehouseRecommendationResult { QList<WarehouseRecommendationItem> items; bool fallback = false; };
+struct WarehouseRecommendationResult { QList<WarehouseRecommendationItem> items; bool fallback = false; QString message; };
+// 非空句柄只在创建它的客户端对象及当前连接会话内有效。
+using RecommendationHandle = QString;
 template<class T> using Callback = std::function<void(Result<T>)>;
 using StatusCallback = std::function<void(Status)>;
 
@@ -37,6 +39,9 @@ public:
     virtual void createWarehouse(const QString& name, Visibility visibility, Callback<WarehouseSummary> done) = 0;
     virtual void addItem(qint64 warehouseId, const MediaRecord& media, Callback<WarehouseItem> done) = 0;
     virtual void removeItem(qint64 warehouseId, qint64 itemId, StatusCallback done) = 0;
-    virtual void recommendResources(const WarehouseRecommendationRequest& request, Callback<WarehouseRecommendationResult> done) = 0;
+    // 立即失败时可同步回调并返回空句柄；否则返回供取消使用的不透明句柄。
+    virtual RecommendationHandle recommendResources(const WarehouseRecommendationRequest& request, Callback<WarehouseRecommendationResult> done) = 0;
+    // true 表示本地成功取消等待并以 Cancelled 完成原回调；false 表示已完成或无效。
+    virtual bool cancelRecommendation(const RecommendationHandle& handle) = 0;
 };
 }
