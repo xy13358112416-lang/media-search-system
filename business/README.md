@@ -15,7 +15,7 @@ Qt 和编译器的安装路径由开发环境提供；Windows 下 Qt 的 DLL 必
 
 `AccountHistoryServiceImpl` 位于 `include/account_history_service.h`，由应用创建并传入 CSV 路径；可调用 `initializeDefaultDatabase()` 在 `QStandardPaths::AppLocalDataLocation` 初始化默认数据库，或调用 `initializeDatabase(dbPath)` 指定路径，再调用 `needsInitialAdmin()` 等共享接口。接口必须从所属线程调用；在一次媒体操作中，`MediaMutationResult.persisted` 表示 CSV 是否已经改变，不能把索引同步失败当作可盲目重试的普通失败。
 
-**集成边界：**账户服务检查当前会话和管理员角色。Qt 的账户模式启动入口通过账户服务处理增删和浏览历史。`MediaLibrary` 和 `CsvMediaRepository` 是底层数据组件，直接调用它们不会检查登录角色。
+**集成边界：**账户服务检查当前会话和管理员角色。Qt 已有账户模式的界面入口，但当前程序的 `main()` 仍启动旧口令模式；在接通新入口之前，不能认为正常启动程序已经具备账户权限控制。`MediaLibrary` 和 `CsvMediaRepository` 是底层数据组件，直接调用它们不会检查登录角色。
 
 账户模式可让界面和账户服务使用同一份媒体库与索引，避免配置两份 CSV 路径：
 
