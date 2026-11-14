@@ -11,7 +11,7 @@ actor_pairs = [('陈明', '王青'), ('陈明', '李悦'), ('王青', '孙晓'),
 categories = ['纪录片', '剧情', '音乐', '科幻']
 types = ['MP4', 'MP3', 'WAV']
 names = ['晨光', '远山', '城市', '海风', '旅程', '星河', '归途', '夜曲']
-out = Path(__file__).parent / 'data' / 'media_records.csv'
+out = Path(__file__).parent / 'tests' / 'fixtures' / 'media_records_synthetic.csv'
 out.parent.mkdir(parents=True, exist_ok=True)
 with out.open('w', encoding='utf-8', newline='') as f:
     writer = csv.writer(f, lineterminator='\n')

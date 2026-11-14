@@ -21,7 +21,7 @@
 | `add_item` | `warehouse_id`, `media` | `item` |
 | `remove_item` | `warehouse_id`, `item_id` | 空 |
 
-`user`：`{"user_id":"1","username":"alice"}`；`warehouse` 摘要：`{"warehouse_id":"2","name":"收藏","owner_id":"1","visibility":"public"}`；`item`：`{"item_id":"3","media":{...}}`。`media` 的十个字段由 `media_json` 定义：`id`、`file_name`、`file_type`、`file_size`、`director`、`actors`、`view_count`、`release_date`、`awards`、`category`；其中大小和浏览次数为无符号十进制字符串，演员与奖项为字符串数组，日期为 `YYYY-MM-DD`。ID、文件名和类型不能为空。字段必须存在，允许空字符串的字段及空数组仍须提供。
+`user`：`{"user_id":"1","username":"alice"}`；`warehouse` 摘要：`{"warehouse_id":"2","name":"收藏","owner_id":"1","visibility":"public"}`；`item`：`{"item_id":"3","media":{...}}`。`media` 的十个字段由 `media_json` 定义：`id`、`file_name`、`file_type`、`file_size`、`director`、`actors`、`view_count`、`release_date`、`awards`、`category`；其中大小和浏览次数为无符号十进制字符串，演员与奖项为字符串数组。ID 和文件名不能为空。元数据记录允许 `file_type` 为空，其日期未知时 `release_date` 也为空；其他日期使用 `YYYY-MM-DD`。所有字段仍须提供。
 
 错误码使用 `warehouse_contract::ErrorCode` 名称：`InvalidArgument`、`NotConnected`、`NotAuthenticated`、`AuthenticationFailed`、`PermissionDenied`、`NotFound`、`Timeout`、`ProtocolError`、`ServerError`。成功不发送 `error_resp`。连接、超时、协议错误也可由客户端本地生成。`WarehouseService` 回调在所属线程调用，每个请求恰好完成一次；断连时未完成请求以错误结束。具体超时长度由客户端实现配置。
 

@@ -32,14 +32,15 @@ bool fromJson(const QJsonObject& j, MediaRecord& output, QString& error) {
     };
     if (!stringField("id",r.id) || r.id.isEmpty()) return invalid("id");
     if (!stringField("file_name",r.fileName) || r.fileName.isEmpty()) return invalid("file_name");
-    if (!stringField("file_type",r.fileType) || r.fileType.isEmpty()) return invalid("file_type");
+    if (!stringField("file_type",r.fileType)) return invalid("file_type");
     if (!numberField("file_size",r.fileSize)) return invalid("file_size");
     if (!stringField("director",r.director)) return invalid("director");
     if (!listField("actors",r.actors)) return invalid("actors");
     if (!numberField("view_count",r.viewCount)) return invalid("view_count");
     QString date; if (!stringField("release_date",date)) return invalid("release_date");
     r.releaseDate = QDate::fromString(date,Qt::ISODate);
-    if (!r.releaseDate.isValid() || r.releaseDate.toString(Qt::ISODate) != date) return invalid("release_date");
+    if (date.isEmpty()) { if (!r.fileType.isEmpty()) return invalid("release_date"); }
+    else if (!r.releaseDate.isValid() || r.releaseDate.toString(Qt::ISODate) != date) return invalid("release_date");
     if (!listField("awards",r.awards)) return invalid("awards");
     if (!stringField("category",r.category)) return invalid("category");
     output = r; return true;

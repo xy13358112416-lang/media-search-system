@@ -8,6 +8,7 @@ class BusinessTests : public QObject {
     Q_OBJECT
 private slots:
     void sampleDeleteAndRestart();
+    void realMetadataLoadsAndRoundTrips();
     void specialCharactersAndFailedUpdates();
     void directoryAndPassword();
     void legacyAndInvalidCsv();
@@ -22,6 +23,25 @@ private slots:
     void failedCsvWriteDoesNotReuseId();
     void legacyAddAlsoAllocates();
 };
+
+void BusinessTests::realMetadataLoadsAndRoundTrips() {
+    QTemporaryDir dir;
+    const QString path = dir.filePath("real.csv");
+    QVERIFY(QFile::copy(QString::fromUtf8(REAL_CSV), path));
+    MediaLibrary library(path, {});
+    QVERIFY2(library.load().success, "real metadata should load without fabricated file details");
+    const auto records = library.records();
+    QCOMPARE(records.size(), 500);
+    for (const auto& record : records) {
+        QVERIFY(record.fileType.isEmpty());
+        QVERIFY(record.category == QStringLiteral("电影") || record.category == QStringLiteral("电视剧") || record.category == QStringLiteral("音乐"));
+    }
+    CsvMediaRepository repository(path);
+    QVERIFY(repository.remove(records.first().id).success);
+    QList<MediaRecord> reloaded;
+    QVERIFY(repository.load(reloaded).success);
+    QCOMPARE(reloaded.size(), 499);
+}
 
 void BusinessTests::sampleDeleteAndRestart() {
     QTemporaryDir dir;

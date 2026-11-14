@@ -36,6 +36,13 @@ private slots:
         json = media_json::toJson(valid); json.insert("actors", QJsonArray{42});
         QVERIFY(!media_json::fromJson(json, record, error));
     }
+    void metadataOnlyRoundTrip() {
+        MediaRecord input; input.id = "tvmaze:1"; input.fileName = "A show"; input.category = QStringLiteral("电视剧");
+        MediaRecord output; QString error;
+        QVERIFY2(media_json::fromJson(media_json::toJson(input), output, error), qPrintable(error));
+        QVERIFY(output.fileType.isEmpty()); QVERIFY(!output.releaseDate.isValid());
+        QCOMPARE(output.id, input.id);
+    }
     void fragmentedAndCoalescedFrames() {
         const QJsonObject first{{"type", "login"}, {"req_id", "1"}};
         const QJsonObject second{{"type", "logout"}, {"req_id", "2"}};

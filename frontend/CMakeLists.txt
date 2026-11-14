@@ -18,8 +18,8 @@ if(BUILD_TESTING)
     set_target_properties(media_frontend_tests PROPERTIES AUTOMOC ON)
     target_link_libraries(media_frontend_tests PRIVATE media_business Qt6::Widgets Qt6::Test)
     target_compile_definitions(media_frontend_tests PRIVATE
-        SAMPLE_CSV="${sample_csv}"
-        EXPANDED_CSV="${PROJECT_SOURCE_DIR}/sample-data/expanded/media_records_expanded.csv")
+        SAMPLE_CSV="${PROJECT_SOURCE_DIR}/sample-data/tests/fixtures/media_records_synthetic.csv"
+        EXPANDED_CSV="${PROJECT_SOURCE_DIR}/sample-data/tests/fixtures/media_records_expanded_legacy.csv")
     target_compile_options(media_frontend_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
     qt_add_resources(media_frontend_tests frontend_test_icons PREFIX / FILES chevron-down.png)
     add_test(NAME frontend_regressions COMMAND media_frontend_tests)

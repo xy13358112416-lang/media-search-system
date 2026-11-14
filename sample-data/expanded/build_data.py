@@ -8,10 +8,10 @@ from pathlib import Path
 from lxml import html
 
 ROOT = Path(__file__).resolve().parent
-BASE = ROOT.parent / 'data' / 'media_records.csv'
+BASE = ROOT.parent / 'tests' / 'fixtures' / 'media_records_synthetic.csv'
 MAIN = ROOT / 'source' / 'main.html'
 CASTS = ROOT / 'source' / 'casts.html'
-OUTPUT = ROOT / 'media_records_expanded.csv'
+OUTPUT = ROOT.parent / 'tests' / 'fixtures' / 'media_records_expanded_legacy.csv'
 PROVENANCE = ROOT / 'provenance.csv'
 HEADER = ['id', 'file_name', 'file_type', 'file_size', 'director', 'actors',
           'view_count', 'release_date', 'awards', 'category']
