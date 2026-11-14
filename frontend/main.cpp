@@ -3,16 +3,18 @@
 #include "library_style.h"
 #include "account_dialog.h"
 #include "account_frontend.h"
+#include "account_history_service.h"
+#include "personalrecommendation_service.h"
 #include "personalrecommendation_contract.h"
 
 #include <QApplication>
-#include <QCheckBox>
 #include <QCommandLineParser>
 #include <QCompleter>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QFont>
 #include <QFrame>
@@ -50,97 +52,6 @@ QString displayText(const QString& value)
 QString displayDate(const QDate& date)
 {
     return displayText(date.toString(Qt::ISODate));
-}
-
-// Keep the password masked without telling the Windows input context to disable IME.
-QLineEdit* addPasswordField(QVBoxLayout* layout, const QString& placeholder)
-{
-    auto* input = new QLineEdit;
-    input->setPlaceholderText(placeholder);
-    input->setAccessibleName(QStringLiteral("系统口令"));
-    auto* visibility = new QCheckBox(QStringLiteral("显示口令"));
-    const auto setVisible = [input](bool visible) {
-        input->setEchoMode(visible ? QLineEdit::Normal : QLineEdit::Password);
-        input->setInputMethodHints(Qt::ImhSensitiveData | Qt::ImhNoAutoUppercase);
-    };
-    setVisible(false);
-    QObject::connect(visibility, &QCheckBox::toggled, input, setVisible);
-    layout->addWidget(input);
-    layout->addWidget(visibility);
-    return input;
-}
-
-QString setupDemoPassword()
-{
-    QDialog dialog;
-    dialog.setWindowTitle(QStringLiteral("设置演示口令"));
-    dialog.setMinimumWidth(390);
-    auto* layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(28, 26, 28, 28);
-    layout->setSpacing(14);
-    auto* title = new QLabel(QStringLiteral("设置演示口令"));
-    title->setObjectName(QStringLiteral("dialogTitle"));
-    layout->addWidget(title);
-    auto* input = addPasswordField(layout, QStringLiteral("请输入本次演示使用的口令"));
-    auto* error = new QLabel(QStringLiteral("口令不能为空，请重新输入。"));
-    error->setStyleSheet(QStringLiteral("color: #b42318;"));
-    error->hide();
-    layout->addWidget(error);
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-    buttons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("继续"));
-    buttons->button(QDialogButtonBox::Ok)->setObjectName(QStringLiteral("primary"));
-    buttons->button(QDialogButtonBox::Ok)->setDefault(true);
-    buttons->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("取消"));
-    layout->addWidget(buttons);
-    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    QObject::connect(input, &QLineEdit::textEdited, error, &QWidget::hide);
-    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, [&] {
-        if (input->text().trimmed().isEmpty()) {
-            error->show();
-            input->setFocus();
-            return;
-        }
-        dialog.accept();
-    });
-    input->setFocus();
-    return dialog.exec() == QDialog::Accepted ? input->text() : QString();
-}
-
-// Verify the entered password before opening the media library.
-bool showLogin(const MediaLibrary& library)
-{
-    QDialog dialog;
-    dialog.setWindowTitle(QStringLiteral("媒体库登录"));
-    auto* layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(28, 26, 28, 28);
-    layout->setSpacing(14);
-    auto* title = new QLabel(QStringLiteral("登录媒体库"));
-    title->setObjectName(QStringLiteral("dialogTitle"));
-    auto* error = new QLabel;
-    error->setStyleSheet(QStringLiteral("color: #b42318;"));
-    error->hide();
-    auto* login = new QPushButton(QStringLiteral("登录"));
-    login->setDefault(true);
-    login->setObjectName(QStringLiteral("primary"));
-    layout->addWidget(title);
-    auto* password = addPasswordField(layout, QStringLiteral("请输入系统口令"));
-    layout->addWidget(error);
-    layout->addWidget(login);
-    dialog.setMinimumWidth(390);
-    password->setFocus();
-
-    QObject::connect(login, &QPushButton::clicked, &dialog, [&] {
-        if (library.authenticate(password->text())) {
-            dialog.accept();
-            return;
-        }
-        error->setText(QStringLiteral("口令错误，请重新输入。"));
-        error->show();
-        password->selectAll();
-        password->setFocus();
-    });
-    QObject::connect(password, &QLineEdit::textEdited, error, &QWidget::hide);
-    return dialog.exec() == QDialog::Accepted;
 }
 
 // Split the form's list fields and discard empty entries.
@@ -953,7 +864,7 @@ private:
 
 } // namespace
 
-// Entry point for the account-backed frontend once the concrete services are wired.
+// Run the account flow with the application-owned services.
 int runAccountFrontend(QApplication& app, MediaLibrary& library,
                        account_contract::AccountHistoryService& accounts,
                        recommendation_contract::PersonalRecommendationService& recommendations,
@@ -1000,19 +911,10 @@ int main(int argc, char* argv[])
     parser.addOption(csvOption);
     parser.process(app);
 
-    QString password = qEnvironmentVariable("MEDIA_LIBRARY_PASSWORD");
-    if (password.isEmpty())
-        password = setupDemoPassword();
-    if (password.isEmpty())
-        return 0;
-
     const QDir appDir(QCoreApplication::applicationDirPath());
     const bool useDefaultCsv = !parser.isSet(csvOption);
     const QString csvPath = useDefaultCsv ? appDir.filePath(QStringLiteral("media_records.csv"))
-                                          : parser.value(csvOption);
-    MediaLibrary library(csvPath, password);
-    if (!showLogin(library))
-        return 0;
+        : QFileInfo(parser.value(csvOption)).absoluteFilePath();
 
     // Initialize the writable demo file once. Subsequent builds only copy the seed.
     if (useDefaultCsv && !QFile::exists(csvPath)) {
@@ -1023,13 +925,21 @@ int main(int argc, char* argv[])
         }
     }
 
+    MediaLibrary library(csvPath, QString());
     const auto result = library.load();
     if (!result.success) {
         QMessageBox::critical(nullptr, QStringLiteral("媒体库加载失败"), result.error);
         return 1;
     }
 
-    LibraryWindow window(library);
-    window.show();
-    return app.exec();
+    AccountHistoryServiceImpl accounts(csvPath);
+    recommendation_contract::PersonalRecommendationServiceImpl recommendations(
+        accounts, [&library] { return library.records(); });
+    const QString databasePath = AccountHistoryServiceImpl::defaultDatabasePath();
+    if (databasePath.isEmpty() || !QDir().mkpath(QFileInfo(databasePath).absolutePath())) {
+        QMessageBox::critical(nullptr, QStringLiteral("账户数据库初始化失败"),
+                              QStringLiteral("无法创建应用数据目录。"));
+        return 1;
+    }
+    return runAccountFrontend(app, library, accounts, recommendations, databasePath);
 }
