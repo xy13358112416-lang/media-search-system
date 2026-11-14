@@ -3,6 +3,7 @@
 #include "library_style.h"
 #include "account_dialog.h"
 #include "avatar_button.h"
+#include "assistant_dialog.h"
 #include "account_frontend.h"
 #include "account_history_service.h"
 #include "personalrecommendation_service.h"
@@ -208,6 +209,23 @@ public:
         bannerLayout->addWidget(heading);
         bannerLayout->addStretch();
         if (identity_) {
+            auto* assistant = new QPushButton(assistantIcon(), QStringLiteral("媒体助手"));
+            assistant->setIconSize(QSize(22, 22));
+            assistant->setObjectName(QStringLiteral("openAssistant"));
+            bannerLayout->addWidget(assistant);
+            connect(assistant, &QPushButton::clicked, this, [this] {
+                if (!assistant_) {
+                    assistant_ = new AssistantDialog(this, [this] {
+                        tabs_->setCurrentIndex(1);
+                        keywordInput_->setFocus();
+                    }, [this] {
+                        tabs_->setCurrentIndex(2);
+                    }, today_ ? QStringLiteral("打开今日推荐") : QStringLiteral("打开推荐"));
+                }
+                assistant_->show();
+                assistant_->raise();
+                assistant_->activateWindow();
+            });
             if (!accountDatabasePath.isEmpty())
                 bannerLayout->addWidget(account_ui::createAvatarButton(
                     accountDatabasePath, identity_->userId, identity_->username));
@@ -975,6 +993,7 @@ private:
     QList<MediaRecord> records_;       // Visible records in table row order.
     QList<QLabel*> detailValues_;      // Detail value labels in form order.
     SearchQuery query_; // Last submitted combination of search fields.
+    AssistantDialog* assistant_ = nullptr;
     QTabBar* tabs_ = new QTabBar; // Switch between browsing and searching.
     QStackedWidget* controls_ = new QStackedWidget; // Controls for the selected tab.
     QLineEdit* director_ = new QLineEdit; // Director full-name query.

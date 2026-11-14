@@ -1,6 +1,7 @@
 #include "account_history_service.h"
 #include "personalrecommendation_service.h"
 #include "window_test_support.h"
+#include <QTextEdit>
 #include <QtTest>
 
 using namespace UiTest;
@@ -287,6 +288,51 @@ private slots:
         QVERIFY(button(f.window.get(), QStringLiteral("删除"))->isHidden());
         QVERIFY(accounts.loadMediaHistory(reader.value->userId).value->isEmpty());
         f.window.reset();
+    }
+
+    void assistantShortcutsAndMissingKey() {
+        Fixture f(QString::fromUtf8(SAMPLE_CSV));
+        AccountHistoryServiceImpl accounts(f.library);
+        QVERIFY(accounts.initializeDatabase(f.directory.filePath("assistant-accounts.sqlite")).ok());
+        QVERIFY(accounts.createInitialAdmin("admin", "secret").ok());
+        QVERIFY(accounts.registerUser("reader", "secret").ok());
+        QVERIFY(accounts.login("reader", "secret").status.ok());
+
+        LibraryWindow window(f.library, &accounts);
+        window.show();
+        auto* opener = window.findChild<QPushButton*>(QStringLiteral("openAssistant"));
+        QVERIFY(opener);
+        opener->click();
+        auto* dialog = window.findChild<QDialog*>();
+        QVERIFY(dialog && dialog->isVisible());
+        auto* key = dialog->findChild<QLineEdit*>(QStringLiteral("assistantApiKey"));
+        auto* input = dialog->findChild<QLineEdit*>(QStringLiteral("assistantInput"));
+        auto* transcript = dialog->findChild<QTextEdit*>(QStringLiteral("assistantTranscript"));
+        QVERIFY(key && input && transcript);
+        QCOMPARE(key->echoMode(), QLineEdit::Password);
+        key->clear();
+        const auto welcome = transcript->toPlainText();
+        input->setText(QStringLiteral("怎么搜索？"));
+        button(dialog, QStringLiteral("发送"))->click();
+        QCOMPARE(input->text(), QStringLiteral("怎么搜索？"));
+        QCOMPARE(transcript->toPlainText(), welcome);
+        auto* status = dialog->findChild<QLabel*>(QStringLiteral("assistantStatus"));
+        QVERIFY(status && status->isVisible());
+        QCOMPARE(status->text(), QStringLiteral("填入 DeepSeek API 密钥后即可发送。"));
+
+        auto* tabs = window.findChild<QTabBar*>();
+        button(dialog, QStringLiteral("打开检索"))->click();
+        QCOMPARE(tabs->currentIndex(), 1);
+        QVERIFY(!dialog->isVisible());
+
+        opener->click();
+        QCOMPARE(window.findChild<QDialog*>(), dialog);
+        button(dialog, QStringLiteral("新对话"))->click();
+        QVERIFY(input->text().isEmpty());
+        QCOMPARE(transcript->toPlainText(), welcome);
+        button(dialog, QStringLiteral("打开推荐"))->click();
+        QCOMPARE(tabs->currentIndex(), 2);
+        QVERIFY(!dialog->isVisible());
     }
 
     void accountFrontendStartsRealSession() {
