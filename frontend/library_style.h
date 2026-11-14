@@ -23,6 +23,7 @@ inline QString libraryStyle()
         QProgressBar#linearBar::chunk { background: #667b98; }
         QProgressBar#fixedBar::chunk { background: #4177c0; }
         QProgressBar#shortBar::chunk { background: #007c70; }
+        QFrame#recommendCard { background: #ffffff; border: 1px solid #d7e1ef; border-radius: 12px; }
         QFrame#detailCard { background: #ffffff; border: 1px solid #d7e1ef; border-radius: 12px; }
         QWidget#detailBody { background: #ffffff; }
         QScrollArea#detailScroll { border: none; background: transparent; }
