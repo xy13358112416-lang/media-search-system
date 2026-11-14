@@ -321,9 +321,26 @@ private slots:
         QCOMPARE(status->text(), QStringLiteral("填入 DeepSeek API 密钥后即可发送。"));
 
         auto* tabs = window.findChild<QTabBar*>();
-        button(dialog, QStringLiteral("打开检索"))->click();
+        auto* table = window.findChild<QTableWidget*>();
+        auto* keyword = dialog->findChild<QLineEdit*>(QStringLiteral("assistantMediaKeyword"));
+        auto* findMedia = button(dialog, QStringLiteral("查本地媒体"));
+        QVERIFY(keyword && table);
+        QVERIFY(!findMedia->isEnabled());
+        searchInput(&window, QStringLiteral("导演"))->setText(QStringLiteral("旧筛选条件"));
+        keyword->setText(QStringLiteral("  晨光.mp3  "));
+        QVERIFY(findMedia->isEnabled());
+        findMedia->click();
         QCOMPARE(tabs->currentIndex(), 1);
         QVERIFY(!dialog->isVisible());
+        QCOMPARE(table->rowCount(), 1);
+        QCOMPARE(table->item(0, 0)->text(), QStringLiteral("晨光.mp3"));
+        QVERIFY(searchInput(&window, QStringLiteral("导演"))->text().isEmpty());
+
+        opener->click();
+        keyword->setText(QStringLiteral("不存在的助手测试片名"));
+        findMedia->click();
+        QCOMPARE(table->rowCount(), 0);
+        QVERIFY(accounts.loadMediaHistory(accounts.currentUser()->userId).value->isEmpty());
 
         opener->click();
         QCOMPARE(window.findChild<QDialog*>(), dialog);

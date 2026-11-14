@@ -55,7 +55,7 @@ QIcon assistantIcon()
     return QIcon(artwork);
 }
 
-AssistantDialog::AssistantDialog(QWidget* parent, std::function<void()> openSearch,
+AssistantDialog::AssistantDialog(QWidget* parent, std::function<void(const QString&)> openSearch,
                                  std::function<void()> openRecommendations, const QString& recommendationLabel)
     : QDialog(parent), network_(new QNetworkAccessManager(this)), key_(new QLineEdit),
       input_(new QLineEdit), send_(new QPushButton(QStringLiteral("发送"))),
@@ -80,16 +80,30 @@ AssistantDialog::AssistantDialog(QWidget* parent, std::function<void()> openSear
     layout->addLayout(heading);
 
     auto* shortcuts = new QHBoxLayout;
-    auto* search = new QPushButton(QStringLiteral("打开检索"));
+    auto* keyword = new QLineEdit;
+    keyword->setObjectName(QStringLiteral("assistantMediaKeyword"));
+    keyword->setAccessibleName(QStringLiteral("本地片名关键词"));
+    keyword->setPlaceholderText(QStringLiteral("输入片名关键词，例如 晨光"));
+    keyword->setMaxLength(200);
+    auto* search = new QPushButton(QStringLiteral("查本地媒体"));
     auto* recommendations = new QPushButton(recommendationLabel);
+    shortcuts->addWidget(keyword, 1);
     shortcuts->addWidget(search);
     shortcuts->addWidget(recommendations);
-    shortcuts->addStretch();
     layout->addLayout(shortcuts);
-    connect(search, &QPushButton::clicked, this, [this, openSearch] {
-        hide();
-        openSearch();
+    search->setEnabled(false);
+    connect(keyword, &QLineEdit::textChanged, search, [search](const QString& text) {
+        search->setEnabled(!text.trimmed().isEmpty());
     });
+    const auto findMedia = [this, keyword, openSearch] {
+        const QString text = keyword->text().trimmed();
+        if (text.isEmpty())
+            return;
+        hide();
+        openSearch(text);
+    };
+    connect(search, &QPushButton::clicked, this, findMedia);
+    connect(keyword, &QLineEdit::returnPressed, this, findMedia);
     connect(recommendations, &QPushButton::clicked, this, [this, openRecommendations] {
         hide();
         openRecommendations();
@@ -107,7 +121,7 @@ AssistantDialog::AssistantDialog(QWidget* parent, std::function<void()> openSear
     keyRow->addWidget(keyLabel);
     keyRow->addWidget(key_, 1);
     layout->addLayout(keyRow);
-    auto* privacy = new QLabel(QStringLiteral("发送时会把本次对话发给 DeepSeek。对话和密钥只保留在当前登录会话。"));
+    auto* privacy = new QLabel(QStringLiteral("AI 对话会发送给 DeepSeek。上方片名检索在本机运行。"));
     privacy->setObjectName(QStringLiteral("muted"));
     privacy->setWordWrap(true);
     layout->addWidget(privacy);

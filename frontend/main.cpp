@@ -215,8 +215,17 @@ public:
             bannerLayout->addWidget(assistant);
             connect(assistant, &QPushButton::clicked, this, [this] {
                 if (!assistant_) {
-                    assistant_ = new AssistantDialog(this, [this] {
-                        tabs_->setCurrentIndex(1);
+                    assistant_ = new AssistantDialog(this, [this](const QString& keyword) {
+                        director_->clear();
+                        actor_->clear();
+                        searchType_->clear();
+                        keywordInput_->setText(keyword);
+                        query_ = {};
+                        keyword_ = keyword;
+                        if (tabs_->currentIndex() == 1)
+                            showSearchResults();
+                        else
+                            tabs_->setCurrentIndex(1);
                         keywordInput_->setFocus();
                     }, [this] {
                         tabs_->setCurrentIndex(2);

@@ -15,7 +15,7 @@ QIcon assistantIcon();
 
 class AssistantDialog final : public QDialog {
 public:
-    AssistantDialog(QWidget* parent, std::function<void()> openSearch,
+    AssistantDialog(QWidget* parent, std::function<void(const QString&)> openSearch,
                     std::function<void()> openRecommendations, const QString& recommendationLabel);
 
 private:
