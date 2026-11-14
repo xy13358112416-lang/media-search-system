@@ -8,6 +8,18 @@
 class ProtocolTests : public QObject {
     Q_OBJECT
 private slots:
+    void recommendationMessageTypes() {
+        QCOMPARE(warehouse_protocol::messageName(warehouse_protocol::MessageType::RecommendResources),
+                 QStringLiteral("recommend_resources"));
+        QCOMPARE(warehouse_protocol::messageName(warehouse_protocol::MessageType::CancelRecommendation),
+                 QStringLiteral("cancel_recommendation"));
+        warehouse_contract::WarehouseRecommendationRequest request;
+        QVERIFY(!request.targetWarehouseId);
+        QCOMPARE(request.limit, 5);
+        warehouse_contract::WarehouseRecommendationResult result;
+        QVERIFY(!result.fallback);
+        QVERIFY(result.items.isEmpty());
+    }
     void mediaRoundTrip() {
         MediaRecord input;
         input.id = "M000001"; input.fileName = QStringLiteral("作品,\"甲\".mp4"); input.fileType = "MP4";

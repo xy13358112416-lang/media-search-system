@@ -8,7 +8,7 @@
 
 namespace warehouse_contract {
 enum class ErrorCode { None, InvalidArgument, NotConnected, NotAuthenticated, AuthenticationFailed, PermissionDenied,
-                       NotFound, Timeout, ProtocolError, ServerError };
+                       NotFound, Timeout, ProtocolError, ServerError, Cancelled, OutcomeUnknown };
 struct Status { ErrorCode code = ErrorCode::None; QString message; bool ok() const { return code == ErrorCode::None; } };
 template<class T> struct Result { Status status; std::optional<T> value; };
 enum class Visibility { Private, Public };
@@ -16,6 +16,10 @@ struct UserInfo { qint64 userId = 0; QString username; };
 struct WarehouseSummary { qint64 warehouseId = 0; QString name; qint64 ownerId = 0; Visibility visibility = Visibility::Private; };
 struct WarehouseItem { qint64 itemId = 0; MediaRecord media; };
 struct WarehouseDetail { WarehouseSummary warehouse; QList<WarehouseItem> items; };
+// 创建仓库时 targetWarehouseId 为空；编辑仓库时提供其编号。服务器确定可访问的候选。
+struct WarehouseRecommendationRequest { QString query; std::optional<qint64> targetWarehouseId; int limit = 5; };
+struct WarehouseRecommendationItem { qint64 warehouseId = 0; qint64 itemId = 0; MediaRecord media; QString reason; };
+struct WarehouseRecommendationResult { QList<WarehouseRecommendationItem> items; bool fallback = false; };
 template<class T> using Callback = std::function<void(Result<T>)>;
 using StatusCallback = std::function<void(Status)>;
 
@@ -33,5 +37,6 @@ public:
     virtual void createWarehouse(const QString& name, Visibility visibility, Callback<WarehouseSummary> done) = 0;
     virtual void addItem(qint64 warehouseId, const MediaRecord& media, Callback<WarehouseItem> done) = 0;
     virtual void removeItem(qint64 warehouseId, qint64 itemId, StatusCallback done) = 0;
+    virtual void recommendResources(const WarehouseRecommendationRequest& request, Callback<WarehouseRecommendationResult> done) = 0;
 };
 }
