@@ -5,7 +5,7 @@ from collections import Counter
 from datetime import date
 from pathlib import Path
 
-DATA = Path(__file__).resolve().parents[1] / 'data' / 'media_records.csv'
+DATA = Path(__file__).resolve().parent / 'fixtures' / 'media_records_synthetic.csv'
 COLUMNS = ['id', 'file_name', 'file_type', 'file_size', 'director', 'actors',
            'view_count', 'release_date', 'awards', 'category']
 

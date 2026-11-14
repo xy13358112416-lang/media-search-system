@@ -953,7 +953,7 @@ private:
         const auto& record = records_.at(row);
         const QLocale locale;
         const QStringList values{record.id, record.fileName, record.fileType,
-                                 QStringLiteral("%1 字节").arg(locale.toString(record.fileSize)),
+                                 record.fileType.isEmpty() ? QStringLiteral("未知") : QStringLiteral("%1 字节").arg(locale.toString(record.fileSize)),
                                  record.director, record.actors.join(QStringLiteral("、")),
                                  locale.toString(record.viewCount), displayDate(record.releaseDate),
                                  record.awards.join(QStringLiteral("、")), record.category};
