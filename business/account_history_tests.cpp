@@ -21,7 +21,53 @@ private slots:
     void failedReinitializationClosesOldSession();
     void concurrentInitialAdminIsUnique();
     void rejectVersionedDatabaseWithoutConstraints();
+    void sharedMediaLibraryStaysSynchronized();
 };
+
+void AccountHistoryTests::sharedMediaLibraryStaysSynchronized() {
+    QTemporaryDir dir;
+    const auto csv = dir.filePath("records.csv");
+    const auto database = dir.filePath("accounts.sqlite");
+    QVERIFY(QFile::copy(QString::fromUtf8(SAMPLE_CSV), csv));
+    MediaLibrary library(csv, {});
+    QVERIFY(library.load().success);
+    AccountHistoryServiceImpl accounts(library);
+    QVERIFY(accounts.initializeDatabase(database).ok());
+    QVERIFY(accounts.createInitialAdmin("admin", "secret").ok());
+    QVERIFY(accounts.registerUser("reader", "secret").ok());
+    const auto admin = accounts.login("admin", "secret");
+    QVERIFY(admin.status.ok());
+
+    MediaRecord record;
+    record.fileName = "shared.mp4";
+    record.fileType = "MP4";
+    record.director = QStringLiteral("共享导演");
+    record.releaseDate = QDate(2024, 1, 1);
+    const auto added = accounts.addMedia(record);
+    QVERIFY(added.status.ok());
+    QVERIFY(added.persisted);
+    MediaRecord found;
+    QVERIFY(library.find(added.mediaId, found));
+    QVERIFY(library.search({QStringLiteral("共享导演"), {}, "MP4"}).contains(added.mediaId));
+    QVERIFY(accounts.recordMediaView(admin.value->userId, added.mediaId).ok());
+
+    QVERIFY(accounts.login("reader", "secret").status.ok());
+    QCOMPARE(accounts.removeMedia(added.mediaId).status.code, ErrorCode::PermissionDenied);
+    QVERIFY(library.find(added.mediaId, found));
+    QVERIFY(accounts.login("admin", "secret").status.ok());
+    const auto removed = accounts.removeMedia(added.mediaId);
+    QVERIFY(removed.status.ok());
+    QVERIFY(removed.persisted);
+    QVERIFY(!library.find(added.mediaId, found));
+    QVERIFY(!library.search({QStringLiteral("共享导演"), {}, "MP4"}).contains(added.mediaId));
+
+    MediaLibrary restarted(csv, {});
+    QVERIFY(restarted.load().success);
+    QVERIFY(!restarted.find(added.mediaId, found));
+    QVERIFY(accounts.initializeDatabase(database).ok());
+    QVERIFY(accounts.login("admin", "secret").status.ok());
+    QVERIFY(accounts.recordMediaView(admin.value->userId, "M000001").ok());
+}
 
 void AccountHistoryTests::accountLifecycleAndHashes() {
     QTemporaryDir dir;

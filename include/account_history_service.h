@@ -8,6 +8,8 @@
 class AccountHistoryServiceImpl final : public account_contract::AccountHistoryService {
 public:
     explicit AccountHistoryServiceImpl(QString csvPath = {});
+    // 复用调用方的媒体库与索引；library 必须比账户服务活得更久。
+    explicit AccountHistoryServiceImpl(MediaLibrary& library);
     ~AccountHistoryServiceImpl() override;
     static QString defaultDatabasePath(); // 应用本地数据目录内的默认数据库路径。
     account_contract::Status initializeDefaultDatabase(); // 创建本地数据目录并初始化默认数据库。
@@ -27,9 +29,11 @@ private:
     account_contract::Status checkUser(qint64 userId) const;
     account_contract::Status checkAdmin() const;
     account_contract::Status ensureLibrary();
+    MediaLibrary* activeLibrary() const; // 返回当前使用的媒体库，不转移所有权。
     QString connectionName_;
     QSqlDatabase db_;
     QString csvPath_;
     std::unique_ptr<MediaLibrary> library_;
+    MediaLibrary* sharedLibrary_ = nullptr; // 非拥有指针，适用于与界面共享快照。
     std::optional<account_contract::UserIdentity> session_;
 };
