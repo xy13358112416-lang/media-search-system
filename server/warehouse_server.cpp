@@ -9,6 +9,7 @@
 #include <QUuid>
 #include <QVariant>
 #include <sodium.h>
+#include <utility>
 
 namespace {
 QString keyFor(const QString& name) {
@@ -72,6 +73,67 @@ bool WarehouseServer::hasUsers(bool& exists, QString& error) const {
         error = q.lastError().text(); return false;
     }
     exists = q.value(0).toBool(); error.clear(); return true;
+}
+bool WarehouseServer::readableWarehouses(qint64 userId, QList<warehouse_contract::WarehouseDetail>& out,
+                                         QString& error) const {
+    if (!db_.isOpen() || userId <= 0) { error = QStringLiteral("数据库或用户无效"); return false; }
+    QSqlQuery user(db_);
+    user.prepare(QStringLiteral("SELECT 1 FROM server_users WHERE user_id=?"));
+    user.addBindValue(userId);
+    if (!user.exec()) { error = QStringLiteral("查询用户失败"); return false; }
+    if (!user.next()) { error = QStringLiteral("用户不存在"); return false; }
+    QSqlQuery q(db_);
+    q.prepare(QStringLiteral(
+        "SELECT w.warehouse_id,w.name,w.owner_id,w.visibility,i.item_id,"
+        "CASE WHEN length(CAST(i.media_json AS BLOB))<=4194304 THEN i.media_json ELSE NULL END,"
+        "length(CAST(i.media_json AS BLOB)) "
+        "FROM warehouses w LEFT JOIN warehouse_items i ON i.warehouse_id=w.warehouse_id "
+        "WHERE w.owner_id=? OR w.visibility='public' ORDER BY w.warehouse_id,i.item_id"));
+    q.addBindValue(userId);
+    if (!q.exec()) { error = QStringLiteral("读取可访问仓库失败"); return false; }
+    QList<warehouse_contract::WarehouseDetail> result;
+    constexpr qint64 maxSnapshotBytes = 4 * 1024 * 1024;
+    constexpr int maxItems = 1000;
+    constexpr int maxWarehouses = 2000;
+    qint64 snapshotBytes = 0;
+    int itemCount = 0;
+    while (q.next()) {
+        const qint64 warehouseId = q.value(0).toLongLong();
+        if (result.isEmpty() || result.last().warehouse.warehouseId != warehouseId) {
+            if (result.size() >= maxWarehouses) {
+                error = QStringLiteral("可访问仓库数量超过候选上限"); return false;
+            }
+            warehouse_contract::WarehouseDetail detail;
+            detail.warehouse.warehouseId = warehouseId;
+            detail.warehouse.name = q.value(1).toString();
+            detail.warehouse.ownerId = q.value(2).toLongLong();
+            const QString visibility = q.value(3).toString();
+            if (visibility != "public" && visibility != "private") {
+                error = QStringLiteral("仓库可见性无效"); return false;
+            }
+            detail.warehouse.visibility = visibility == "public"
+                ? warehouse_contract::Visibility::Public : warehouse_contract::Visibility::Private;
+            result.append(detail);
+        }
+        if (!q.value(4).isNull()) {
+            const qint64 length = q.value(6).toLongLong();
+            if (++itemCount > maxItems || length < 0 || length > maxSnapshotBytes - snapshotBytes) {
+                error = QStringLiteral("可访问媒体快照超过候选上限"); return false;
+            }
+            snapshotBytes += length;
+            warehouse_contract::WarehouseItem item;
+            item.itemId = q.value(4).toLongLong();
+            const auto doc = QJsonDocument::fromJson(q.value(5).toByteArray());
+            QString parseError;
+            if (item.itemId <= 0 || !doc.isObject() || !media_json::fromJson(doc.object(), item.media, parseError)) {
+                error = QStringLiteral("仓库媒体快照无效"); return false;
+            }
+            result.last().items.append(item);
+        }
+    }
+    out = std::move(result);
+    error.clear();
+    return true;
 }
 bool WarehouseServer::addUser(const QString& name, const QString& password, QString& error) {
     if (!db_.isOpen() || keyFor(name).isEmpty() || password.isEmpty()) {
