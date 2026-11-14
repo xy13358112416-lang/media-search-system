@@ -215,11 +215,14 @@ public:
             bannerLayout->addWidget(assistant);
             connect(assistant, &QPushButton::clicked, this, [this] {
                 if (!assistant_) {
-                    assistant_ = new AssistantDialog(this, [this](const QString& keyword) {
+                    assistant_ = new AssistantDialog(this, [this](const QString& keyword,
+                                                       media_mood::Mood mood, const QString& category) {
                         director_->clear();
                         actor_->clear();
                         searchType_->clear();
                         keywordInput_->setText(keyword);
+                        moodFilter_->setCurrentIndex(moodFilter_->findData(static_cast<int>(mood)));
+                        contentFilter_->setCurrentIndex(contentFilter_->findData(category));
                         query_ = {};
                         keyword_ = keyword;
                         if (tabs_->currentIndex() == 1)
@@ -300,6 +303,25 @@ public:
 
         auto* searchBar = new QHBoxLayout;
         searchLayout->addLayout(searchBar);
+        auto* moodLabel = new QLabel(QStringLiteral("内容氛围"));
+        moodLabel->setBuddy(moodFilter_);
+        moodFilter_->setObjectName(QStringLiteral("searchMoodFilter"));
+        using media_mood::Mood;
+        for (auto mood : {Mood::Any, Mood::Relaxing, Mood::Resonant, Mood::Energizing, Mood::Nostalgic})
+            moodFilter_->addItem(media_mood::label(mood), static_cast<int>(mood));
+        auto* contentLabel = new QLabel(QStringLiteral("内容类别"));
+        contentLabel->setBuddy(contentFilter_);
+        contentFilter_->setObjectName(QStringLiteral("searchContentFilter"));
+        contentFilter_->addItem(QStringLiteral("全部内容"), QString());
+        for (const auto& category : {QStringLiteral("音乐"), QStringLiteral("电影"), QStringLiteral("电视剧")})
+            contentFilter_->addItem(category, category);
+        auto* moodBar = new QHBoxLayout;
+        moodBar->addWidget(moodLabel);
+        moodBar->addWidget(moodFilter_);
+        moodBar->addWidget(contentLabel);
+        moodBar->addWidget(contentFilter_);
+        moodBar->addStretch();
+        searchLayout->addLayout(moodBar);
         director_->setPlaceholderText(QStringLiteral("完整姓名"));
         actor_->setPlaceholderText(QStringLiteral("完整姓名"));
         searchType_->setPlaceholderText(QStringLiteral("例如 MP4"));
@@ -500,6 +522,8 @@ public:
             showSearchResults();
         };
         connect(searchButton, &QPushButton::clicked, this, submitSearch);
+        connect(moodFilter_, &QComboBox::activated, this, submitSearch);
+        connect(contentFilter_, &QComboBox::activated, this, submitSearch);
         for (auto* input : {keywordInput_, director_, actor_, searchType_})
             connect(input, &QLineEdit::returnPressed, this, submitSearch);
         connect(suggestions, qOverload<const QString&>(&QCompleter::activated), this,
@@ -512,6 +536,8 @@ public:
             director_->clear();
             actor_->clear();
             searchType_->clear();
+            moodFilter_->setCurrentIndex(0);
+            contentFilter_->setCurrentIndex(0);
             submitSearch();
             keywordInput_->setFocus();
         });
@@ -738,20 +764,29 @@ private:
         SearchTrace trace;
         const auto ids = library_.search(query_, trace);
         const QSet<QString> matched(ids.cbegin(), ids.cend());
+        const auto mood = static_cast<media_mood::Mood>(moodFilter_->currentData().toInt());
+        const QString category = contentFilter_->currentData().toString();
         QList<MediaRecord> results;
         for (const auto& record : library_.records()) {
-            if (matched.contains(record.id) &&
+            if (matched.contains(record.id) && media_mood::matches(record, mood) &&
+                (category.isEmpty() || record.category == category) &&
                 (keyword_.isEmpty() || record.fileName.contains(keyword_, Qt::CaseInsensitive)))
                 results.append(record);
         }
         populateTable(results);
         count_->setText(QStringLiteral("命中 %1 条").arg(results.size()));
 
-        const bool hasKeyword = !keyword_.isEmpty();
-        traceStatus_->setText(hasKeyword
-            ? QStringLiteral("文件名包含「%1」 · 筛选后剩余 %2 条").arg(keyword_).arg(results.size())
-            : QStringLiteral("未填写条件，显示全部记录。"));
-        traceStatus_->setVisible(hasKeyword || trace.steps.isEmpty());
+        QStringList filters;
+        if (!keyword_.isEmpty())
+            filters << QStringLiteral("文件名包含「%1」").arg(keyword_);
+        if (mood != media_mood::Mood::Any)
+            filters << media_mood::label(mood);
+        if (!category.isEmpty())
+            filters << category;
+        traceStatus_->setText(filters.isEmpty()
+            ? QStringLiteral("未填写条件，显示全部记录。")
+            : QStringLiteral("%1 · 筛选后剩余 %2 条").arg(filters.join(QStringLiteral(" · "))).arg(results.size()));
+        traceStatus_->setVisible(!filters.isEmpty() || trace.steps.isEmpty());
         for (std::size_t i = 0; i < traceCards_.size(); ++i) {
             auto* card = traceCards_[i];
             if (i >= static_cast<std::size_t>(trace.steps.size())) {
@@ -1008,6 +1043,8 @@ private:
     QLineEdit* director_ = new QLineEdit; // Director full-name query.
     QLineEdit* actor_ = new QLineEdit; // Actor full-name query.
     QString keyword_; // Last submitted file-name keyword.
+    QComboBox* moodFilter_ = new QComboBox;
+    QComboBox* contentFilter_ = new QComboBox;
     QStringListModel keywordSuggestions_; // Current library file names for completion.
     QLineEdit* keywordInput_ = new QLineEdit; // Partial file-name query.
     QLineEdit* searchType_ = new QLineEdit; // File extension query.

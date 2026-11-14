@@ -1,7 +1,7 @@
 #include "account_history_service.h"
 #include "personalrecommendation_service.h"
 #include "window_test_support.h"
-#include <QTextEdit>
+
 #include <QtTest>
 
 using namespace UiTest;
@@ -290,8 +290,8 @@ private slots:
         f.window.reset();
     }
 
-    void assistantShortcutsAndMissingKey() {
-        Fixture f(QString::fromUtf8(SAMPLE_CSV));
+    void assistantSearchesLocalMediaByMood() {
+        Fixture f(QString::fromUtf8(REAL_CSV));
         AccountHistoryServiceImpl accounts(f.library);
         QVERIFY(accounts.initializeDatabase(f.directory.filePath("assistant-accounts.sqlite")).ok());
         QVERIFY(accounts.createInitialAdmin("admin", "secret").ok());
@@ -302,51 +302,38 @@ private slots:
         window.show();
         auto* opener = window.findChild<QPushButton*>(QStringLiteral("openAssistant"));
         QVERIFY(opener);
+        QVERIFY(!window.findChild<QDialog*>());
         opener->click();
         auto* dialog = window.findChild<QDialog*>();
         QVERIFY(dialog && dialog->isVisible());
-        auto* key = dialog->findChild<QLineEdit*>(QStringLiteral("assistantApiKey"));
-        auto* input = dialog->findChild<QLineEdit*>(QStringLiteral("assistantInput"));
-        auto* transcript = dialog->findChild<QTextEdit*>(QStringLiteral("assistantTranscript"));
-        QVERIFY(key && input && transcript);
-        QCOMPARE(key->echoMode(), QLineEdit::Password);
-        key->clear();
-        const auto welcome = transcript->toPlainText();
-        input->setText(QStringLiteral("怎么搜索？"));
-        button(dialog, QStringLiteral("发送"))->click();
-        QCOMPARE(input->text(), QStringLiteral("怎么搜索？"));
-        QCOMPARE(transcript->toPlainText(), welcome);
-        auto* status = dialog->findChild<QLabel*>(QStringLiteral("assistantStatus"));
-        QVERIFY(status && status->isVisible());
-        QCOMPARE(status->text(), QStringLiteral("填入 DeepSeek API 密钥后即可发送。"));
-
+        QVERIFY(!dialog->findChild<QLineEdit*>(QStringLiteral("assistantApiKey")));
         auto* tabs = window.findChild<QTabBar*>();
         auto* table = window.findChild<QTableWidget*>();
+        auto* mood = dialog->findChild<QComboBox*>(QStringLiteral("assistantMood"));
+        auto* category = dialog->findChild<QComboBox*>(QStringLiteral("assistantCategory"));
         auto* keyword = dialog->findChild<QLineEdit*>(QStringLiteral("assistantMediaKeyword"));
-        auto* findMedia = button(dialog, QStringLiteral("查本地媒体"));
-        QVERIFY(keyword && table);
-        QVERIFY(!findMedia->isEnabled());
-        searchInput(&window, QStringLiteral("导演"))->setText(QStringLiteral("旧筛选条件"));
-        keyword->setText(QStringLiteral("  晨光.mp3  "));
-        QVERIFY(findMedia->isEnabled());
-        findMedia->click();
+        QVERIFY(tabs && table && mood && category && keyword);
+        const auto choose = [](QComboBox* box, const QVariant& selection) {
+            box->setCurrentIndex(box->findData(selection));
+        };
+        choose(mood, static_cast<int>(media_mood::Mood::Energizing));
+        choose(category, QStringLiteral("音乐"));
+        keyword->setText(QStringLiteral("  Champions  "));
+        button(dialog, QStringLiteral("查本地媒体"))->click();
         QCOMPARE(tabs->currentIndex(), 1);
         QVERIFY(!dialog->isVisible());
         QCOMPARE(table->rowCount(), 1);
-        QCOMPARE(table->item(0, 0)->text(), QStringLiteral("晨光.mp3"));
-        QVERIFY(searchInput(&window, QStringLiteral("导演"))->text().isEmpty());
+        QCOMPARE(table->item(0, 0)->text(), QStringLiteral("We Are the Champions"));
 
         opener->click();
-        keyword->setText(QStringLiteral("不存在的助手测试片名"));
-        findMedia->click();
+        choose(category, QStringLiteral("电影"));
+        button(dialog, QStringLiteral("查本地媒体"))->click();
         QCOMPARE(table->rowCount(), 0);
         QVERIFY(accounts.loadMediaHistory(accounts.currentUser()->userId).value->isEmpty());
 
+        button(&window, QStringLiteral("清空条件"))->click();
+        QCOMPARE(table->rowCount(), f.library.records().size());
         opener->click();
-        QCOMPARE(window.findChild<QDialog*>(), dialog);
-        button(dialog, QStringLiteral("新对话"))->click();
-        QVERIFY(input->text().isEmpty());
-        QCOMPARE(transcript->toPlainText(), welcome);
         button(dialog, QStringLiteral("打开推荐"))->click();
         QCOMPARE(tabs->currentIndex(), 2);
         QVERIFY(!dialog->isVisible());

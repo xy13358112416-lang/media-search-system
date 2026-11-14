@@ -66,8 +66,6 @@ inline QString libraryStyle()
         QPushButton#avatarButton:hover, QPushButton#avatarButton:focus { border-color: #98b7ff; }
         QPushButton#danger { color: #9d2c41; }
         QPushButton:disabled, QPushButton#danger:disabled { color: #7d8ba0; background: #f2f5f9; }
-        QTextEdit#assistantTranscript { background: #ffffff; color: #182942;
-            border: 1px solid #d7e1ef; border-radius: 10px; padding: 8px; }
         QTableWidget { background: #ffffff; alternate-background-color: #f5f8fd;
                        border: 1px solid #d7e1ef; border-radius: 11px;
                        selection-background-color: #dceaff; selection-color: #143362; }

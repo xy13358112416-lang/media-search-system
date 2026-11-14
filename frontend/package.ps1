@@ -36,7 +36,7 @@ $out = (New-Item -ItemType Directory -Path $OutputDirectory).FullName
 foreach ($file in $files) {
     Copy-Item -LiteralPath (Join-Path $frontend $file) -Destination $out
 }
-& $deploy --release --no-translations --include-plugins qschannelbackend --dir $out (Join-Path $out 'media_library_qt.exe')
+& $deploy --release --no-translations --dir $out (Join-Path $out 'media_library_qt.exe')
 if ($LASTEXITCODE -ne 0) {
     throw "windeployqt failed with exit code $LASTEXITCODE"
 }
@@ -44,10 +44,6 @@ if ($LASTEXITCODE -ne 0) {
 Copy-Item -LiteralPath $SodiumDll -Destination (Join-Path $out 'libsodium.dll')
 if (!(Test-Path -LiteralPath (Join-Path $out 'sqldrivers/qsqlite.dll') -PathType Leaf)) {
     throw "Missing Qt SQLite driver in the package."
-}
-
-if (!(Test-Path -LiteralPath (Join-Path $out 'tls/qschannelbackend.dll') -PathType Leaf)) {
-    throw "Missing Windows TLS backend for DeepSeek."
 }
 
 $help = @'
@@ -58,7 +54,7 @@ $help = @'
 3. 媒体库默认打开 500 条作品元数据，不包含音视频文件。增删会保存到同目录的 media_records.csv。
 4. 检索样例作品时请选择文件类型「不限」，因为样例的实际文件格式未知。
 5. 推荐页可选类别与类型。检索页的「性能对照」展示 10 万条合成数据的已记录实验。
-6. 登录后点击右上角「媒体助手」。输入片名关键词后点「查本地媒体」，可直接查看检索结果。查询本地媒体和打开今日推荐无需密钥。使用 AI 对话时，请在窗口内填写自己的 DeepSeek API 密钥，或在启动前配置 DEEPSEEK_API_KEY。对话发送给 DeepSeek，关闭登录会话后清除。
+6. 登录后点击右上角「媒体助手」，按片名或想看的氛围检索本地内容。氛围标签目前覆盖部分样例。
 
 账户和浏览历史存放在应用本地数据目录的 accounts.sqlite。开始新一轮演示前如需恢复样例，请在关闭程序后备份或移走 media_records.csv。
 '@
