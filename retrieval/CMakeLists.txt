@@ -9,7 +9,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core)
 add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 add_library(media_search STATIC mediasearch.cpp mediarecommendation.cpp
-            personalrecommendation_service.cpp)
+            personalrecommendation_service.cpp todayrecommendation_service.cpp)
 target_include_directories(media_search PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_compile_features(media_search PUBLIC cxx_std_17)
 target_link_libraries(media_search PUBLIC Qt6::Core)
@@ -41,4 +41,9 @@ if(BUILD_TESTING)
     set_target_properties(personal_recommendation_tests PROPERTIES AUTOMOC ON)
     target_link_libraries(personal_recommendation_tests PRIVATE media_search Qt6::Test)
     add_test(NAME personal_recommendation COMMAND personal_recommendation_tests)
+
+    add_executable(todayrecommendation_tests todayrecommendation_tests.cpp)
+    set_target_properties(todayrecommendation_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(todayrecommendation_tests PRIVATE media_search Qt6::Test)
+    add_test(NAME today_recommendation COMMAND todayrecommendation_tests)
 endif()
