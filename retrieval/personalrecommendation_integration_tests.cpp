@@ -32,9 +32,9 @@ private slots:
             QVERIFY(user.status.ok() && user.value); userId = user.value->userId;
             QVERIFY(accounts.recordMediaView(userId, "M000004").ok());
         }
-        AccountHistoryServiceImpl accounts(csv);
-        QVERIFY(accounts.initializeDatabase(database).ok());
         MediaLibrary media(csv, {}); QVERIFY(media.load().success);
+        AccountHistoryServiceImpl accounts(media);
+        QVERIFY(accounts.initializeDatabase(database).ok());
         PersonalRecommendationServiceImpl service(accounts, [&] { return media.records(); });
         QVERIFY(accounts.login("reader", "secret").status.ok());
         auto reader = service.recommend({userId});
@@ -52,7 +52,6 @@ private slots:
 
         // Delete the item that contributed the administrator's only history entry.
         QVERIFY(accounts.removeMedia("M000001").status.ok());
-        QVERIFY(media.load().success); // This sync remains the frontend/assembly owner's responsibility.
         auto afterDelete = service.recommend({adminId});
         QVERIFY(afterDelete.success);
         QCOMPARE(afterDelete.mediaIds, recommendMedia(media.records(), {}));

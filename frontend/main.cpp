@@ -600,8 +600,7 @@ private:
         refreshTypes(filter_->currentData().toString());
     }
 
-    // The account service owns a separate MediaLibrary. Reload the UI snapshot
-    // after a committed write, including writes that reported an index error.
+    // Reload after a committed write, including writes that reported an index error.
     bool reloadAfterAccountMutation(QWidget* parent,
                                     const account_contract::MediaMutationResult& result,
                                     const QString& action)
@@ -932,7 +931,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    AccountHistoryServiceImpl accounts(csvPath);
+    AccountHistoryServiceImpl accounts(library);
     recommendation_contract::PersonalRecommendationServiceImpl recommendations(
         accounts, [&library] { return library.records(); });
     const QString databasePath = AccountHistoryServiceImpl::defaultDatabasePath();

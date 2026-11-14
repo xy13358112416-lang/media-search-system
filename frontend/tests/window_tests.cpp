@@ -1,3 +1,5 @@
+#include "account_history_service.h"
+#include "personalrecommendation_service.h"
 #include "window_test_support.h"
 #include <QtTest>
 
@@ -242,6 +244,82 @@ private slots:
         QVERIFY(f.library.search(query).isEmpty());
         MediaRecord removed;
         QVERIFY(!f.library.find(ids.first(), removed));
+    }
+
+    void realAccountHistoryAndRecommendationFlow() {
+        Fixture f(QString::fromUtf8(SAMPLE_CSV));
+        AccountHistoryServiceImpl accounts(f.library);
+        QVERIFY(accounts.initializeDatabase(f.directory.filePath("accounts.sqlite")).ok());
+        QVERIFY(accounts.createInitialAdmin("admin", "secret").ok());
+        QVERIFY(accounts.registerUser("reader", "secret").ok());
+        const auto admin = accounts.login("admin", "secret");
+        QVERIFY(admin.status.ok() && admin.value);
+        recommendation_contract::PersonalRecommendationServiceImpl recommendations(
+            accounts, [&] { return f.library.records(); });
+
+        f.window = std::make_unique<LibraryWindow>(f.library, &accounts, &recommendations);
+        f.window->show();
+        auto* table = static_cast<ObservedTable*>(f.window->findChild<QTableWidget*>());
+        auto* tabs = f.window->findChild<QTabBar*>();
+        QVERIFY(table && tabs);
+        finishLayout(table);
+        QVERIFY(accounts.loadMediaHistory(admin.value->userId).value->isEmpty());
+        const QString clickedId = f.detail(QStringLiteral("编号"));
+        QTest::mouseClick(table->viewport(), Qt::LeftButton, Qt::NoModifier,
+                          table->visualItemRect(table->item(0, 0)).center());
+        auto history = accounts.loadMediaHistory(admin.value->userId);
+        QVERIFY(history.status.ok() && history.value);
+        QCOMPARE(history.value->size(), 1);
+        QCOMPARE(history.value->first().mediaId, clickedId);
+        tabs->setCurrentIndex(2);
+        finishLayout(table);
+        const auto result = recommendations.recommend({admin.value->userId});
+        QVERIFY(result.success && !result.mediaIds.isEmpty());
+        QCOMPARE(f.detail(QStringLiteral("编号")), result.mediaIds.first());
+        QCOMPARE(accounts.loadMediaHistory(admin.value->userId).value->first().viewCount, qint64(1));
+
+        f.window.reset();
+        const auto reader = accounts.login("reader", "secret");
+        QVERIFY(reader.status.ok() && reader.value);
+        f.window = std::make_unique<LibraryWindow>(f.library, &accounts, &recommendations);
+        f.window->show();
+        QVERIFY(button(f.window.get(), QStringLiteral("新增"))->isHidden());
+        QVERIFY(button(f.window.get(), QStringLiteral("删除"))->isHidden());
+        QVERIFY(accounts.loadMediaHistory(reader.value->userId).value->isEmpty());
+        f.window.reset();
+    }
+
+    void accountFrontendStartsRealSession() {
+        Fixture f(QString::fromUtf8(SAMPLE_CSV));
+        const auto database = f.directory.filePath("startup.sqlite");
+        AccountHistoryServiceImpl accounts(f.library);
+        QVERIFY(accounts.initializeDatabase(database).ok());
+        QVERIFY(accounts.createInitialAdmin("admin", "secret").ok());
+        recommendation_contract::PersonalRecommendationServiceImpl recommendations(
+            accounts, [&] { return f.library.records(); });
+        bool loginDialogSeen = false;
+        bool sessionSeen = false;
+        QTimer::singleShot(0, [&] {
+            auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            if (!dialog) return;
+            const auto fields = dialog->findChildren<QLineEdit*>();
+            if (fields.size() < 2) { dialog->reject(); return; }
+            loginDialogSeen = true;
+            fields.at(0)->setText("admin");
+            fields.at(1)->setText("secret");
+            QTimer::singleShot(0, [&] {
+                auto* session = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+                if (!session) return;
+                sessionSeen = session->findChild<QTableWidget*>() && accounts.currentUser().has_value();
+                session->reject();
+            });
+            button(dialog, QStringLiteral("登录"))->click();
+            if (dialog->isVisible()) dialog->reject();
+        });
+        QCOMPARE(runAccountFrontend(*qApp, f.library, accounts, recommendations, database), 0);
+        QVERIFY(loginDialogSeen);
+        QVERIFY(sessionSeen);
+        QVERIFY(!accounts.currentUser().has_value());
     }
 
     void externalChangeStillRecovers() {
