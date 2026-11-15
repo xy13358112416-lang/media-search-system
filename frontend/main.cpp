@@ -213,10 +213,11 @@ public:
             assistant->setIconSize(QSize(22, 22));
             assistant->setObjectName(QStringLiteral("openAssistant"));
             bannerLayout->addWidget(assistant);
-            connect(assistant, &QPushButton::clicked, this, [this] {
+            connect(assistant, &QPushButton::clicked, this, [this, banner] {
                 if (!assistant_) {
                     assistant_ = new AssistantDialog(this, [this](const QString& keyword,
-                                                       media_mood::Mood mood, const QString& category) {
+                                                       media_mood::Mood mood, const QString& category, bool useScene) {
+                        sceneSearch_ = useScene;
                         director_->clear();
                         actor_->clear();
                         searchType_->clear();
@@ -230,6 +231,15 @@ public:
                         else
                             tabs_->setCurrentIndex(1);
                         keywordInput_->setFocus();
+                    }, [this, banner](warm_mode::Scene scene) {
+                        const auto theme = warm_mode::theme(scene);
+                        banner->setStyleSheet(scene == warm_mode::Scene::Neutral ? QString()
+                            : QStringLiteral("QFrame#banner { background: %1; }").arg(theme.banner));
+                        if (sceneSearch_) {
+                            moodFilter_->setCurrentIndex(moodFilter_->findData(static_cast<int>(theme.mood)));
+                            if (tabs_->currentIndex() == 1)
+                                showSearchResults();
+                        }
                     }, [this] {
                         tabs_->setCurrentIndex(2);
                     }, today_ ? QStringLiteral("打开今日推荐") : QStringLiteral("打开推荐"));
@@ -522,7 +532,10 @@ public:
             showSearchResults();
         };
         connect(searchButton, &QPushButton::clicked, this, submitSearch);
-        connect(moodFilter_, &QComboBox::activated, this, submitSearch);
+        connect(moodFilter_, &QComboBox::activated, this, [this, submitSearch] {
+            sceneSearch_ = false;
+            submitSearch();
+        });
         connect(contentFilter_, &QComboBox::activated, this, submitSearch);
         for (auto* input : {keywordInput_, director_, actor_, searchType_})
             connect(input, &QLineEdit::returnPressed, this, submitSearch);
@@ -536,6 +549,7 @@ public:
             director_->clear();
             actor_->clear();
             searchType_->clear();
+            sceneSearch_ = false;
             moodFilter_->setCurrentIndex(0);
             contentFilter_->setCurrentIndex(0);
             submitSearch();
@@ -1038,6 +1052,7 @@ private:
     QList<QLabel*> detailValues_;      // Detail value labels in form order.
     SearchQuery query_; // Last submitted combination of search fields.
     AssistantDialog* assistant_ = nullptr;
+    bool sceneSearch_ = false;
     QTabBar* tabs_ = new QTabBar; // Switch between browsing and searching.
     QStackedWidget* controls_ = new QStackedWidget; // Controls for the selected tab.
     QLineEdit* director_ = new QLineEdit; // Director full-name query.
