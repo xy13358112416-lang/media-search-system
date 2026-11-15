@@ -8,7 +8,11 @@ namespace warehouse_protocol {
 constexpr quint32 MaxFrameSize = 4U * 1024U * 1024U;
 enum class MessageType { Login, Logout, ListMyWarehouses, ListPublicWarehouses,
                          GetWarehouse, CreateWarehouse, AddItem, RemoveItem, RecommendResources,
-                         CancelRecommendation, ErrorResponse };
+                         CancelRecommendation, ErrorResponse,
+                         RecordBehavior, GetParticipationSettings, SetParticipationSettings, ClearHistory,
+                         ListFollows, SetFollow, GetPersonWorks, GetPersonUpdates,
+                         GetTrending, GetFootprint, RecommendTemporal, ListWorkFeedback, SetWorkFeedback,
+                         GetResource, SearchPeople };
 QString messageName(MessageType type);
 // 大端 4 字节长度 + UTF-8 JSON 对象；失败时返回空数组并填写 error。
 QByteArray encodeFrame(const QJsonObject& object, QString& error);
