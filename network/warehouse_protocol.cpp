@@ -18,6 +18,21 @@ QString messageName(MessageType type) {
     case MessageType::RecommendResources: return QStringLiteral("recommend_resources");
     case MessageType::CancelRecommendation: return QStringLiteral("cancel_recommendation");
     case MessageType::ErrorResponse: return QStringLiteral("error_resp");
+    case MessageType::RecordBehavior: return QStringLiteral("record_behavior");
+    case MessageType::GetParticipationSettings: return QStringLiteral("get_participation_settings");
+    case MessageType::SetParticipationSettings: return QStringLiteral("set_participation_settings");
+    case MessageType::ClearHistory: return QStringLiteral("clear_history");
+    case MessageType::ListFollows: return QStringLiteral("list_follows");
+    case MessageType::SetFollow: return QStringLiteral("set_follow");
+    case MessageType::GetPersonWorks: return QStringLiteral("get_person_works");
+    case MessageType::GetPersonUpdates: return QStringLiteral("get_person_updates");
+    case MessageType::GetTrending: return QStringLiteral("get_trending");
+    case MessageType::GetFootprint: return QStringLiteral("get_footprint");
+    case MessageType::RecommendTemporal: return QStringLiteral("recommend_temporal");
+    case MessageType::ListWorkFeedback: return QStringLiteral("list_work_feedback");
+    case MessageType::SetWorkFeedback: return QStringLiteral("set_work_feedback");
+    case MessageType::GetResource: return QStringLiteral("get_resource");
+    case MessageType::SearchPeople: return QStringLiteral("search_people");
     }
     return {};
 }
