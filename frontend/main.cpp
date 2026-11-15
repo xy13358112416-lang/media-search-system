@@ -6,6 +6,7 @@
 #include "account_dialog.h"
 #include "avatar_button.h"
 #include "assistant_dialog.h"
+#include "care_dashboard.h"
 #include "account_frontend.h"
 #include "account_history_service.h"
 #include "personalrecommendation_service.h"
@@ -215,6 +216,19 @@ public:
             assistant->setIconSize(QSize(22, 22));
             assistant->setObjectName(QStringLiteral("openAssistant"));
             bannerLayout->addWidget(assistant);
+            auto* careDemo = new QPushButton(QStringLiteral("关怀演示"));
+            bannerLayout->addWidget(careDemo);
+            connect(careDemo, &QPushButton::clicked, this, [this] {
+                using care_contract::BrowseScene;
+                BrowseScene scene = BrowseScene::Neutral;
+                switch (warmScene_) {
+                case warm_mode::Scene::Neutral: break;
+                case warm_mode::Scene::Relax: scene = BrowseScene::Relax; break;
+                case warm_mode::Scene::Focus: scene = BrowseScene::Focus; break;
+                case warm_mode::Scene::Explore: scene = BrowseScene::Explore; break;
+                }
+                showCareDemonstration(this, scene);
+            });
             connect(assistant, &QPushButton::clicked, this, [this, banner] {
                 if (!assistant_) {
                     assistant_ = new AssistantDialog(this, [this](const QString& keyword,
@@ -234,6 +248,7 @@ public:
                             tabs_->setCurrentIndex(1);
                         keywordInput_->setFocus();
                     }, [this, banner](warm_mode::Scene scene) {
+                        warmScene_ = scene;
                         const auto theme = warm_mode::theme(scene);
                         banner->setStyleSheet(scene == warm_mode::Scene::Neutral ? QString()
                             : QStringLiteral("QFrame#banner { background: %1; }").arg(theme.banner));
@@ -1059,6 +1074,7 @@ private:
     SearchQuery query_; // Last submitted combination of search fields.
     AssistantDialog* assistant_ = nullptr;
     bool sceneSearch_ = false;
+    warm_mode::Scene warmScene_ = warm_mode::Scene::Neutral;
     QTabBar* tabs_ = new QTabBar; // Switch between browsing and searching.
     QStackedWidget* controls_ = new QStackedWidget; // Controls for the selected tab.
     QLineEdit* director_ = new QLineEdit; // Director full-name query.

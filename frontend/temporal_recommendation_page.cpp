@@ -61,6 +61,7 @@ public:
     void deactivate() override
     {
         CarePage::deactivate();
+        history_->setEnabled(true);
         writing_ = false;
         cancelRequest();
         clearRows();

@@ -1,6 +1,6 @@
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
-add_library(qt_care_pages STATIC follow_center.cpp)
+add_library(qt_care_pages STATIC follow_center.cpp care_dashboard.cpp)
 target_sources(qt_care_pages PRIVATE trending_page.cpp)
 target_sources(qt_care_pages PRIVATE footprint_page.cpp)
 target_sources(qt_care_pages PRIVATE temporal_recommendation_page.cpp)
@@ -11,7 +11,7 @@ target_compile_options(qt_care_pages PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 add_executable(media_library_qt WIN32 main.cpp assistant_dialog.cpp warehouse_page.cpp)
 qt_add_resources(media_library_qt frontend_icons PREFIX / FILES chevron-down.png)
-target_link_libraries(media_library_qt PRIVATE media_business warehouse_client Qt6::Widgets)
+target_link_libraries(media_library_qt PRIVATE media_business warehouse_client qt_care_pages Qt6::Widgets)
 target_compile_options(media_library_qt PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 set(sample_csv "${PROJECT_SOURCE_DIR}/sample-data/data/media_records.csv")
@@ -25,7 +25,7 @@ if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
     add_executable(media_frontend_tests tests/window_tests.cpp assistant_dialog.cpp warehouse_page.cpp)
     set_target_properties(media_frontend_tests PROPERTIES AUTOMOC ON)
-    target_link_libraries(media_frontend_tests PRIVATE media_business warehouse_client Qt6::Widgets Qt6::Test)
+    target_link_libraries(media_frontend_tests PRIVATE media_business warehouse_client qt_care_pages Qt6::Widgets Qt6::Test)
     target_compile_definitions(media_frontend_tests PRIVATE
         REAL_CSV="${sample_csv}"
         SAMPLE_CSV="${PROJECT_SOURCE_DIR}/sample-data/tests/fixtures/media_records_synthetic.csv"
@@ -44,9 +44,18 @@ if(BUILD_TESTING)
     add_test(NAME warehouse_page_tests COMMAND warehouse_page_tests)
     set_tests_properties(warehouse_page_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+
+    add_executable(care_dashboard_tests tests/care_dashboard_tests.cpp)
+    set_target_properties(care_dashboard_tests PROPERTIES AUTOMOC ON)
+    target_include_directories(care_dashboard_tests PRIVATE "${PROJECT_SOURCE_DIR}/include")
+    target_link_libraries(care_dashboard_tests PRIVATE qt_care_pages Qt6::Test)
+    target_compile_options(care_dashboard_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    add_test(NAME care_dashboard_tests COMMAND care_dashboard_tests)
+    set_tests_properties(care_dashboard_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
     # Explicit benchmark target: timings are evidence, not a hardware-dependent CTest gate.
     add_executable(media_frontend_benchmark EXCLUDE_FROM_ALL tests/window_benchmark.cpp assistant_dialog.cpp warehouse_page.cpp)
-    target_link_libraries(media_frontend_benchmark PRIVATE media_business warehouse_client Qt6::Widgets)
+    target_link_libraries(media_frontend_benchmark PRIVATE media_business warehouse_client qt_care_pages Qt6::Widgets)
     target_compile_options(media_frontend_benchmark PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
     qt_add_resources(media_frontend_benchmark frontend_benchmark_icons PREFIX / FILES chevron-down.png)
 endif()
