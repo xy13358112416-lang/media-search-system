@@ -15,6 +15,8 @@ QString messageName(MessageType type) {
     case MessageType::CreateWarehouse: return QStringLiteral("create_warehouse");
     case MessageType::AddItem: return QStringLiteral("add_item");
     case MessageType::RemoveItem: return QStringLiteral("remove_item");
+    case MessageType::RecommendResources: return QStringLiteral("recommend_resources");
+    case MessageType::CancelRecommendation: return QStringLiteral("cancel_recommendation");
     case MessageType::ErrorResponse: return QStringLiteral("error_resp");
     }
     return {};

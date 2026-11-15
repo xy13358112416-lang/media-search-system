@@ -1,1 +1,28 @@
-# PR 2 将在此添加 media_server；PR 0 不提供可运行的服务器。
+find_package(Qt6 REQUIRED COMPONENTS Core Network Sql)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SODIUM REQUIRED IMPORTED_TARGET libsodium)
+
+add_library(warehouse_server STATIC warehouse_server.cpp recommendation_router.cpp)
+target_link_libraries(warehouse_server PUBLIC warehouse_protocol llm_recommendation Qt6::Sql PRIVATE PkgConfig::SODIUM)
+target_compile_options(warehouse_server PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+
+add_executable(media_server main.cpp)
+target_link_libraries(media_server PRIVATE warehouse_server)
+target_compile_options(media_server PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+
+if(BUILD_TESTING)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+    add_executable(warehouse_server_tests tests.cpp)
+    set_target_properties(warehouse_server_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(warehouse_server_tests PRIVATE warehouse_server Qt6::Test)
+    target_compile_options(warehouse_server_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    add_test(NAME warehouse_server_tests COMMAND warehouse_server_tests)
+    # R01 supplies the actual client; the R03 branch remains testable before it merges.
+    if(EXISTS "${PROJECT_SOURCE_DIR}/network/warehouse_client.cpp")
+        add_executable(recommendation_client_tests recommendation_client_tests.cpp)
+        set_target_properties(recommendation_client_tests PROPERTIES AUTOMOC ON)
+        target_link_libraries(recommendation_client_tests PRIVATE warehouse_server warehouse_client Qt6::Test)
+        target_compile_options(recommendation_client_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+        add_test(NAME recommendation_client_tests COMMAND recommendation_client_tests)
+    endif()
+endif()

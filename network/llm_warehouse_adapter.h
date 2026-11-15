@@ -14,12 +14,17 @@ struct WarehouseResult {
     QList<WarehouseSelection> items;
     QString message;
 };
-// Server MUST authenticate the session and authorize the target before calling.
+// Server MUST authenticate, validate query/limit/optional target and authorize any target before calling.
 // readable contains only warehouse snapshots readable by that network user.
+Request fromWarehouses(const warehouse_contract::WarehouseRecommendationRequest& query,
+                       const QList<warehouse_contract::WarehouseDetail>& readable);
+// Compatibility entry point for existing consumers that use the warehouse name as a theme.
 Request fromWarehouses(const warehouse_contract::WarehouseSummary& target,
                        const QList<warehouse_contract::WarehouseDetail>& readable, int limit = 6);
 // Call with freshly authorized snapshots after completion. Deleted/inaccessible
 // entries are omitted; session and target authorization remain the server's job.
 WarehouseResult toWarehouses(const Result& result,
                             const QList<warehouse_contract::WarehouseDetail>& currentlyReadable);
+warehouse_contract::WarehouseRecommendationResult toRecommendationResult(
+    const Result& result, const QList<warehouse_contract::WarehouseDetail>& currentlyReadable);
 } // namespace llm_recommendation

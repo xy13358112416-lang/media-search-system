@@ -7,11 +7,11 @@ QString key(qint64 warehouse, qint64 item) {
     return QString::number(warehouse) + QLatin1Char(':') + QString::number(item);
 }
 }
-Request fromWarehouses(const warehouse_contract::WarehouseSummary& target,
-                       const QList<warehouse_contract::WarehouseDetail>& readable, int limit) {
+Request fromWarehouses(const warehouse_contract::WarehouseRecommendationRequest& query,
+                       const QList<warehouse_contract::WarehouseDetail>& readable) {
     Request request;
-    request.context = target.name;
-    request.limit = limit;
+    request.context = query.query;
+    request.limit = query.limit;
     QSet<QString> seen;
     for (const auto& warehouse : readable) {
         if (warehouse.warehouse.warehouseId <= 0) continue;
@@ -24,6 +24,10 @@ Request fromWarehouses(const warehouse_contract::WarehouseSummary& target,
         }
     }
     return request;
+}
+Request fromWarehouses(const warehouse_contract::WarehouseSummary& target,
+                       const QList<warehouse_contract::WarehouseDetail>& readable, int limit) {
+    return fromWarehouses(warehouse_contract::WarehouseRecommendationRequest{target.name, target.warehouseId, limit}, readable);
 }
 WarehouseResult toWarehouses(const Result& result,
                             const QList<warehouse_contract::WarehouseDetail>& currentlyReadable) {
@@ -45,6 +49,15 @@ WarehouseResult toWarehouses(const Result& result,
         output.items.append(selected);
         seen.insert(item.key);
     }
+    return output;
+}
+warehouse_contract::WarehouseRecommendationResult toRecommendationResult(
+    const Result& result, const QList<warehouse_contract::WarehouseDetail>& currentlyReadable) {
+    const auto mapped = toWarehouses(result, currentlyReadable);
+    warehouse_contract::WarehouseRecommendationResult output;
+    output.fallback = mapped.fallback; output.message = mapped.message;
+    for (const auto& selection : mapped.items)
+        output.items.append({selection.warehouseId, selection.item.itemId, selection.item.media, selection.reason});
     return output;
 }
 } // namespace llm_recommendation
