@@ -22,3 +22,5 @@ ctest -R "^warehouse_server_tests$" --output-on-failure
 `recommend_resources` 接受 `query`、`limit`（1–50）和可选的 `warehouse_id`。服务器验证当前连接的会话及目标仓库的可读权限，仅从本人仓库和公开仓库中构造候选，返回前再次确认会话与资源可读性。推荐异步完成，普通请求无需等待模型。`cancel_recommendation` 的 `target_req_id` 必须指向同一连接的推荐；取消先到时原请求收到 `Cancelled`，取消请求收到独立确认。退出或断开连接会取消该会话的待处理任务，迟到结果被丢弃。
 
 当前单次可读快照最多 1000 个仓库、1000 条记录和 4 MiB 媒体 JSON，超过上限时返回错误，不截断候选后假装结果完整。读取快照仍在服务器线程同步完成；规模进一步增长时需要分页或后台查询。
+
+当 R01 的 `warehouse_client.cpp` 已进入项目时，构建自动启用 `recommendation_client_tests`：使用真实网络客户端和本机服务器验证推荐回退及取消。模型请求使用模拟服务或无 Key 配置，自动测试不消耗 API 配额。
