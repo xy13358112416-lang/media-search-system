@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory)][string]$BuildDirectory,
     [Parameter(Mandatory)][string]$QtBin,
     [Parameter(Mandatory)][string]$OutputDirectory,
@@ -54,6 +54,7 @@ $help = @'
 3. 媒体库默认打开 500 条作品元数据，不包含音视频文件。增删会保存到同目录的 media_records.csv。
 4. 检索样例作品时请选择文件类型「不限」，因为样例的实际文件格式未知。
 5. 推荐页可选类别与类型。检索页的「性能对照」展示 10 万条合成数据的已记录实验。
+6. 资源仓库页使用服务器地址、端口和独立的网络账号。请由服务器管理员创建演示账号。智能推荐需服务器接通推荐服务。
 
 账户和浏览历史存放在应用本地数据目录的 accounts.sqlite。开始新一轮演示前如需恢复样例，请在关闭程序后备份或移走 media_records.csv。
 '@

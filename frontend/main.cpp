@@ -1,4 +1,6 @@
 #include "medialibrary.h"
+#include "warehouse_client.h"
+#include "warehouse_page.h"
 #include "mediarecommendation.h"
 #include "library_style.h"
 #include "account_dialog.h"
@@ -229,6 +231,8 @@ public:
         tabs_->addTab(QStringLiteral("媒体库"));
         tabs_->addTab(QStringLiteral("检索"));
         tabs_->addTab(QStringLiteral("推荐"));
+        if (identity_)
+            tabs_->addTab(QStringLiteral("资源仓库"));
         layout->addWidget(tabs_);
 
         auto* libraryControls = new QWidget;
@@ -379,6 +383,14 @@ public:
         splitter->setStretchFactor(0, 3);
         splitter->setStretchFactor(1, 1);
         layout->addWidget(splitter, 1);
+        WarehousePage* warehousePage = nullptr;
+        if (identity_) {
+            auto* client = new WarehouseClient(this);
+            warehousePage = new WarehousePage(*client, [this] { return library_.records(); });
+            client->setParent(warehousePage);
+            layout->addWidget(warehousePage, 1);
+            warehousePage->hide();
+        }
         trace_->setObjectName(QStringLiteral("tracePanel"));
         trace_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
         auto* traceLayout = new QVBoxLayout(trace_);
@@ -404,8 +416,19 @@ public:
         trace_->hide();
         layout->addWidget(trace_);
 
-        connect(tabs_, &QTabBar::currentChanged, this, [this](int index) {
-            controls_->setCurrentIndex(index);
+        connect(tabs_, &QTabBar::currentChanged, this, [this, warehousePage, splitter](int index) {
+            const bool online = index == 3;
+            controls_->setVisible(!online);
+            splitter->setVisible(!online);
+            count_->setVisible(!online);
+            order_->setVisible(!online);
+            if (warehousePage) {
+                if (warehousePage->isVisible() && !online)
+                    warehousePage->suspend();
+                warehousePage->setVisible(online);
+            }
+            if (!online)
+                controls_->setCurrentIndex(index);
             trace_->setVisible(index == 1);
             recommendationReason_->setVisible(index == 2 && !recommendationReason_->text().isEmpty());
             order_->setText(index == 2 ? QStringLiteral("按推荐顺序")
@@ -416,7 +439,7 @@ public:
                 showRecommendations(records);
             } else if (index == 1) {
                 showSearchResults();
-            } else {
+            } else if (index == 0) {
                 refresh();
             }
         });
