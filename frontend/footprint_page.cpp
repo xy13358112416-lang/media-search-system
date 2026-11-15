@@ -4,7 +4,9 @@
 #include <QDateEdit>
 #include <QHeaderView>
 #include <QHBoxLayout>
+#include <QProgressBar>
 #include <QPushButton>
+#include <algorithm>
 #include <QTableWidget>
 #include <QTabWidget>
 
@@ -79,7 +81,7 @@ public:
         tabs->addTab(people_, QStringLiteral("人物分布"));
         layout->addWidget(tabs, 1);
         setup(days_, {QStringLiteral("北京时间"), QStringLiteral("浏览次数"), QStringLiteral("搜索次数")});
-        setup(categories_, {QStringLiteral("类别"), QStringLiteral("浏览次数")});
+        setup(categories_, {QStringLiteral("类别"), QStringLiteral("浏览次数"), QStringLiteral("相对分布")});
         setup(people_, {QStringLiteral("人物"), QStringLiteral("角色"), QStringLiteral("浏览次数")});
         connect(mode_, &QComboBox::activated, this, [this] { activate(); });
         connect(fetch, &QPushButton::clicked, this, [this] { activate(); });
@@ -132,6 +134,19 @@ public:
             for (const auto& item : current.categories)
                 rows.append({item.label, QString::number(item.count)});
             fill(categories_, rows);
+            qint64 largest = 0;
+            for (const auto& item : current.categories)
+                largest = std::max(largest, item.count);
+            for (int row = 0; row < current.categories.size(); ++row) {
+                const auto& item = current.categories.at(row);
+                auto* bar = new QProgressBar;
+                bar->setAccessibleName(item.label);
+                bar->setAccessibleDescription(QString::number(item.count));
+                bar->setRange(0, 1000);
+                bar->setTextVisible(false);
+                bar->setValue(largest > 0 ? qRound(1000.0 * item.count / largest) : 0);
+                categories_->setCellWidget(row, 2, bar);
+            }
             rows.clear();
             for (const auto& item : current.people)
                 rows.append({item.name, care_ui::roleLabel(item.role), QString::number(item.count)});
