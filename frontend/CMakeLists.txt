@@ -1,5 +1,11 @@
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
+add_library(qt_care_pages STATIC follow_center.cpp)
+target_include_directories(qt_care_pages PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" PRIVATE "${PROJECT_SOURCE_DIR}/include")
+target_compile_features(qt_care_pages PUBLIC cxx_std_17)
+target_link_libraries(qt_care_pages PUBLIC Qt6::Widgets)
+target_compile_options(qt_care_pages PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+
 add_executable(media_library_qt WIN32 main.cpp)
 qt_add_resources(media_library_qt frontend_icons PREFIX / FILES chevron-down.png)
 target_link_libraries(media_library_qt PRIVATE media_business Qt6::Widgets)
