@@ -1,0 +1,12 @@
+# Offline tools only. Python is optional and never a production dependency.
+if(BUILD_TESTING)
+    add_executable(care_simulation_demo "${CMAKE_CURRENT_LIST_DIR}/care_simulation_demo.cpp")
+    target_link_libraries(care_simulation_demo PRIVATE care_footprint care_trending care_temporal)
+    target_compile_options(care_simulation_demo PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    find_package(Python3 QUIET COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME care_simulation_generator COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/test_generate.py")
+        add_test(NAME care_simulation_algorithms COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/test_algorithms.py" "$<TARGET_FILE:care_simulation_demo>")
+        set_tests_properties(care_simulation_generator care_simulation_algorithms PROPERTIES TIMEOUT 60 ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
+    endif()
+endif()
