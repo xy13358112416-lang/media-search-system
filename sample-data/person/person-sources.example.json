@@ -1,0 +1,10 @@
+{
+  "schema": "care-person-source-config-v1",
+  "provenance": "PLACEHOLDER ONLY: replace with the official feed URL and the operator's verification record.",
+  "sources": [
+    {
+      "person_id": "person:replace-with-imported-id",
+      "feed_url": "https://feeds.example.org/replace-with-official-feed"
+    }
+  ]
+}
