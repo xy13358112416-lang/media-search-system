@@ -33,8 +33,8 @@ Widget* matching(QWidget& page, const QString& text)
     return nullptr;
 }
 
-// The warehouse operations use an actual TCP server. Only the unfinished R03
-// recommendation endpoint is supplied by this test double.
+// The integration test uses a TCP server for warehouse operations; recommendation
+// responses remain controlled to exercise cancellation and explicit confirmation.
 class TestClient : public WarehouseClient {
 public:
     RecommendationHandle recommendResources(const WarehouseRecommendationRequest& request,
@@ -56,6 +56,50 @@ public:
     Callback<WarehouseRecommendationResult> callback;
 };
 
+// Deterministic page tests can finish a list request while a confirmation is open.
+class DeferredPageClient final : public TestClient {
+public:
+    void connectToServer(const QString&, quint16, StatusCallback done) override { done({}); }
+    void login(const QString&, const QString&, Callback<UserInfo> done) override
+    { done({{}, UserInfo{7, QStringLiteral("reader")}}); }
+    void listMyWarehouses(Callback<QList<WarehouseSummary>> done) override
+    {
+        if (deferLists)
+            listDone = std::move(done);
+        else
+            done({{}, warehouses});
+    }
+    void getWarehouse(qint64 id, Callback<WarehouseDetail> done) override
+    {
+        for (const auto& warehouse : warehouses) {
+            if (warehouse.warehouseId == id) {
+                done({{}, WarehouseDetail{warehouse, {}}});
+                return;
+            }
+        }
+        done({{ErrorCode::NotFound, QStringLiteral("仓库不存在")}, {}});
+    }
+    void addItem(qint64 id, const MediaRecord& media, Callback<WarehouseItem> done) override
+    {
+        addedTo.append(id);
+        done({{}, WarehouseItem{1, media}});
+    }
+    void completeList(QList<WarehouseSummary> result)
+    {
+        warehouses = std::move(result);
+        auto done = std::move(listDone);
+        listDone = {};
+        done({{}, warehouses});
+    }
+
+    bool deferLists = false;
+    QList<WarehouseSummary> warehouses{
+        {1, QStringLiteral("A"), 7, Visibility::Private},
+        {2, QStringLiteral("B"), 7, Visibility::Private}};
+    Callback<QList<WarehouseSummary>> listDone;
+    QList<qint64> addedTo;
+};
+
 void signIn(WarehousePage& page, quint16 port, const QString& user, const QString& password)
 {
     named<QSpinBox>(page, "warehousePort")->setValue(port);
@@ -69,6 +113,63 @@ void signIn(WarehousePage& page, quint16 port, const QString& user, const QStrin
 class OnlineWarehouseTests : public QObject {
     Q_OBJECT
 private slots:
+    void refreshKeepsSelectionChangedWhileLoading()
+    {
+        DeferredPageClient client;
+        WarehousePage page(client, [] { return QList<MediaRecord>{}; });
+        signIn(page, 8765, QStringLiteral("reader"), QStringLiteral("secret"));
+        auto* warehouses = named<QListWidget>(page, "onlineWarehouseList");
+        QCOMPARE(warehouses->currentRow(), 0);
+        client.deferLists = true;
+        matching<QPushButton>(page, QStringLiteral("刷新列表"))->click();
+        QVERIFY(client.listDone);
+        warehouses->setCurrentRow(1);
+        named<QLineEdit>(page, "warehouseRecommendationQuery")->setText(QStringLiteral("轻松电影"));
+        matching<QPushButton>(page, QStringLiteral("获取推荐"))->click();
+        QVERIFY(client.lastRequest.targetWarehouseId);
+        QCOMPARE(*client.lastRequest.targetWarehouseId, qint64(2));
+
+        client.completeList(client.warehouses);
+        QCOMPARE(warehouses->currentRow(), 1);
+        auto done = std::move(client.callback);
+        QVERIFY(done);
+        const WarehouseRecommendationItem suggestion{2, 1, {}, QStringLiteral("适合放松")};
+        done({{}, WarehouseRecommendationResult{{suggestion}, false, {}}});
+        QCOMPARE(named<QListWidget>(page, "onlineWarehouseRecommendations")->count(), 1);
+        QVERIFY(client.cancelled.isEmpty());
+        QVERIFY(client.addedTo.isEmpty());
+    }
+
+    void confirmationRejectsWarehouseChangedByListResponse()
+    {
+        DeferredPageClient client;
+        WarehousePage page(client, [] { return QList<MediaRecord>{}; });
+        signIn(page, 8765, QStringLiteral("reader"), QStringLiteral("secret"));
+        auto* warehouses = named<QListWidget>(page, "onlineWarehouseList");
+        warehouses->setCurrentRow(1);
+        matching<QCheckBox>(page, QStringLiteral("使用所选仓库"))->setChecked(false);
+        named<QLineEdit>(page, "warehouseRecommendationQuery")->setText(QStringLiteral("轻松电影"));
+        matching<QPushButton>(page, QStringLiteral("获取推荐"))->click();
+        auto done = std::move(client.callback);
+        QVERIFY(done);
+        const WarehouseRecommendationItem suggestion{2, 1, {}, QStringLiteral("适合放松")};
+        done({{}, WarehouseRecommendationResult{{suggestion}, false, {}}});
+        named<QListWidget>(page, "onlineWarehouseRecommendations")->setCurrentRow(0);
+
+        client.deferLists = true;
+        matching<QPushButton>(page, QStringLiteral("刷新列表"))->click();
+        QVERIFY(client.listDone);
+        QTimer::singleShot(0, &page, [&] {
+            client.completeList({client.warehouses.first()});
+            auto* dialog = page.findChild<QMessageBox*>();
+            QVERIFY(dialog);
+            dialog->button(QMessageBox::Yes)->click();
+        });
+        matching<QPushButton>(page, QStringLiteral("确认加入所选仓库"))->click();
+        QCOMPARE(warehouses->currentRow(), 0);
+        QVERIFY(client.addedTo.isEmpty());
+    }
+
     void twoAccountsAndRecommendationConfirm()
     {
         QTemporaryDir temporary;

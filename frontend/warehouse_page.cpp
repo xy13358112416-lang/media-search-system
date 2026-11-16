@@ -276,16 +276,17 @@ void WarehousePage::refresh()
 {
     if (!user_)
         return;
-    const auto previous = selection();
     const auto generation = ++listEpoch_;
     status_->setText(QStringLiteral("正在加载仓库…"));
-    auto done = inSession([this, generation, previous](Result<QList<WarehouseSummary>> result) {
+    auto done = inSession([this, generation](Result<QList<WarehouseSummary>> result) {
         if (generation != listEpoch_)
             return;
         if (!result.status.ok() || !result.value) {
             displayStatus(result.status);
             return;
         }
+        // Preserve a selection made while this request was in flight.
+        const auto previous = selection();
         const auto previousId = previous ? previous->warehouseId : 0;
         warehouses_ = *result.value;
         {
@@ -510,12 +511,20 @@ void WarehousePage::suspend()
 void WarehousePage::addSuggestion()
 {
     const auto row = recommendationList_->currentRow();
-    if (!addSuggestion_->isEnabled() || row < 0 || row >= suggestions_.size())
+    const auto warehouse = selection();
+    if (!warehouse || !addSuggestion_->isEnabled() || row < 0 || row >= suggestions_.size())
         return;
     const auto record = suggestions_.at(row).media;
     const auto epoch = sessionEpoch_;
+    const auto detailGeneration = detailEpoch_;
     if (QMessageBox::question(this, QStringLiteral("确认入库"),
         QStringLiteral("将所选推荐作品加入当前仓库？"), QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
-        == QMessageBox::Yes && epoch == sessionEpoch_)
-        addMedia(record);
+        != QMessageBox::Yes || epoch != sessionEpoch_)
+        return;
+    const auto current = selection();
+    if (!current || current->warehouseId != warehouse->warehouseId || detailGeneration != detailEpoch_) {
+        status_->setText(QStringLiteral("仓库已变化，请重新确认入库。"));
+        return;
+    }
+    addMedia(record);
 }
