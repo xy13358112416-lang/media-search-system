@@ -3,6 +3,7 @@
 #include "behavior_contract.h"
 #include "care_footprint.h"
 #include "care_trending.h"
+#include "care_temporal.h"
 
 #include <QDateTime>
 #include <QJsonArray>
@@ -11,6 +12,7 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QTcpSocket>
+#include <QTimeZone>
 #include <QUuid>
 #include <memory>
 #include <sodium.h>
@@ -43,6 +45,32 @@ bool readRange(const QJsonValue& value, care_contract::TimeRange& range)
 QJsonObject rangeJson(const care_contract::TimeRange& range)
 {
     return {{"begin_utc", QString::number(range.beginUtc)}, {"end_utc", QString::number(range.endUtc)}};
+}
+bool readPreference(const QJsonValue& value, recommendation_contract::PreferenceSelection& preference)
+{
+    if (!value.isObject()) return false;
+    const auto object = value.toObject();
+    if (!object.value("mode").isString() || !object.value("value").isString()) return false;
+    const auto mode = object.value("mode").toString();
+    if (mode == "auto") preference.mode = recommendation_contract::PreferenceMode::Auto;
+    else if (mode == "any") preference.mode = recommendation_contract::PreferenceMode::Any;
+    else if (mode == "explicit") preference.mode = recommendation_contract::PreferenceMode::Explicit;
+    else return false;
+    preference.value = object.value("value").toString();
+    return true;
+}
+QJsonObject workJson(const care_contract::ResourceSummary& work)
+{
+    QJsonArray people;
+    for (const auto& person : work.people) {
+        QJsonArray roles;
+        for (const auto role : person.roles)
+            roles.append(role == care_contract::PersonRole::Actor ? "actor" : role == care_contract::PersonRole::Director ? "director" : "musician");
+        people.append(QJsonObject{{"person_id", person.personId}, {"name", person.name}, {"roles", roles}, {"followed", person.followed}});
+    }
+    return {{"resource", QJsonObject{{"work_id", work.resource.workId}, {"source", QJsonObject{
+        {"warehouse_id", QString::number(work.resource.source.warehouseId)}, {"item_id", QString::number(work.resource.source.itemId)}}}}},
+        {"media", media_json::toJson(work.media)}, {"people", people}};
 }
 QJsonObject periodJson(const care_contract::PeriodFootprint& period)
 {
@@ -388,6 +416,101 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         session.userId = 0;
         session.token.clear();
         return success();
+    }
+    if (type == "recommend_temporal") {
+        care_contract::TemporalRecommendationRequest input;
+        if (!readPreference(payload.value("category"), input.category) || !readPreference(payload.value("file_type"), input.fileType) ||
+            !payload.value("scene").isString() || !payload.value("limit").isDouble()) return invalid();
+        const auto scene = payload.value("scene").toString();
+        if (scene == "neutral") input.scene = care_contract::BrowseScene::Neutral;
+        else if (scene == "relax") input.scene = care_contract::BrowseScene::Relax;
+        else if (scene == "focus") input.scene = care_contract::BrowseScene::Focus;
+        else if (scene == "explore") input.scene = care_contract::BrowseScene::Explore;
+        else return invalid();
+        const double limit = payload.value("limit").toDouble();
+        if (limit < 1 || limit > care_contract::MaxRecommendationLimit || limit != static_cast<int>(limit)) return invalid();
+        input.limit = static_cast<int>(limit);
+        if (!care_contract::validate(input).ok()) return invalid();
+        const auto candidates = readableCandidates(session.userId);
+        const auto history = queryBehavior(session.userId, {0, care_contract::MaxUtcExclusive});
+        if (!candidates || !history) return dbError();
+        care_algorithms::PersonalSnapshot snapshot;
+        snapshot.userKey = QString::number(session.userId);
+        snapshot.nowUtc = QDateTime::currentSecsSinceEpoch();
+        QSqlQuery settings(db_);
+        settings.prepare("SELECT history_enabled,personalization_enabled,contribute_public_trends FROM behavior_settings WHERE user_id=?");
+        settings.addBindValue(session.userId);
+        if (!settings.exec()) return dbError();
+        if (settings.next()) snapshot.settings = {settings.value(0).toBool(), settings.value(1).toBool(), settings.value(2).toBool()};
+        else if (settings.lastError().isValid()) return dbError();
+        // One transaction avoids one disk commit per newly discovered candidate.
+        if (!db_.transaction()) return dbError();
+        QSqlQuery insertSource(db_), findSource(db_);
+        insertSource.prepare("INSERT OR IGNORE INTO work_sources(warehouse_id,item_id,work_id) VALUES(?,?,?)");
+        findSource.prepare("SELECT work_id FROM work_sources WHERE warehouse_id=? AND item_id=?");
+        for (const auto& warehouse : *candidates) {
+            for (const auto& item : warehouse.items) {
+                findSource.bindValue(0, warehouse.warehouse.warehouseId); findSource.bindValue(1, item.itemId);
+                if (!findSource.exec()) { db_.rollback(); return dbError(); }
+                if (!findSource.next()) {
+                    if (findSource.lastError().isValid()) { db_.rollback(); return dbError(); }
+                    findSource.finish();
+                    insertSource.bindValue(0, warehouse.warehouse.warehouseId); insertSource.bindValue(1, item.itemId);
+                    insertSource.bindValue(2, QStringLiteral("srv:") + QUuid::createUuid().toString(QUuid::WithoutBraces));
+                    if (!insertSource.exec() || !findSource.exec() || !findSource.next()) { db_.rollback(); return dbError(); }
+                }
+                snapshot.readableWorks.append({{findSource.value(0).toString(), {warehouse.warehouse.warehouseId, item.itemId}}, item.media, {}});
+                findSource.finish();
+            }
+        }
+        if (!db_.commit()) { db_.rollback(); return dbError(); }
+        for (const auto& stored : *history) {
+            care_algorithms::ObservedBehavior event;
+            event.userKey = snapshot.userKey; event.record = stored.record; event.publicEligible = stored.publicEligible;
+            if (stored.record.event.resource && stored.mediaSnapshot)
+                event.workSnapshot = care_contract::ResourceSummary{*stored.record.event.resource, *stored.mediaSnapshot, {}};
+            snapshot.events.append(event);
+        }
+        // The recommendation uses the complete seven-day public heat window, not the truncated UI top list.
+        const QTimeZone zone("Asia/Shanghai");
+        if (!zone.isValid()) return dbError();
+        QMap<QString, QMap<qint64, QSet<qint64>>> heatDays;
+        QSet<QString> syntheticHeat;
+        QSqlQuery heat(db_);
+        heat.prepare("SELECT e.work_id,e.user_id,e.occurred_at_utc,e.synthetic FROM behavior_events e "
+            "JOIN behavior_settings b ON b.user_id=e.user_id JOIN work_sources s ON s.work_id=e.work_id "
+            "AND s.warehouse_id=e.warehouse_id AND s.item_id=e.item_id "
+            "JOIN warehouse_items i ON i.id=s.item_id AND i.warehouse_id=s.warehouse_id "
+            "JOIN warehouses w ON w.id=s.warehouse_id WHERE w.is_public=1 AND e.public_eligible=1 "
+            "AND b.contribute_public_trends=1 AND e.action='view' AND e.occurred_at_utc>=? AND e.occurred_at_utc<=?");
+        heat.addBindValue(qMax<qint64>(0, snapshot.nowUtc - 7 * 86400)); heat.addBindValue(snapshot.nowUtc);
+        if (!heat.exec()) return dbError();
+        int heatRows = 0;
+        while (heat.next()) {
+            if (++heatRows > 100000) return dbError();
+            const auto workId = heat.value(0).toString(); const auto userId = heat.value(1).toLongLong();
+            const auto date = QDateTime::fromSecsSinceEpoch(heat.value(2).toLongLong(), zone).date();
+            if (workId.isEmpty() || userId <= 0 || !date.isValid()) return dbError();
+            heatDays[workId][userId].insert(date.toJulianDay());
+            if (heat.value(3).toBool()) syntheticHeat.insert(workId);
+        }
+        if (heat.lastError().isValid()) return dbError();
+        for (auto it = heatDays.cbegin(); it != heatDays.cend(); ++it) {
+            if (it.value().size() < 3) continue;
+            qint64 effective = 0;
+            for (const auto& days : it.value()) effective += days.size();
+            snapshot.publicHeat.insert(it.key(), effective);
+            if (syntheticHeat.contains(it.key())) snapshot.publicHeatContainsSyntheticData = true;
+        }
+        const auto recommended = care_algorithms::recommendTemporal(input, snapshot);
+        if (!recommended.status.ok() || !recommended.value) return fail("ServerError", recommended.status.message);
+        QJsonArray rows;
+        for (const auto& item : recommended.value->items) rows.append(QJsonObject{{"work", workJson(item.work)}, {"reason", item.reason}});
+        const QString note = QStringLiteral("人物关注与不感兴趣功能尚未接入，当前仅使用历史、公开热度及发行日期等可用数据。");
+        return success({{"result", QJsonObject{{"items", rows}, {"message", recommended.value->message + note},
+            {"fallback", recommended.value->fallback}, {"engine", "temporal"},
+            {"generated_at_utc", QString::number(recommended.value->generatedAtUtc)},
+            {"contains_synthetic_data", recommended.value->containsSyntheticData}}}});
     }
     if (type == "get_trending") {
         care_contract::TrendingRequest input;

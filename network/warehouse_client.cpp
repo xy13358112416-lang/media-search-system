@@ -389,9 +389,9 @@ bool WarehouseClient::cancelRecommendation(const RecommendationHandle& handle) {
     if (!handle.startsWith(handlePrefix_)) return false;
     const QString id = handle.mid(handlePrefix_.size());
     const auto it = pending_.constFind(id);
-    if (id.isEmpty() || it == pending_.cend() || it->responseType != "recommend_resources_resp") return false;
+    if (id.isEmpty() || it == pending_.cend() || (it->responseType != "recommend_resources_resp" && it->responseType != "recommend_temporal_resp")) return false;
     auto p = pending_.take(id);
-    sendCancellation(id);
+    if (p.responseType == "recommend_resources_resp") sendCancellation(id);
     p.callback(fail(ErrorCode::Cancelled, QStringLiteral("推荐请求已取消")), {});
     return true;
 }
