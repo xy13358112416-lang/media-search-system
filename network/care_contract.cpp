@@ -52,9 +52,27 @@ Status validate(const PageRequest& value) {
         value.limit <= 0 || value.limit > MaxPageSize) return invalid("分页范围无效。");
     return {};
 }
+Status validatePersonId(const QString& personId) {
+    return identifier(personId) ? Status{} : invalid("人物标识无效。");
+}
+Status validate(const PersonUpdate& value) {
+    auto status = validatePersonId(value.personId);
+    if (!status.ok()) return status;
+    const auto timestamp = [](qint64 seconds) { return seconds >= 0 && seconds < MaxUtcExclusive; };
+    if (!identifier(value.updateId) || value.title.trimmed().isEmpty() ||
+        (value.kind != UpdateKind::News && value.kind != UpdateKind::Release) ||
+        !value.sourceUrl.isValid() || value.sourceUrl.scheme() != "https" ||
+        value.sourceUrl.host().isEmpty() || !value.sourceUrl.userInfo().isEmpty() ||
+        !timestamp(value.fetchedAtUtc) ||
+        (value.publishedAtUtc && !timestamp(*value.publishedAtUtc)) ||
+        (value.eventAtUtc && !timestamp(*value.eventAtUtc)))
+        return invalid("人物资讯标识、来源或日期无效。");
+    return {};
+}
 Status validate(const PersonUpdatesRequest& value) {
-    if (!identifier(value.personId)) return invalid("人物标识无效。");
-    auto status = validate(value.range); if (!status.ok()) return status;
+    auto status = validatePersonId(value.personId);
+    if (!status.ok()) return status;
+    status = validate(value.range); if (!status.ok()) return status;
     return validate(value.page);
 }
 Status validate(const TrendingRequest& value) {

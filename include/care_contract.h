@@ -91,6 +91,8 @@ struct TemporalRecommendationResult {
     bool containsSyntheticData = false;
 };
 
+Status validatePersonId(const QString& personId);
+Status validate(const PersonUpdate& value);
 Status validate(const PersonUpdatesRequest& value);
 Status validate(const TrendingRequest& value);
 Status validate(const FootprintRequest& value);
