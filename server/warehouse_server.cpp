@@ -97,6 +97,14 @@ qint64 readId(const QJsonValue& value)
     static const QRegularExpression format(QStringLiteral("\\A[1-9][0-9]*\\z"));
     return format.match(text).hasMatch() ? text.toLongLong() : 0;
 }
+bool readResource(const QJsonValue& value, care_contract::ResourceRef& result)
+{
+    if (!value.isObject()) return false;
+    const auto object = value.toObject(); const auto source = object.value("source");
+    if (!object.value("work_id").isString() || !source.isObject()) return false;
+    result = {object.value("work_id").toString(), {readId(source.toObject().value("warehouse_id")), readId(source.toObject().value("item_id"))}};
+    return care_contract::validate(result).ok();
+}
 
 QJsonObject summaryJson(const WarehouseSummary& warehouse)
 {
@@ -215,6 +223,9 @@ bool WarehouseServer::openDatabase(const QString& path, QString& error)
         !query.exec("CREATE TABLE IF NOT EXISTS behavior_settings "
                     "(user_id INTEGER PRIMARY KEY REFERENCES network_users(id), history_enabled INTEGER NOT NULL, "
                     "personalization_enabled INTEGER NOT NULL, contribute_public_trends INTEGER NOT NULL)") ||
+        !query.exec("CREATE TABLE IF NOT EXISTS work_feedback "
+                    "(user_id INTEGER NOT NULL REFERENCES network_users(id), work_id TEXT NOT NULL, "
+                    "warehouse_id INTEGER NOT NULL, item_id INTEGER NOT NULL, PRIMARY KEY(user_id,work_id))") ||
         !query.exec("CREATE TABLE IF NOT EXISTS server_schema_migrations(version INTEGER PRIMARY KEY)") ||
         !query.exec("INSERT OR IGNORE INTO server_schema_migrations(version) VALUES(1)") ||
         !db_.commit()) {
@@ -417,6 +428,64 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         session.token.clear();
         return success();
     }
+    if (type == "set_work_feedback") {
+        care_contract::ResourceRef ref;
+        if (!readResource(payload.value("resource"), ref) || !payload.value("feedback").isString()) return invalid();
+        const auto feedback = payload.value("feedback").toString();
+        QSqlQuery query(db_);
+        if (feedback == "neutral") {
+            // Removing one's own stored feedback remains possible after source deletion.
+            query.prepare("DELETE FROM work_feedback WHERE user_id=? AND work_id=?");
+            query.addBindValue(session.userId); query.addBindValue(ref.workId);
+            if (!query.exec()) return dbError();
+            return success();
+        }
+        if (feedback != "not_interested") return invalid();
+        query.prepare("SELECT w.owner_id,w.is_public,s.work_id FROM warehouses w JOIN warehouse_items i ON i.warehouse_id=w.id "
+                      "JOIN work_sources s ON s.warehouse_id=w.id AND s.item_id=i.id WHERE w.id=? AND i.id=?");
+        query.addBindValue(ref.source.warehouseId); query.addBindValue(ref.source.itemId);
+        if (!query.exec()) return dbError();
+        if (!query.next()) return query.lastError().isValid() ? dbError() : fail("NotFound", QStringLiteral("资源不存在。"));
+        if (query.value(0).toLongLong() != session.userId && !query.value(1).toBool())
+            return fail("PermissionDenied", QStringLiteral("没有此资源的访问权限。"));
+        if (query.value(2).toString() != ref.workId) return invalid();
+        query.finish();
+        query.prepare("INSERT INTO work_feedback(user_id,work_id,warehouse_id,item_id) VALUES(?,?,?,?) "
+                      "ON CONFLICT(user_id,work_id) DO UPDATE SET warehouse_id=excluded.warehouse_id,item_id=excluded.item_id");
+        query.addBindValue(session.userId); query.addBindValue(ref.workId);
+        query.addBindValue(ref.source.warehouseId); query.addBindValue(ref.source.itemId);
+        if (!query.exec()) return dbError();
+        return success();
+    }
+    if (type == "list_work_feedback") {
+        qint64 offset = 0;
+        if (!readUtc(payload.value("offset"), offset) || !payload.value("limit").isDouble()) return invalid();
+        const double limit = payload.value("limit").toDouble();
+        if (limit < 1 || limit > care_contract::MaxPageSize || limit != static_cast<int>(limit)) return invalid();
+        const care_contract::PageRequest page{offset, static_cast<int>(limit)};
+        if (!care_contract::validate(page).ok()) return invalid();
+        QSqlQuery query(db_);
+        query.prepare("SELECT f.work_id,s.warehouse_id,s.item_id,i.media FROM work_feedback f "
+                      "JOIN work_sources s ON s.work_id=f.work_id "
+                      "JOIN warehouse_items i ON i.id=s.item_id AND i.warehouse_id=s.warehouse_id "
+                      "JOIN warehouses w ON w.id=s.warehouse_id WHERE f.user_id=? AND (w.owner_id=? OR w.is_public=1) "
+                      "ORDER BY f.work_id,s.warehouse_id,s.item_id LIMIT ? OFFSET ?");
+        query.addBindValue(session.userId); query.addBindValue(session.userId);
+        query.addBindValue(page.limit + 1); query.addBindValue(page.offset);
+        if (!query.exec()) return dbError();
+        QJsonArray items; bool more = false;
+        while (query.next()) {
+            if (items.size() == page.limit) { more = true; break; }
+            MediaRecord media; QString error;
+            if (!media_json::fromJson(QJsonDocument::fromJson(query.value(3).toByteArray()).object(), media, error)) return dbError();
+            care_contract::ResourceSummary work{{query.value(0).toString(), {query.value(1).toLongLong(), query.value(2).toLongLong()}}, media, {}};
+            items.append(QJsonObject{{"work", workJson(work)}, {"feedback", "not_interested"}});
+        }
+        if (query.lastError().isValid()) return dbError();
+        QJsonObject result{{"items", items}};
+        if (more) result.insert("next_offset", QString::number(page.offset + page.limit));
+        return success({{"page", result}});
+    }
     if (type == "recommend_temporal") {
         care_contract::TemporalRecommendationRequest input;
         if (!readPreference(payload.value("category"), input.category) || !readPreference(payload.value("file_type"), input.fileType) ||
@@ -437,6 +506,18 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         care_algorithms::PersonalSnapshot snapshot;
         snapshot.userKey = QString::number(session.userId);
         snapshot.nowUtc = QDateTime::currentSecsSinceEpoch();
+        QSqlQuery exclusions(db_);
+        exclusions.prepare("SELECT f.work_id FROM work_feedback f "
+            "JOIN work_sources s ON s.work_id=f.work_id "
+            "JOIN warehouse_items i ON i.id=s.item_id AND i.warehouse_id=s.warehouse_id "
+            "JOIN warehouses w ON w.id=s.warehouse_id WHERE f.user_id=? AND (w.owner_id=? OR w.is_public=1)");
+        exclusions.addBindValue(session.userId); exclusions.addBindValue(session.userId);
+        if (!exclusions.exec()) return dbError();
+        while (exclusions.next()) {
+            if (snapshot.notInterestedWorkIds.size() >= 10000) return dbError();
+            snapshot.notInterestedWorkIds.insert(exclusions.value(0).toString());
+        }
+        if (exclusions.lastError().isValid()) return dbError();
         QSqlQuery settings(db_);
         settings.prepare("SELECT history_enabled,personalization_enabled,contribute_public_trends FROM behavior_settings WHERE user_id=?");
         settings.addBindValue(session.userId);
@@ -506,7 +587,7 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         if (!recommended.status.ok() || !recommended.value) return fail("ServerError", recommended.status.message);
         QJsonArray rows;
         for (const auto& item : recommended.value->items) rows.append(QJsonObject{{"work", workJson(item.work)}, {"reason", item.reason}});
-        const QString note = QStringLiteral("人物关注与不感兴趣功能尚未接入，当前仅使用历史、公开热度及发行日期等可用数据。");
+        const QString note = QStringLiteral("人物关注尚未接入，当前使用历史、公开热度、发行日期及不感兴趣设置。");
         return success({{"result", QJsonObject{{"items", rows}, {"message", recommended.value->message + note},
             {"fallback", recommended.value->fallback}, {"engine", "temporal"},
             {"generated_at_utc", QString::number(recommended.value->generatedAtUtc)},

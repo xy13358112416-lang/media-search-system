@@ -16,6 +16,94 @@ using care_contract::ResourceSummary;
 class CareClientServerTests : public QObject {
     Q_OBJECT
 private slots:
+    void feedbackIsPerUserPersistentAndExcludesRecommendations()
+    {
+        QTemporaryDir dir; QString error; const auto path = dir.filePath("feedback.sqlite");
+        care_contract::ResourceRef publicRef, privateRef;
+        {
+            WarehouseServer server(llm_recommendation::Config{});
+            QVERIFY(server.openDatabase(path, error));
+            QVERIFY(server.addUser("alice", "password-123", error)); QVERIFY(server.addUser("bob", "password-123", error));
+            QVERIFY(server.listen(QHostAddress::LocalHost));
+            OnlineCareClient alice, bob; bool done = false; Status status;
+            for (auto* client : {&alice, &bob}) {
+                client->connectToServer("127.0.0.1", server.serverPort(), [&](Status s) { status = s; done = true; });
+                QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+                client->login(client == &alice ? "alice" : "bob", "password-123", [&](auto r) { status = r.status; done = true; });
+                QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            }
+            Result<WarehouseSummary> pub, priv;
+            alice.createWarehouse("public", Visibility::Public, [&](auto r) { pub = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(pub.status.ok() && pub.value); done = false;
+            alice.createWarehouse("private", Visibility::Private, [&](auto r) { priv = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(priv.status.ok() && priv.value); done = false;
+            MediaRecord media; media.id = "item"; media.fileName = "Media"; media.category = "music";
+            Result<WarehouseItem> publicItem, privateItem;
+            alice.addItem(pub.value->warehouseId, media, [&](auto r) { publicItem = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(publicItem.status.ok() && publicItem.value); done = false;
+            alice.addItem(priv.value->warehouseId, media, [&](auto r) { privateItem = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(privateItem.status.ok() && privateItem.value); done = false;
+            Result<ResourceSummary> resource;
+            alice.getResource({pub.value->warehouseId, publicItem.value->itemId}, [&](auto r) { resource = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(resource.status.ok() && resource.value); publicRef = resource.value->resource; done = false;
+            alice.getResource({priv.value->warehouseId, privateItem.value->itemId}, [&](auto r) { resource = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(resource.status.ok() && resource.value); privateRef = resource.value->resource; done = false;
+            bob.setWorkFeedback({privateRef, care_contract::WorkFeedbackKind::NotInterested}, [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QCOMPARE(status.code, ErrorCode::PermissionDenied); done = false;
+            for (int i = 0; i < 2; ++i) {
+                alice.setWorkFeedback({publicRef, care_contract::WorkFeedbackKind::NotInterested}, [&](Status s) { status = s; done = true; });
+                QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            }
+            alice.setWorkFeedback({privateRef, care_contract::WorkFeedbackKind::NotInterested}, [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            Result<care_contract::Page<care_contract::WorkFeedback>> page;
+            bob.listWorkFeedback({0, 1}, [&](auto r) { page = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(page.status.ok() && page.value); QVERIFY(page.value->items.isEmpty()); done = false;
+            alice.listWorkFeedback({0, 1}, [&](auto r) { page = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(page.status.ok() && page.value); QCOMPARE(page.value->items.size(), 1); QVERIFY(page.value->nextOffset); done = false;
+            alice.listWorkFeedback({*page.value->nextOffset, 1}, [&](auto r) { page = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(page.status.ok() && page.value); QCOMPARE(page.value->items.size(), 1); QVERIFY(!page.value->nextOffset); done = false;
+            alice.clearHistory([&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            alice.setParticipationSettings({true, false, false}, [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            {
+                auto db = QSqlDatabase::addDatabase("QSQLITE", "feedback-stale");
+                db.setDatabaseName(path); QVERIFY(db.open()); QSqlQuery q(db);
+                QVERIFY(q.exec("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<10001) "
+                    "INSERT INTO work_feedback(user_id,work_id,warehouse_id,item_id) SELECT 1,'stale-'||x,999999,999999 FROM n"));
+                db.close();
+            }
+            QSqlDatabase::removeDatabase("feedback-stale");
+            Result<care_contract::TemporalRecommendationResult> rec;
+            alice.recommendTemporal({}, [&](auto r) { rec = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(rec.status.ok() && rec.value); QVERIFY(rec.value->items.isEmpty()); done = false;
+            bob.recommendTemporal({}, [&](auto r) { rec = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(rec.status.ok() && rec.value); QCOMPARE(rec.value->items.size(), 1);
+        }
+        {
+            WarehouseServer server(llm_recommendation::Config{}); QVERIFY(server.openDatabase(path, error)); QVERIFY(server.listen(QHostAddress::LocalHost));
+            OnlineCareClient alice; bool done = false; Status status;
+            alice.connectToServer("127.0.0.1", server.serverPort(), [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            alice.login("alice", "password-123", [&](auto r) { status = r.status; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            Result<care_contract::Page<care_contract::WorkFeedback>> page;
+            alice.listWorkFeedback({0, 10}, [&](auto r) { page = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(page.status.ok() && page.value); QCOMPARE(page.value->items.size(), 2); done = false;
+            alice.removeItem(publicRef.source.warehouseId, publicRef.source.itemId, [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            alice.listWorkFeedback({0, 10}, [&](auto r) { page = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(page.status.ok() && page.value); QCOMPARE(page.value->items.size(), 1); done = false;
+            alice.setWorkFeedback({publicRef, care_contract::WorkFeedbackKind::Neutral}, [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            auto alternateSource = privateRef; alternateSource.source = {999999, 999999};
+            alice.setWorkFeedback({alternateSource, care_contract::WorkFeedbackKind::Neutral}, [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            alice.listWorkFeedback({0, 10}, [&](auto r) { page = r; done = true; });
+            QTRY_VERIFY(done); QVERIFY(page.status.ok() && page.value); QVERIFY(page.value->items.isEmpty());
+        }
+    }
     void temporalUsesCompletePublicHeatBeyondTopFifty()
     {
         QTemporaryDir dir; QString error;
@@ -293,6 +381,15 @@ private slots:
         int calls = 0;
         client.recordBehavior({"event-logout", BehaviorAction::Search, std::nullopt, "music"},
                               [&](Status s) { status = s; ++calls; });
+        client.logout([](Status) {});
+        QCOMPARE(calls, 1); QCOMPARE(status.code, ErrorCode::OutcomeUnknown);
+        QTest::qWait(100); QCOMPARE(calls, 1);
+        done = false;
+        client.login("alice", "alice-demo", [&](auto r) { status = r.status; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok());
+        calls = 0;
+        client.setWorkFeedback({{"work:test", {1, 1}}, care_contract::WorkFeedbackKind::NotInterested},
+                               [&](Status s) { status = s; ++calls; });
         client.logout([](Status) {});
         QCOMPARE(calls, 1); QCOMPARE(status.code, ErrorCode::OutcomeUnknown);
         QTest::qWait(100); QCOMPARE(calls, 1);
