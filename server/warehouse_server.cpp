@@ -3,6 +3,7 @@
 #include "behavior_contract.h"
 #include "care_footprint.h"
 #include "person_schema.h"
+#include "person_store_sqlite.h"
 #include "care_trending.h"
 #include "care_temporal.h"
 #include "person_snapshot_json.h"
@@ -182,6 +183,8 @@ WarehouseServer::WarehouseServer(llm_recommendation::Config config)
 WarehouseServer::~WarehouseServer()
 {
     close();
+    personContextLoader_ = {};
+    personStore_.reset();
     db_ = {};
     QSqlDatabase::removeDatabase(dbName_);
 }
@@ -236,6 +239,12 @@ bool WarehouseServer::openDatabase(const QString& path, QString& error)
         db_.rollback();
         if (error.isEmpty()) error = QStringLiteral("无法创建仓库表。");
         return false;
+    }
+    personStore_ = std::make_unique<person_store::SqliteStore>(db_);
+    if (!personContextLoader_) {
+        personContextLoader_ = [this](qint64 userId, const QList<care_contract::ResourceRef>& resources) {
+            return personStore_->contextFor(userId, resources);
+        };
     }
     return true;
 }

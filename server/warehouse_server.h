@@ -13,6 +13,7 @@
 #include <utility>
 
 class QTcpSocket;
+namespace person_store { class SqliteStore; }
 
 struct StoredBehavior {
     care_contract::BehaviorRecord record;
@@ -62,5 +63,6 @@ private:
     llm_recommendation::Client recommender_;
     QString dbName_;
     QSqlDatabase db_;
+    std::unique_ptr<person_store::SqliteStore> personStore_;
     PersonContextLoader personContextLoader_;
 };

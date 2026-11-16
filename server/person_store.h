@@ -1,6 +1,7 @@
 #pragma once
 
 #include "care_person_snapshot.h"
+#include <QUrl>
 
 // N00 internal SERVER boundary. Not a new RPC, client database or concrete SQLite store.
 // N03 implements this using the server's existing connection, migration and transactions.
@@ -32,10 +33,21 @@ public:
     virtual care_contract::Result<QList<care_contract::PersonUpdate>> updatesFor(
         qint64 authenticatedUserId, const QString& personId) = 0;
 
-    // Trusted server provider only. Validate source identity, HTTPS and dates; commit the
-    // entire refresh atomically. Failed refresh leaves old cached entries available/stale.
-    // No client may select an arbitrary fetch URL or submit news through this interface.
-    virtual care_contract::Status mergeUpdates(const QString& personId,
+    // Trusted server provider only. feedUrl is the exact configured
+    // person_sources.source_url, never a PersonUpdate article URL. begin returns a
+    // persistent generation, invalidating any older in-flight refresh for that feed.
+    virtual care_contract::Result<qint64> beginUpdatesRefresh(
+        const QString& personId, const QUrl& feedUrl) = 0;
+
+    // Marks the current generation stale without discarding the last successful cache.
+    virtual care_contract::Status failUpdatesRefresh(
+        const QString& personId, const QUrl& feedUrl, qint64 generation) = 0;
+
+    // Trusted provider only. Validates every row and feed generation, then atomically
+    // replaces this feed's cache. Invalid rows or write failure leave old rows stale.
+    // Empty successful updates still record last_success so an empty result is valid.
+    virtual care_contract::Status mergeUpdates(const QString& personId, const QUrl& feedUrl,
+        qint64 generation, qint64 completedAtUtc,
         const QList<care_contract::PersonUpdate>& updates) = 0;
 };
 } // namespace person_store

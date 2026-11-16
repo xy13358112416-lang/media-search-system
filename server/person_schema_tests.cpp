@@ -28,6 +28,11 @@ private slots:
             QSqlQuery q(db); QVERIFY(q.exec("SELECT username FROM network_users WHERE id=1")); QVERIFY(q.next()); QCOMPARE(q.value(0).toString(), QStringLiteral("existing-user"));
             QVERIFY(q.exec("SELECT COUNT(*) FROM behavior_events WHERE event_id='old-event'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 1);
             QVERIFY(q.exec("SELECT COUNT(*) FROM server_schema_migrations WHERE version=2")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 1);
+            QVERIFY(q.exec("SELECT COUNT(*) FROM server_schema_migrations WHERE version=3")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 1);
+            QVERIFY(q.exec("PRAGMA table_info(person_sources)"));
+            bool hasRefreshGeneration = false;
+            while (q.next()) if (q.value(1).toString() == "refresh_generation") hasRefreshGeneration = true;
+            QVERIFY(hasRefreshGeneration);
             QVERIFY(q.exec("INSERT INTO person_catalog VALUES('person:1','Name','https://example.org/person')"));
             QVERIFY(q.exec("INSERT INTO person_sources(person_id,source_url) VALUES('person:1','https://example.org/feed')"));
             QVERIFY(q.exec("INSERT INTO person_updates(person_id,update_id,feed_url,source_url,title,kind,published_at_utc,event_at_utc,fetched_at_utc) "
@@ -41,6 +46,39 @@ private slots:
         }
         QSqlDatabase::removeDatabase(connection);
     }
+    void upgradesVersionTwoWithoutLosingSourceState() {
+        QTemporaryDir dir; const auto connection = QUuid::createUuid().toString();
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", connection); db.setDatabaseName(dir.filePath("v2.sqlite")); QVERIFY(db.open()); QVERIFY(initial(db));
+            QSqlQuery q(db);
+            QVERIFY(q.exec("CREATE TABLE person_catalog(person_id TEXT PRIMARY KEY NOT NULL,display_name TEXT NOT NULL,identity_source TEXT NOT NULL)"));
+            QVERIFY(q.exec("CREATE TABLE person_aliases(person_id TEXT NOT NULL REFERENCES person_catalog(person_id),alias TEXT NOT NULL,PRIMARY KEY(person_id,alias))"));
+            QVERIFY(q.exec("CREATE TABLE person_credits(person_id TEXT NOT NULL REFERENCES person_catalog(person_id),work_id TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('actor','director','musician')),credit_source TEXT NOT NULL,PRIMARY KEY(person_id,work_id,role))"));
+            QVERIFY(q.exec("CREATE INDEX person_credits_work ON person_credits(work_id,person_id)"));
+            QVERIFY(q.exec("CREATE TABLE person_follows(user_id INTEGER NOT NULL REFERENCES network_users(id),person_id TEXT NOT NULL REFERENCES person_catalog(person_id),known_name TEXT NOT NULL,known_roles_json BLOB NOT NULL,PRIMARY KEY(user_id,person_id))"));
+            QVERIFY(q.exec("CREATE TABLE person_sources(person_id TEXT NOT NULL REFERENCES person_catalog(person_id),source_url TEXT NOT NULL,last_success_utc INTEGER,stale INTEGER NOT NULL DEFAULT 0 CHECK(stale IN (0,1)),PRIMARY KEY(person_id,source_url))"));
+            QVERIFY(q.exec("CREATE TABLE person_updates(person_id TEXT NOT NULL,update_id TEXT NOT NULL,feed_url TEXT NOT NULL,source_url TEXT NOT NULL,title TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('news','release')),published_at_utc INTEGER,event_at_utc INTEGER,fetched_at_utc INTEGER NOT NULL,stale INTEGER NOT NULL DEFAULT 0 CHECK(stale IN (0,1)),PRIMARY KEY(person_id,update_id,feed_url),FOREIGN KEY(person_id,feed_url) REFERENCES person_sources(person_id,source_url))"));
+            QVERIFY(q.exec("INSERT INTO person_catalog VALUES('person:1','Name','https://example.org/person')"));
+            QVERIFY(q.exec("INSERT INTO person_sources VALUES('person:1','https://example.org/feed',200,0)"));
+            QVERIFY(q.exec("INSERT INTO server_schema_migrations VALUES(2)"));
+            QString error; QVERIFY(db.transaction());
+            QVERIFY2(person_schema::migrate(db,error),qPrintable(error));
+            QVERIFY(db.commit());
+            QVERIFY(q.exec("SELECT last_success_utc,stale,refresh_generation FROM person_sources WHERE person_id='person:1'"));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toLongLong(),qint64(200));
+            QCOMPARE(q.value(1).toInt(),0);
+            QCOMPARE(q.value(2).toInt(),0);
+            QVERIFY(q.exec("SELECT COUNT(*) FROM server_schema_migrations WHERE version=3"));
+            QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),1);
+            q.finish();
+            QVERIFY(db.transaction());
+            QVERIFY2(person_schema::migrate(db,error),qPrintable(error));
+            QVERIFY(db.commit());
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(connection);
+    }
     void collisionRollsBackEntireMigration() {
         QTemporaryDir dir; const auto connection = QUuid::createUuid().toString();
         {
@@ -48,7 +86,7 @@ private slots:
             QSqlQuery q(db); QVERIFY(q.exec("CREATE VIEW person_catalog AS SELECT 'keep' AS original"));
             QString error; QVERIFY(db.transaction()); QVERIFY(!person_schema::migrate(db, error)); QVERIFY(!error.isEmpty()); QVERIFY(db.rollback());
             QVERIFY(q.exec("SELECT original FROM person_catalog")); QVERIFY(q.next()); QCOMPARE(q.value(0).toString(), QStringLiteral("keep"));
-            QVERIFY(q.exec("SELECT COUNT(*) FROM server_schema_migrations WHERE version=2")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 0);
+            QVERIFY(q.exec("SELECT COUNT(*) FROM server_schema_migrations WHERE version>=2")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 0);
             QVERIFY(q.exec("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='person_follows'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 0);
             db.close();
         }
