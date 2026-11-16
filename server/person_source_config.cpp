@@ -29,7 +29,7 @@ std::optional<QUrl> canonicalFeed(const QString& text) {
     if (text.size() > 2048) return std::nullopt;
     const QUrl url(text, QUrl::StrictMode);
     if (!url.isValid() || url.scheme() != "https" || url.host().isEmpty() ||
-        !url.userInfo().isEmpty() || !url.fragment().isEmpty())
+        !url.userInfo().isEmpty() || url.hasFragment())
         return std::nullopt;
     return QUrl(url.toString(QUrl::FullyEncoded), QUrl::StrictMode);
 }

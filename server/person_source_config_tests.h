@@ -11,6 +11,7 @@ private:
 private slots:
     void registrationIsIdempotentAndDoesNotFakeRefreshSuccess();
     void invalidEntryRollsBackWholeRegistration();
+    void feedFragmentsAreRejectedWithoutPartialRegistration();
     void rejectsInsecureOrMalformedConfiguration();
     void readsPagedSourcesWithoutChangingRefreshState();
     void additiveRegistrationPreservesCachedSourceState();

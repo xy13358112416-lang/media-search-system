@@ -89,6 +89,38 @@ bool PersonSourceConfigTests::fixture(QSqlDatabase& db) {
                       "('person:two','Two','https://example.org/two')");
 }
 
+void PersonSourceConfigTests::feedFragmentsAreRejectedWithoutPartialRegistration()
+{
+    const QString name = QUuid::createUuid().toString();
+    {
+        auto db = QSqlDatabase::addDatabase("QSQLITE", name);
+        db.setDatabaseName(":memory:");
+        QVERIFY(db.open());
+        QVERIFY(fixture(db));
+        const auto clean = person_source_config::parse(validConfig("https://feeds.example.org/a%23b"));
+        QVERIFY(clean.status.ok() && clean.value);
+        QVERIFY(person_source_config::registerBatch(db, *clean.value).status.ok());
+
+        for (const auto& invalid : {QString("https://feeds.example.org/a#"),
+                                    QString("https://feeds.example.org/a#section")}) {
+            QVERIFY(!person_source_config::parse(validConfig(invalid.toUtf8())).status.ok());
+            const person_source_config::Batch batch{"Reviewed test fixture", {
+                {"person:one", QUrl("https://feeds.example.org/valid-new")},
+                {"person:two", QUrl(invalid)}
+            }};
+            QVERIFY(!person_source_config::registerBatch(db, batch).status.ok());
+        }
+        QSqlQuery rows(db);
+        QVERIFY(rows.exec("SELECT source_url FROM person_sources ORDER BY source_url"));
+        QStringList saved;
+        while (rows.next()) saved.append(rows.value(0).toString());
+        QCOMPARE(saved.size(), 3);
+        QVERIFY(saved.contains("https://feeds.example.org/a%23b"));
+        QVERIFY(!saved.contains("https://feeds.example.org/valid-new"));
+    }
+    QSqlDatabase::removeDatabase(name);
+}
+
 void PersonSourceConfigTests::registrationIsIdempotentAndDoesNotFakeRefreshSuccess() {
         const QString name = QUuid::createUuid().toString();
         {
