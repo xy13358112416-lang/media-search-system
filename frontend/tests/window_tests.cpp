@@ -420,6 +420,45 @@ private slots:
         QVERIFY(!accounts.currentUser().has_value());
     }
 
+    void integrationKeepsTodayAssistantAndOnlineWarehouse() {
+        Fixture f(QString::fromUtf8(SAMPLE_CSV));
+        AccountHistoryServiceImpl accounts(f.library);
+        QVERIFY(accounts.initializeDatabase(f.directory.filePath("integrated-account.sqlite")).ok());
+        QVERIFY(accounts.createInitialAdmin("admin", "secret").ok());
+        QVERIFY(accounts.login("admin", "secret").status.ok());
+        recommendation_contract::PersonalRecommendationServiceImpl recommendations(
+            accounts, [&] { return f.library.records(); });
+        recommendation_contract::TodayRecommendationServiceImpl today(
+            recommendations, [&] { return f.library.records(); });
+        LibraryWindow window(f.library, &accounts, &recommendations, &today);
+        window.show();
+        auto* tabs = window.findChild<QTabBar*>();
+        QVERIFY(tabs);
+        QCOMPARE(tabs->count(), 4);
+        QCOMPARE(tabs->tabText(2), QStringLiteral("今日推荐"));
+        QCOMPARE(tabs->tabText(3), QStringLiteral("资源仓库"));
+        auto* host = window.findChild<QLineEdit*>(QStringLiteral("warehouseHost"));
+        QVERIFY(host); // Real WarehousePage, rather than the old placeholder.
+        tabs->setCurrentIndex(2);
+        QVERIFY(!window.findChildren<QFrame*>(QStringLiteral("recommendCard")).isEmpty());
+        QVERIFY(!host->isVisible());
+        tabs->setCurrentIndex(3);
+        QVERIFY(host->isVisible());
+        for (auto* card : window.findChildren<QFrame*>(QStringLiteral("recommendCard")))
+            QVERIFY(!card->isVisible());
+        auto* assistant = window.findChild<QPushButton*>(QStringLiteral("openAssistant"));
+        QVERIFY(assistant);
+        assistant->click();
+        auto* dialog = window.findChild<QDialog*>();
+        QVERIFY(dialog);
+        button(dialog, QStringLiteral("打开今日推荐"))->click();
+        QCOMPARE(tabs->currentIndex(), 2);
+        QVERIFY(!host->isVisible());
+        tabs->setCurrentIndex(0);
+        auto* table = window.findChild<QTableWidget*>();
+        QVERIFY(table && table->isVisible());
+    }
+
     void externalChangeStillRecovers() {
         Fixture f(QString::fromUtf8(SAMPLE_CSV));
         const auto removed = f.library.records().first();

@@ -12,6 +12,13 @@ target_compile_options(media_server PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
+    add_executable(care_snapshot_integration_tests care_snapshot_integration_tests.cpp)
+    set_target_properties(care_snapshot_integration_tests PROPERTIES AUTOMOC ON)
+    target_include_directories(care_snapshot_integration_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(care_snapshot_integration_tests PRIVATE warehouse_server warehouse_client
+        care_person care_footprint care_trending care_temporal Qt6::Test)
+    target_compile_options(care_snapshot_integration_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    add_test(NAME care_snapshot_integration_tests COMMAND care_snapshot_integration_tests)
     add_executable(warehouse_server_tests tests.cpp)
     set_target_properties(warehouse_server_tests PROPERTIES AUTOMOC ON)
     target_link_libraries(warehouse_server_tests PRIVATE warehouse_server Qt6::Test)

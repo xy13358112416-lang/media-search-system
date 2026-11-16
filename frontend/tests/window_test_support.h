@@ -1,6 +1,7 @@
 #pragma once
 
 #include "medialibrary.h"
+#include "account_history_service.h"
 #include <QTableWidget>
 #include <QStyledItemDelegate>
 
@@ -49,6 +50,9 @@ protected:
     }
 };
 
+// Load externally implemented business declarations before replacing MediaLibrary:
+// otherwise benchmark TUs declare AccountHistoryServiceImpl(ObservedLibrary&),
+// which does not match the constructor exported by media_business.
 // The window currently lives in main.cpp. Include it in this separate executable
 // to drive its real callbacks without exposing test-only APIs in production.
 #define MediaLibrary ObservedLibrary
