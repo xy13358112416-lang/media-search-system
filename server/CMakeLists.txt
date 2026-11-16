@@ -3,6 +3,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(SODIUM REQUIRED IMPORTED_TARGET libsodium)
 
 add_library(warehouse_server STATIC warehouse_server.cpp recommendation_router.cpp person_schema.cpp person_snapshot_json.cpp)
+target_sources(warehouse_server PRIVATE person_store_sqlite.cpp)
 target_link_libraries(warehouse_server PUBLIC warehouse_protocol care_contract care_footprint care_trending care_temporal care_person_snapshot llm_recommendation Qt6::Sql PRIVATE PkgConfig::SODIUM)
 target_compile_options(warehouse_server PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
@@ -16,6 +17,10 @@ target_compile_options(media_demo_import PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-
 
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
+    add_executable(person_store_sqlite_tests person_store_sqlite_tests.cpp)
+    set_target_properties(person_store_sqlite_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(person_store_sqlite_tests PRIVATE warehouse_server Qt6::Test)
+    add_test(NAME person_store_sqlite_tests COMMAND person_store_sqlite_tests)
     add_executable(person_schema_tests person_schema_tests.cpp)
     set_target_properties(person_schema_tests PROPERTIES AUTOMOC ON)
     target_link_libraries(person_schema_tests PRIVATE warehouse_server Qt6::Test)

@@ -32,10 +32,12 @@ public:
     virtual care_contract::Result<QList<care_contract::PersonUpdate>> updatesFor(
         qint64 authenticatedUserId, const QString& personId) = 0;
 
-    // Trusted server provider only. Validate source identity, HTTPS and dates; commit the
-    // entire refresh atomically. Failed refresh leaves old cached entries available/stale.
-    // No client may select an arbitrary fetch URL or submit news through this interface.
-    virtual care_contract::Status mergeUpdates(const QString& personId,
-        const QList<care_contract::PersonUpdate>& updates) = 0;
+    // Trusted server provider only. The registered feed URL is separate from each
+    // article URL. fetchedAtUtc is required even for a successful empty refresh.
+    // No client may choose the feed or submit news through this interface.
+    virtual care_contract::Status mergeUpdates(const QString& personId, const QUrl& feedUrl,
+        qint64 fetchedAtUtc, const QList<care_contract::PersonUpdate>& updates) = 0;
+    // A failed refresh preserves the old cache while marking this feed stale.
+    virtual care_contract::Status markSourceFailure(const QString& personId, const QUrl& feedUrl) = 0;
 };
 } // namespace person_store
