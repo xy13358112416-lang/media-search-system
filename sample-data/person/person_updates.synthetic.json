@@ -1,0 +1,42 @@
+{
+  "schema": "care-person-update-fixture-v1",
+  "synthetic": true,
+  "productionLoaderEnabled": false,
+  "provenance": "Hand-authored validation fixtures, never crawled. Reserved example.invalid URLs intentionally do not identify real news or source material.",
+  "clockUtc": 1794744000,
+  "updates": [
+    {
+      "updateId": "up_3a7",
+      "personId": "ps_2c4",
+      "title": "Fictional test announcement",
+      "kind": "News",
+      "sourceUrl": "https://example.invalid/synthetic/person/up_3a7",
+      "publishedAtUtc": 1794657600,
+      "eventAtUtc": null,
+      "fetchedAtUtc": 1794743940,
+      "stale": false
+    },
+    {
+      "updateId": "up_5b8",
+      "personId": "ps_2c4",
+      "title": "Fictional release with an explicitly known future date",
+      "kind": "Release",
+      "sourceUrl": "https://example.invalid/synthetic/releases/up_5b8",
+      "publishedAtUtc": 1794657600,
+      "eventAtUtc": 1795348800,
+      "fetchedAtUtc": 1794743940,
+      "stale": false
+    },
+    {
+      "updateId": "up_9c0",
+      "personId": "ps_2c4",
+      "title": "Fictional undated release; no calendar event may be invented",
+      "kind": "Release",
+      "sourceUrl": "https://example.invalid/synthetic/releases/up_9c0",
+      "publishedAtUtc": null,
+      "eventAtUtc": null,
+      "fetchedAtUtc": 1794743940,
+      "stale": true
+    }
+  ]
+}

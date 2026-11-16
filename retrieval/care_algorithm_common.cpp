@@ -39,8 +39,8 @@ bool sameWork(const ResourceSummary& a, const ResourceSummary& b) {
     }
     return true;
 }
-Status checkWork(const ResourceSummary& work, bool current) {
-    if (!validate(work.resource).ok() || (current && work.media.fileName.trimmed().isEmpty()))
+Status checkWork(const ResourceSummary& work, bool requireTitle) {
+    if (!validate(work.resource).ok() || (requireTitle && work.media.fileName.trimmed().isEmpty()))
         return serverError(QStringLiteral("资源快照包含无效标识或标题。"));
     for (const auto& person : work.people) {
         if (!validId(person.personId) || person.name.trimmed().isEmpty()) return serverError(QStringLiteral("人物快照包含无效身份。"));
@@ -94,11 +94,11 @@ Result<QList<ObservedBehavior>> collect(const QList<ObservedBehavior>& input, qi
     return {{}, events};
 }
 }
-Result<QList<ResourceSummary>> canonicalWorks(const QList<ResourceSummary>& works) {
+Result<QList<ResourceSummary>> canonicalWorks(const QList<ResourceSummary>& works, bool requireTitle) {
     QMap<QString, ResourceSummary> canonical;
     QMap<QPair<qint64, qint64>, ResourceSummary> sources;
     for (const auto& work : works) {
-        const auto status = checkWork(work, true); if (!status.ok()) return {status, {}};
+        const auto status = checkWork(work, requireTitle); if (!status.ok()) return {status, {}};
         const auto source = qMakePair(work.resource.source.warehouseId, work.resource.source.itemId);
         if (sources.contains(source) && !sameWork(sources.value(source), work))
             return {serverError(QStringLiteral("同一来源位置包含冲突作品。")), {}};

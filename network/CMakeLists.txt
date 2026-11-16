@@ -19,6 +19,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_person.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_footprint.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_trending.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_temporal.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_person_snapshot.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../sample-data/simulation/simulation.cmake)
 
 add_library(warehouse_client STATIC warehouse_client.cpp online_care_client.cpp)
@@ -53,3 +54,4 @@ if(BUILD_TESTING)
 endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/llm_recommendation.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/llm_trend_summary.cmake)
