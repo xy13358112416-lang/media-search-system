@@ -2,6 +2,7 @@
 #include "media_json.h"
 #include "behavior_contract.h"
 #include "care_footprint.h"
+#include "person_schema.h"
 #include "care_trending.h"
 #include "care_temporal.h"
 #include "person_snapshot_json.h"
@@ -187,6 +188,7 @@ WarehouseServer::~WarehouseServer()
 
 bool WarehouseServer::openDatabase(const QString& path, QString& error)
 {
+    error.clear();
     if (db_.isValid() || path.trimmed().isEmpty() || sodium_init() < 0) {
         error = QStringLiteral("无法初始化仓库数据库。");
         return false;
@@ -229,9 +231,10 @@ bool WarehouseServer::openDatabase(const QString& path, QString& error)
                     "warehouse_id INTEGER NOT NULL, item_id INTEGER NOT NULL, PRIMARY KEY(user_id,work_id))") ||
         !query.exec("CREATE TABLE IF NOT EXISTS server_schema_migrations(version INTEGER PRIMARY KEY)") ||
         !query.exec("INSERT OR IGNORE INTO server_schema_migrations(version) VALUES(1)") ||
+        !person_schema::migrate(db_, error) ||
         !db_.commit()) {
         db_.rollback();
-        error = QStringLiteral("无法创建仓库表。");
+        if (error.isEmpty()) error = QStringLiteral("无法创建仓库表。");
         return false;
     }
     return true;
