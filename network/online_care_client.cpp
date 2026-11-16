@@ -72,6 +72,7 @@ QJsonObject rangeJson(const TimeRange& range) {
     return {{"begin_utc", QString::number(range.beginUtc)}, {"end_utc", QString::number(range.endUtc)}};
 }
 bool sameRange(const TimeRange& a, const TimeRange& b) { return a.beginUtc == b.beginUtc && a.endUtc == b.endUtc; }
+bool parsePerson(const QJsonValue& value, PersonSummary& person);
 bool parseWork(const QJsonValue& value, ResourceSummary& result) {
     const auto work = value.toObject(); const auto refValue = work.value("resource"); const auto ref = refValue.toObject();
     const auto sourceValue = ref.value("source"); const auto source = sourceValue.toObject(); QString error;
@@ -82,16 +83,8 @@ bool parseWork(const QJsonValue& value, ResourceSummary& result) {
     result.resource.workId = ref.value("work_id").toString();
     if (!validate(result.resource).ok()) return false;
     for (const auto& entry : work.value("people").toArray()) {
-        const auto p = entry.toObject();
-        if (!entry.isObject() || !p.value("person_id").isString() || p.value("person_id").toString().isEmpty() ||
-            !p.value("name").isString() || !p.value("roles").isArray() || !p.value("followed").isBool()) return false;
-        PersonSummary person{p.value("person_id").toString(), p.value("name").toString(), {}, p.value("followed").toBool()};
-        for (const auto& role : p.value("roles").toArray()) {
-            if (role == "actor") person.roles.append(PersonRole::Actor);
-            else if (role == "director") person.roles.append(PersonRole::Director);
-            else if (role == "musician") person.roles.append(PersonRole::Musician);
-            else return false;
-        }
+        PersonSummary person;
+        if (!parsePerson(entry, person)) return false;
         result.people.append(person);
     }
     return true;
@@ -121,7 +114,7 @@ template<class T, class Parser> bool parsePage(const QJsonValue& value, const Pa
     const auto next = object.value("next_offset");
     if (!next.isUndefined() && !next.isNull()) {
         qint64 offset = 0;
-        if (!nonnegative(next, offset) || page.items.size() != request.limit || offset != request.offset + page.items.size()) return false;
+        if (!nonnegative(next, offset) || offset <= request.offset || !validate(PageRequest{offset, request.limit}).ok()) return false;
         page.nextOffset = offset;
     }
     return true;

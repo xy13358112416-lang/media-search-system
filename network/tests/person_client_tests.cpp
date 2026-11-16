@@ -94,6 +94,36 @@ private slots:
         PersonFakeServer::reply(fake.requests[0].first, fake.requests[0].second, {{"page", QJsonObject{{"items", QJsonArray{bad}}}}});
         QTRY_VERIFY(done); QCOMPARE(status.code, ErrorCode::ProtocolError);
     }
+    void rejectsMalformedNestedPeople() {
+        PersonFakeServer fake; QVERIFY(fake.server.listen(QHostAddress::LocalHost));
+        OnlineCareClient client; bool done = false; Status status;
+        client.connectToServer("127.0.0.1", fake.server.serverPort(), [&](Status s) { status = s; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        client.login("alice", "password", [&](auto r) { status = r.status; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        client.getPersonWorks("person:1", {0, 10}, [&](auto r) { status = r.status; done = true; });
+        QTRY_COMPARE(fake.requests.size(), 1);
+        MediaRecord media; media.id = "m1"; media.fileName = "Film";
+        const QJsonObject bad{{"person_id", "invalid id"}, {"name", "Person"}, {"roles", QJsonArray{"actor"}}, {"followed", false}};
+        const QJsonObject resource{{"work_id", "work:1"}, {"source", QJsonObject{{"warehouse_id", "1"}, {"item_id", "2"}}}};
+        const QJsonObject work{{"resource", resource}, {"media", media_json::toJson(media)}, {"people", QJsonArray{bad}}};
+        PersonFakeServer::reply(fake.requests[0].first, fake.requests[0].second, {{"page", QJsonObject{{"items", QJsonArray{work}}}}});
+        QTRY_VERIFY(done); QCOMPARE(status.code, ErrorCode::ProtocolError);
+    }
+    void acceptsAdvancingCursorOnShortPage() {
+        PersonFakeServer fake; QVERIFY(fake.server.listen(QHostAddress::LocalHost));
+        OnlineCareClient client; bool done = false; Status status;
+        client.connectToServer("127.0.0.1", fake.server.serverPort(), [&](Status s) { status = s; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        client.login("alice", "password", [&](auto r) { status = r.status; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        Result<Page<PersonSummary>> result;
+        client.searchPeople({"person", {0, 10}}, [&](auto r) { result = r; done = true; });
+        QTRY_COMPARE(fake.requests.size(), 1);
+        const QJsonObject person{{"person_id", "person:1"}, {"name", "Person"}, {"roles", QJsonArray{"actor"}}, {"followed", false}};
+        PersonFakeServer::reply(fake.requests[0].first, fake.requests[0].second, {{"page", QJsonObject{{"items", QJsonArray{person}}, {"next_offset", "7"}}}});
+        QTRY_VERIFY(done); QVERIFY(result.status.ok() && result.value && result.value->nextOffset); QCOMPARE(*result.value->nextOffset, 7);
+    }
 };
 QTEST_GUILESS_MAIN(PersonClientTests)
 #include "person_client_tests.moc"
