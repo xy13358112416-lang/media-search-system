@@ -4,6 +4,7 @@
 #include <QDateEdit>
 #include <QHeaderView>
 #include <QHBoxLayout>
+#include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
 #include <algorithm>
@@ -48,12 +49,14 @@ void fill(QTableWidget* table, const QList<QStringList>& rows)
 
 class FootprintPage final : public CarePage {
 public:
-    explicit FootprintPage(CareService& service) : CarePage(QStringLiteral("个人媒体足迹")), service_(service)
+    FootprintPage(CareService& service, std::function<bool()> signedIn)
+        : CarePage(QStringLiteral("个人媒体足迹")), service_(service), signedIn_(std::move(signedIn))
     {
         const auto today = care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
         auto* bar = new QHBoxLayout;
         mode_->addItems({QStringLiteral("自然周"), QStringLiteral("自然月"), QStringLiteral("自然年"), QStringLiteral("自选区间")});
         mode_->setAccessibleName(QStringLiteral("统计区间类型"));
+        mode_->setObjectName(QStringLiteral("footprintPeriod"));
         from_->setDate(today.addDays(-6));
         to_->setDate(today);
         from_->setAccessibleName(QStringLiteral("开始日期"));
@@ -63,14 +66,22 @@ public:
             date->setCalendarPopup(true);
             date->setDateRange(QDate(1970, 1, 2), today);
         }
-        auto* fetch = new QPushButton(QStringLiteral("查看足迹"));
         bar->addWidget(mode_);
-        bar->addWidget(from_);
-        bar->addWidget(to_);
+        auto* dates = new QHBoxLayout(dates_);
+        dates->setContentsMargins(0, 0, 0, 0);
+        dates->addWidget(from_);
+        dates->addWidget(new QLabel(QStringLiteral("至")));
+        dates->addWidget(to_);
+        dates_->hide();
+        bar->addWidget(dates_);
+        presetHint_->setObjectName(QStringLiteral("muted"));
+        bar->addWidget(presetHint_);
         bar->addStretch();
-        bar->addWidget(fetch);
+        bar->addWidget(fetch_);
         layout->addLayout(bar);
         counts_->setObjectName(QStringLiteral("sectionTitle"));
+        counts_->setAccessibleName(QStringLiteral("足迹统计"));
+        counts_->setObjectName(QStringLiteral("footprintCounts"));
         layout->addWidget(counts_);
         note_->setTextFormat(Qt::PlainText);
         note_->setWordWrap(true);
@@ -83,19 +94,36 @@ public:
         setup(days_, {QStringLiteral("北京时间"), QStringLiteral("浏览次数"), QStringLiteral("搜索次数")});
         setup(categories_, {QStringLiteral("类别"), QStringLiteral("浏览次数"), QStringLiteral("相对分布")});
         setup(people_, {QStringLiteral("人物"), QStringLiteral("角色"), QStringLiteral("浏览次数")});
-        connect(mode_, &QComboBox::activated, this, [this] { activate(); });
-        connect(fetch, &QPushButton::clicked, this, [this] { activate(); });
+        auto* actions = new QHBoxLayout;
+        actions->addStretch();
+        clearHistory_->setObjectName(QStringLiteral("danger"));
+        actions->addWidget(clearHistory_);
+        layout->addLayout(actions);
+        connect(clearHistory_, &QPushButton::clicked, this, [this] { clearHistory(); });
+        connect(mode_, &QComboBox::currentIndexChanged, this, [this] { activate(); });
+        connect(fetch_, &QPushButton::clicked, this, [this] { activate(); });
     }
 
     void activate() override
     {
+        active_ = true;
         clear();
         invalidate(0);
+        const bool connected = !signedIn_ || signedIn_();
+        mode_->setEnabled(connected);
+        fetch_->setEnabled(connected);
+        clearHistory_->setEnabled(connected && !clearing_);
+        if (!connected) {
+            dates_->hide();
+            presetHint_->hide();
+            status->setText(QStringLiteral("请先到「资源仓库」登录服务器账号。"));
+            return;
+        }
         const auto today = care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
         const auto mode = mode_->currentIndex();
         const bool custom = mode == 3;
-        from_->setEnabled(custom);
-        to_->setEnabled(custom);
+        dates_->setVisible(custom);
+        presetHint_->setVisible(!custom);
         auto start = custom ? from_->date() : periodStart(today, mode);
         auto end = custom ? to_->date().addDays(1) : nextPeriod(start, mode, 1);
         if (start >= end) {
@@ -159,12 +187,38 @@ public:
 
     void deactivate() override
     {
+        active_ = false;
         CarePage::deactivate();
         clear();
         status->clear();
     }
 
 private:
+    void clearHistory()
+    {
+        if (QMessageBox::question(this, QStringLiteral("清理浏览和搜索历史"),
+                QStringLiteral("清理后无法恢复。已关注的人物和「不感兴趣」记录会保留。确定清理？"),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes ||
+                (signedIn_ && !signedIn_()))
+            return;
+        clearing_ = true;
+        clearHistory_->setEnabled(false);
+        invalidate(0);
+        status->setText(QStringLiteral("正在清理历史…"));
+        service_.clearHistory([page = QPointer<FootprintPage>(this)](Status result) {
+            if (!page)
+                return;
+            page->clearing_ = false;
+            if (!page->active_ || (page->signedIn_ && !page->signedIn_()))
+                return;
+            page->clearHistory_->setEnabled(true);
+            if (result.ok())
+                page->activate();
+            else
+                page->reportError(result);
+        });
+    }
+
     void setup(QTableWidget* table, const QStringList& headings)
     {
         table->setColumnCount(headings.size());
@@ -184,7 +238,14 @@ private:
     }
 
     CareService& service_;
+    std::function<bool()> signedIn_;
+    bool active_ = false;
+    bool clearing_ = false;
     QComboBox* mode_ = new QComboBox;
+    QPushButton* fetch_ = new QPushButton(QStringLiteral("查看足迹"));
+    QPushButton* clearHistory_ = new QPushButton(QStringLiteral("清理历史"));
+    QWidget* dates_ = new QWidget;
+    QLabel* presetHint_ = new QLabel(QStringLiteral("手动选择日期请切换到「自选区间」"));
     QDateEdit* from_ = new QDateEdit;
     QDateEdit* to_ = new QDateEdit;
     QLabel* counts_ = new QLabel;
@@ -196,4 +257,7 @@ private:
 
 } // namespace
 
-CarePage* createFootprintPage(CareService& service) { return new FootprintPage(service); }
+CarePage* createFootprintPage(CareService& service, std::function<bool()> signedIn)
+{
+    return new FootprintPage(service, std::move(signedIn));
+}

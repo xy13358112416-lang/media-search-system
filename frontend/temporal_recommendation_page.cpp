@@ -3,7 +3,6 @@
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QListWidget>
-#include <QMessageBox>
 #include <QPushButton>
 
 using namespace care_contract;
@@ -36,11 +35,9 @@ public:
         reason_->setWordWrap(true);
         layout->addWidget(reason_);
         auto* actions = new QHBoxLayout;
-        history_->setToolTip(QStringLiteral("删除服务器历史，保留主动关注和作品反馈。"));
         actions->addWidget(feedback_);
         actions->addWidget(blocked_);
         actions->addStretch();
-        actions->addWidget(history_);
         layout->addLayout(actions);
         connect(fetch_, &QPushButton::clicked, this, [this] { request(); });
         connect(cancel_, &QPushButton::clicked, this, [this] {
@@ -50,7 +47,6 @@ public:
         connect(list_, &QListWidget::currentRowChanged, this, [this] { updateSelection(); });
         connect(blocked_, &QPushButton::toggled, this, [this] { reloadView(); });
         connect(feedback_, &QPushButton::clicked, this, [this] { updateFeedback(); });
-        connect(history_, &QPushButton::clicked, this, [this] { clearHistory(); });
         blocked_->setCheckable(true);
         updateSelection();
         cancel_->setEnabled(false);
@@ -71,7 +67,6 @@ public:
     void deactivate() override
     {
         CarePage::deactivate();
-        history_->setEnabled(true);
         writing_ = false;
         cancelRequest();
         clearRows();
@@ -223,22 +218,6 @@ private:
         }));
     }
 
-    void clearHistory()
-    {
-        if (QMessageBox::question(this, QStringLiteral("清理浏览和搜索历史"),
-                QStringLiteral("清理后无法恢复，继续吗？"), QMessageBox::Yes | QMessageBox::No,
-                QMessageBox::No) != QMessageBox::Yes)
-            return;
-        history_->setEnabled(false);
-        service_.clearHistory(latest(3, [this](Status result) {
-            history_->setEnabled(true);
-            if (result.ok())
-                reloadView();
-            else
-                reportError(result);
-        }));
-    }
-
     CareService& service_;
     std::function<BrowseScene()> scene_;
     QComboBox* category_ = new QComboBox;
@@ -249,7 +228,6 @@ private:
     QPushButton* cancel_ = new QPushButton(QStringLiteral("取消"));
     QPushButton* feedback_ = new QPushButton;
     QPushButton* blocked_ = new QPushButton(QStringLiteral("查看已排除作品"));
-    QPushButton* history_ = new QPushButton(QStringLiteral("清理历史"));
     QList<RecommendedResource> entries_;
     std::optional<qint64> nextBlocked_;
     warehouse_contract::RecommendationHandle handle_;

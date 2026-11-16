@@ -1,6 +1,6 @@
 #pragma once
 
-#include "warehouse_contract.h"
+#include "care_contract.h"
 #include <QPointer>
 #include <QWidget>
 #include <utility>
@@ -18,6 +18,9 @@ public:
                   std::function<QList<MediaRecord>()> localRecords, QWidget* parent = nullptr);
     ~WarehousePage() override;
     void suspend();
+    void connectionLost();
+    bool isSignedIn() const { return user_.has_value(); }
+    void setSessionChangedCallback(std::function<void()> callback) { sessionChanged_ = std::move(callback); }
 
 private:
     std::optional<warehouse_contract::WarehouseSummary> selection() const;
@@ -28,6 +31,7 @@ private:
     void resetSession(bool disconnect = true);
     void refresh();
     void refreshDetail();
+    void recordMediaView(const care_contract::WarehouseItemRef& source);
     void createWarehouse();
     void addLocalMedia();
     void removeItem();
@@ -48,6 +52,8 @@ private:
     }
 
     warehouse_contract::WarehouseService& service_;
+    care_contract::CareService* care_;
+    std::function<void()> sessionChanged_;
     std::function<QList<MediaRecord>()> localRecords_;
     std::optional<warehouse_contract::UserInfo> user_;
     QList<warehouse_contract::WarehouseSummary> warehouses_;
@@ -61,6 +67,7 @@ private:
     bool connecting_ = false;
     bool recommending_ = false;
     bool writing_ = false;
+    bool writeOutcomeUnknown_ = false;
 
     QLineEdit* host_;
     QSpinBox* port_;
@@ -84,4 +91,5 @@ private:
     QCheckBox* useTarget_;
     QLineEdit* query_;
     QLabel* reason_;
+    QLabel* recommendationStatus_ = nullptr;
 };
