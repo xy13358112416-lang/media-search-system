@@ -12,9 +12,9 @@
 
 ## 主逻辑的 N03 接法
 
-`server/person_store.h` 是尚待实现的内部仓储声明。沿用现有服务端数据库和线程，不创建另一份媒体库，不把 SQLite 交给客户端。
+`server/person_store.h` 是内部仓储边界，现由 `person_store::SqliteStore` 实现；服务器在打开数据库后默认装配人物 context。沿用现有服务端数据库和线程，不创建另一份媒体库，不把 SQLite 交给客户端。
 
-实现 `person_store::Store` 的迁移、人物与 credits 目录、用户关注、资讯缓存及授权查询后，在服务器启动时装配：
+需要替换默认实现或在测试中注入目录时，可在服务器启动时装配：
 
 ```cpp
 server.setPersonContextLoader([&store](qint64 authenticatedUserId,
@@ -24,6 +24,8 @@ server.setPersonContextLoader([&store](qint64 authenticatedUserId,
 ```
 
 `store` 必须比服务器及其加载器活得更久。加载器同步运行在服务器/数据库所属线程，不发网络请求，不启动嵌套事件循环。数据库失败返回错误；未知人物成功返回空映射。目录返回的 `PersonContext` 是当前用户作用域，不能直接由客户端 JSON 构造。
+
+可信目录/作品关联可由服务端操作工具 `media_person_import` 导入，格式与事务约定见 `server/PERSON_IMPORT.md`。必须核对服务器登记的完整作品来源三元组；导入不推断 CSV 同名身份。虚构样例只用于显式允许的独立演示库。人物 RPC/provider 和页面装配仍是后续 Qt 对接任务，不能把导入测试通过等同于这些链路已完成。
 
 加载器未设置时保持原有 `people=[]` 和无人物关注加分，不声称人物中心已经联网。既有历史人物快照即使未装配目录或作品已删除，也仍可用于本人足迹。`followedPeople` 只影响当前候选，默认 `+0.05`；关闭个性化忽略关注加分，不感兴趣仍硬排除。主动关注不是隐式历史，清历史不得删除关注表。
 
