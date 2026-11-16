@@ -3,10 +3,12 @@
 #include "person_credit_import.h"
 #include "person_store_sqlite.h"
 #include "person_feed_refresh.h"
+#include "deepseek_person_news.h"
 #include "person_source_config.h"
 #include "care_person.h"
 #include <QDateTime>
 #include <QFile>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -73,6 +75,28 @@ protected:
     {
         requestedUrl = request.url();
         return new FeedReply(request, status, content, this);
+    }
+};
+
+class NewsNetwork final : public QNetworkAccessManager {
+public:
+    QList<QNetworkRequest> requests;
+    QList<QJsonObject> payloads;
+    int searchStatus = 200;
+    int fetchStatus = 200;
+    QJsonObject searchBody;
+    QJsonObject fetchBody;
+    QJsonObject unrelatedBody;
+protected:
+    QNetworkReply* createRequest(Operation, const QNetworkRequest& request, QIODevice* data) override
+    {
+        requests.append(request);
+        payloads.append(data ? QJsonDocument::fromJson(data->readAll()).object() : QJsonObject{});
+        const bool search = request.url().path() == "/v1/tools/search";
+        const bool unrelated = payloads.last().value("url").toString().endsWith("/unrelated");
+        const auto reply = search ? searchBody : unrelated ? unrelatedBody : fetchBody;
+        return new FeedReply(request, search ? searchStatus : fetchStatus,
+            QJsonDocument(reply).toJson(QJsonDocument::Compact), this);
     }
 };
 } // namespace
@@ -181,7 +205,7 @@ private slots:
                 FeedNetwork network;
                 network.content = R"(<rss version="2.0"><channel>
                     <title>Example</title><item><title>Fictional story</title>
-                    <link>https://example.invalid/story</link></item>
+                    <link>https://publisher.example.org/story</link></item>
                     </channel></rss>)";
                 person_feed_refresh::refresh(store, network, sources.value->items.first(),
                     [&](Status outcome) { status = std::move(outcome); done = true; });
@@ -198,7 +222,7 @@ private slots:
             QCOMPARE(news.value->items.first().title,QStringLiteral("Fictional story"));
             QVERIFY(!news.value->items.first().publishedAtUtc);
             QVERIFY(!news.value->items.first().stale);
-            QCOMPARE(news.value->items.first().sourceUrl, QUrl("https://example.invalid/story"));
+            QCOMPARE(news.value->items.first().sourceUrl, QUrl("https://publisher.example.org/story"));
             {
                 auto db = QSqlDatabase::addDatabase("QSQLITE", "person-import-failed-refresh");
                 db.setDatabaseName(path); QVERIFY(db.open());
@@ -208,7 +232,7 @@ private slots:
                 FeedNetwork network;
                 network.content = "<feed xmlns=\"http://www.w3.org/2005/Atom\">"
                                   "<title>Example</title><entry><title>Fictional story</title>"
-                                  "<link rel=\"alternate\" href=\"/story\"/></entry></feed>";
+                                  "<link rel=\"alternate\" href=\"https://publisher.example.org/story\"/></entry></feed>";
                 const auto refresh = [&] {
                     person_feed_refresh::refresh(store, network, sources.value->items.first(),
                         [&](Status outcome) { status = std::move(outcome); done = true; });
@@ -229,6 +253,82 @@ private slots:
             QCOMPARE(news.value->items.size(), 1);
             QCOMPARE(news.value->items.first().title, QStringLiteral("Fictional story"));
             QVERIFY(news.value->items.first().stale);
+
+            const QString approvedArticle = QStringLiteral("https://publisher.example.org/story");
+            {
+                auto db = QSqlDatabase::addDatabase("QSQLITE", "person-import-deepseek-news");
+                db.setDatabaseName(path); QVERIFY(db.open());
+                const deepseek_person_news::Request input{
+                    "person:demo", "Fictional Person", "publisher.example.org", "Fictional performance"
+                };
+                const auto source = deepseek_person_news::cacheSource(input);
+                QVERIFY(source.status.ok() && source.value);
+                QVERIFY(deepseek_person_news::isSearchSource(*source.value));
+                QVERIFY(!deepseek_person_news::isSearchSource(QUrl("https://example.invalid/feed")));
+                QVERIFY(person_source_config::registerBatch(db, {"Test provider", {{"person:demo", *source.value}}}).status.ok());
+                person_store::SqliteStore store(db);
+                NewsNetwork network;
+                network.searchBody = {{"results", QJsonArray{
+                    QJsonObject{{"url", "https://unapproved.example.org/story"}},
+                    QJsonObject{{"url", approvedArticle}, {"date", "2099-11-15T01:00:00Z"}},
+                    QJsonObject{{"url", approvedArticle}},
+                    QJsonObject{{"url", "https://publisher.example.org/unrelated"}}
+                }}};
+                network.fetchBody = {{"title", "Publisher story"}, {"content", "Fictional Person premieres Fictional performance."}};
+                network.unrelatedBody = {{"title", "Unrelated article"}, {"content", "Other people and other works."}};
+                const auto refresh = [&](const QByteArray& key) {
+                    deepseek_person_news::refresh(store, network, input, key,
+                        [&](Status outcome) { status = std::move(outcome); done = true; });
+                };
+                refresh({});
+                QVERIFY(done); QCOMPARE(status.code, ErrorCode::InvalidArgument); done = false;
+                QVERIFY(network.requests.isEmpty());
+                refresh("fixture-key");
+                QTRY_VERIFY(done); QVERIFY2(status.ok(), qPrintable(status.message)); done = false;
+                QCOMPARE(network.requests.size(), 3);
+                QCOMPARE(network.requests.first().url(), QUrl("https://api.deepseek.com/v1/tools/search"));
+                QCOMPARE(network.requests.at(1).url(), QUrl("https://api.deepseek.com/v1/tools/fetch"));
+                QCOMPARE(network.payloads.first().value("query").toString(),
+                         QString::fromLatin1("\"Fictional Person\" \"Fictional performance\" site:publisher.example.org"));
+                QCOMPARE(network.payloads.at(1).value("url").toString(), approvedArticle);
+                QCOMPARE(network.payloads.at(2).value("url").toString(),
+                         QStringLiteral("https://publisher.example.org/unrelated"));
+                // Force two successful providers into the same UTC second.
+                QSqlQuery alignTimes(db);
+                alignTimes.prepare("UPDATE person_updates SET fetched_at_utc=? WHERE source_url=?");
+                alignTimes.addBindValue(now);
+                alignTimes.addBindValue(approvedArticle);
+                QVERIFY(alignTimes.exec());
+                QCOMPARE(alignTimes.numRowsAffected(), qint64(2));
+                alice.getPersonUpdates(updates, [&](auto r){news=r;done=true;});
+                QTRY_VERIFY(done); QVERIFY2(news.status.ok() && news.value, qPrintable(news.status.message)); done = false;
+                const auto deepseekArticle = [&]() -> const PersonUpdate* {
+                    if (!news.value) return nullptr;
+                    for (const auto& article : news.value->items)
+                        if (article.sourceUrl == QUrl(approvedArticle) && article.title == "Publisher story")
+                            return &article;
+                    return nullptr;
+                };
+                QCOMPARE(news.value->items.size(), 2);
+                QVERIFY(deepseekArticle());
+                QVERIFY(!deepseekArticle()->stale && !deepseekArticle()->publishedAtUtc && !deepseekArticle()->eventAtUtc);
+                network.fetchStatus = 503;
+                refresh("fixture-key");
+                QTRY_VERIFY(done); QCOMPARE(status.code, ErrorCode::ServerError); done = false;
+                alice.getPersonUpdates(updates, [&](auto r){news=r;done=true;});
+                QTRY_VERIFY(done); QVERIFY(news.status.ok() && news.value); done = false;
+                QVERIFY(deepseekArticle() && deepseekArticle()->stale);
+
+                network.fetchStatus = 200;
+                network.fetchBody = {{"title", "Another person"}, {"content", "Fictional Person is in a different film."}};
+                refresh("fixture-key");
+                QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+                alice.getPersonUpdates(updates, [&](auto r){news=r;done=true;});
+                QTRY_VERIFY(done); QVERIFY(news.status.ok() && news.value); done = false;
+                QVERIFY(!deepseekArticle());
+                QCOMPARE(news.value->items.size(), 1); // Refresh never replaces the RSS partition.
+            }
+            QSqlDatabase::removeDatabase("person-import-deepseek-news");
 
             Result<WarehouseSummary> publicWarehouse;
             alice.createWarehouse("Public demo", Visibility::Public, [&](auto r){publicWarehouse=r;done=true;});
