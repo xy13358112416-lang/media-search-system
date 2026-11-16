@@ -6,6 +6,7 @@
 #include <QMap>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <limits>
 
 namespace person_store {
 using namespace care_contract;
@@ -154,90 +155,6 @@ Status SqliteStore::setFollow(qint64 userId, const QString& personId, bool follo
     if (!db_.commit()) { db_.rollback(); return error(QStringLiteral("无法提交关注事务。")); }
     return {};
 }
-Result<QList<PersonUpdate>> SqliteStore::updatesFor(qint64 userId, const QString& personId) {
-    auto status = checkUser(db_,userId); if (!status.ok()) return {status,{}};
-    if (!validPersonId(personId)) return {invalid(QStringLiteral("人物标识无效。")),{}};
-    QSqlQuery permission(db_);
-    permission.prepare("SELECT 1 FROM person_credits c JOIN work_sources s ON s.work_id=c.work_id "
-                       "JOIN warehouse_items i ON i.id=s.item_id AND i.warehouse_id=s.warehouse_id "
-                       "JOIN warehouses w ON w.id=s.warehouse_id WHERE c.person_id=? AND (w.owner_id=? OR w.is_public=1) LIMIT 1");
-    permission.addBindValue(personId); permission.addBindValue(userId);
-    if (!permission.exec()) return {error(QStringLiteral("无法检查人物权限。")),{}};
-    if (!permission.next()) return {denied(),{}};
-    QSqlQuery sources(db_); sources.prepare("SELECT 1 FROM person_sources WHERE person_id=? LIMIT 1"); sources.addBindValue(personId);
-    if (!sources.exec()) return {error(QStringLiteral("无法读取资讯源。")),{}};
-    if (!sources.next()) return {error(QStringLiteral("该人物尚未配置资讯源。")),{}};
-    QSqlQuery q(db_);
-    q.prepare("SELECT u.update_id,u.title,u.kind,u.source_url,u.published_at_utc,u.event_at_utc,u.fetched_at_utc,u.stale,s.stale "
-              "FROM person_updates u JOIN person_sources s ON s.person_id=u.person_id AND s.source_url=u.feed_url "
-              "WHERE u.person_id=? ORDER BY u.update_id,u.feed_url LIMIT 10001");
-    q.addBindValue(personId); if (!q.exec()) return {error(QStringLiteral("无法读取资讯缓存。")),{}};
-    QList<PersonUpdate> result; qsizetype bytes=0; const qint64 now=QDateTime::currentSecsSinceEpoch();
-    while (q.next()) {
-        PersonUpdate row; row.updateId=q.value(0).toString(); row.personId=personId; row.title=q.value(1).toString();
-        const auto kind=q.value(2).toString(); row.kind=kind=="news" ? UpdateKind::News : UpdateKind::Release;
-        row.sourceUrl=QUrl(q.value(3).toString(),QUrl::StrictMode);
-        bool valid=false; row.fetchedAtUtc=q.value(6).toLongLong(&valid);
-        if (!q.value(4).isNull()) { bool ok=false; const auto t=q.value(4).toLongLong(&ok); if (!ok) return {error(QStringLiteral("资讯日期无效。")),{}}; row.publishedAtUtc=t; }
-        if (!q.value(5).isNull()) { bool ok=false; const auto t=q.value(5).toLongLong(&ok); if (!ok) return {error(QStringLiteral("资讯日期无效。")),{}}; row.eventAtUtc=t; }
-        row.stale=q.value(7).toInt()!=0 || q.value(8).toInt()!=0;
-        bytes += row.title.size()*2 + row.sourceUrl.toString().size()*2 + row.updateId.size()*2;
-        if (result.size() >= 10000 || bytes > 4*1024*1024 || !validPersonId(row.updateId) || !validName(row.title) ||
-            (kind!="news" && kind!="release") || !validUrl(row.sourceUrl) || !valid || !validTimestamp(row.fetchedAtUtc) || row.fetchedAtUtc>now ||
-            (row.publishedAtUtc && (!validTimestamp(*row.publishedAtUtc) || *row.publishedAtUtc>now)) ||
-            (row.eventAtUtc && !validTimestamp(*row.eventAtUtc))) return {error(QStringLiteral("资讯缓存数据无效或超过上限。")),{}};
-        result.append(row);
-    }
-    if (q.lastError().isValid()) return {error(QStringLiteral("读取资讯缓存失败。")),{}};
-    return {{},result};
-}
-
-Status SqliteStore::mergeUpdates(const QString& personId, const QUrl& feedUrl, qint64 fetchedAtUtc, const QList<PersonUpdate>& updates) {
-    if (!db_.isOpen() || db_.driverName()!="QSQLITE") return error(QStringLiteral("人物数据库不可用。"));
-    const qint64 now=QDateTime::currentSecsSinceEpoch();
-    if (!validPersonId(personId) || !validUrl(feedUrl) || !validTimestamp(fetchedAtUtc) || fetchedAtUtc>now || updates.size()>1000)
-        return invalid(QStringLiteral("资讯源、时间或数量无效。"));
-    QSet<QString> seen; qsizetype bytes=0;
-    for (const auto& row : updates) {
-        bytes += row.title.size()*2 + row.sourceUrl.toString().size()*2 + row.updateId.size()*2;
-        if (!validPersonId(row.updateId) || seen.contains(row.updateId) || row.personId!=personId || !validName(row.title) ||
-            (row.kind!=UpdateKind::News && row.kind!=UpdateKind::Release) || !validUrl(row.sourceUrl) || row.fetchedAtUtc!=fetchedAtUtc || row.stale ||
-            (row.publishedAtUtc && (!validTimestamp(*row.publishedAtUtc) || *row.publishedAtUtc>now)) ||
-            (row.eventAtUtc && !validTimestamp(*row.eventAtUtc)) || bytes>4*1024*1024)
-            return invalid(QStringLiteral("资讯内容、来源或日期无效。"));
-        seen.insert(row.updateId);
-    }
-    if (!db_.transaction()) return error(QStringLiteral("无法开始资讯事务。"));
-    QSqlQuery q(db_); q.prepare("SELECT last_success_utc FROM person_sources WHERE person_id=? AND source_url=?");
-    q.addBindValue(personId); q.addBindValue(feedUrl.toString(QUrl::FullyEncoded));
-    if (!q.exec()) { db_.rollback(); return error(QStringLiteral("无法读取资讯源。")); }
-    if (!q.next()) { db_.rollback(); return denied(); }
-    if (!q.value(0).isNull() && q.value(0).toLongLong()>fetchedAtUtc) { db_.rollback(); return invalid(QStringLiteral("资讯刷新结果已过期。")); }
-    q.finish();
-    for (const auto& row : updates) {
-        q.prepare("INSERT INTO person_updates(person_id,update_id,feed_url,source_url,title,kind,published_at_utc,event_at_utc,fetched_at_utc,stale) "
-                  "VALUES(?,?,?,?,?,?,?,?,?,0) ON CONFLICT(person_id,update_id,feed_url) DO UPDATE SET source_url=excluded.source_url,title=excluded.title,"
-                  "kind=excluded.kind,published_at_utc=excluded.published_at_utc,event_at_utc=excluded.event_at_utc,fetched_at_utc=excluded.fetched_at_utc,stale=0");
-        q.addBindValue(personId); q.addBindValue(row.updateId); q.addBindValue(feedUrl.toString(QUrl::FullyEncoded));
-        q.addBindValue(row.sourceUrl.toString(QUrl::FullyEncoded)); q.addBindValue(row.title); q.addBindValue(row.kind==UpdateKind::News ? "news" : "release");
-        q.addBindValue(row.publishedAtUtc ? QVariant(*row.publishedAtUtc) : QVariant());
-        q.addBindValue(row.eventAtUtc ? QVariant(*row.eventAtUtc) : QVariant()); q.addBindValue(fetchedAtUtc);
-        if (!q.exec()) { db_.rollback(); return error(QStringLiteral("无法写入资讯缓存。")); }
-    }
-    q.prepare("UPDATE person_sources SET last_success_utc=?,stale=0 WHERE person_id=? AND source_url=?");
-    q.addBindValue(fetchedAtUtc); q.addBindValue(personId); q.addBindValue(feedUrl.toString(QUrl::FullyEncoded));
-    if (!q.exec()) { db_.rollback(); return error(QStringLiteral("无法更新资讯源。")); }
-    if (!db_.commit()) { db_.rollback(); return error(QStringLiteral("无法提交资讯事务。")); }
-    return {};
-}
-
-Status SqliteStore::markSourceFailure(const QString& personId, const QUrl& feedUrl) {
-    if (!db_.isOpen() || db_.driverName()!="QSQLITE") return error(QStringLiteral("人物数据库不可用。"));
-    if (!validPersonId(personId) || !validUrl(feedUrl)) return invalid(QStringLiteral("资讯源无效。"));
-    QSqlQuery q(db_); q.prepare("UPDATE person_sources SET stale=1 WHERE person_id=? AND source_url=?");
-    q.addBindValue(personId); q.addBindValue(feedUrl.toString(QUrl::FullyEncoded));
-    if (!q.exec()) return error(QStringLiteral("无法标记资讯源状态。"));
-    if (q.numRowsAffected()!=1) return denied();
-    return {};
-}
+Result<QList<PersonUpdate>> SqliteStore::updatesFor(qint64, const QString&) { return {error(QStringLiteral("资讯缓存尚未实现。")), {}}; }
+Status SqliteStore::mergeUpdates(const QString&, const QList<PersonUpdate>&) { return error(QStringLiteral("资讯缓存尚未实现。")); }
 }

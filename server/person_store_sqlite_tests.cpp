@@ -64,48 +64,6 @@ private slots:
         }
         QSqlDatabase::removeDatabase(name);
     }
-    void cacheUsesRegisteredFeedAndRetainsOldDataOnFailure() {
-        const QString name = QUuid::createUuid().toString();
-        {
-            auto db=QSqlDatabase::addDatabase("QSQLITE",name); db.setDatabaseName(":memory:"); QVERIFY(db.open()); QVERIFY(fixture(db));
-            person_store::SqliteStore store(db); const QUrl feed("https://example.org/feed");
-            QSqlQuery q(db); QVERIFY(q.exec("INSERT INTO person_sources(person_id,source_url) VALUES('p2','https://example.org/feed')"));
-            const qint64 now=QDateTime::currentSecsSinceEpoch();
-            cc::PersonUpdate row; row.updateId="news:1"; row.personId="p2"; row.title="News";
-            row.kind=cc::UpdateKind::News; row.sourceUrl=QUrl("https://example.org/article/1"); row.fetchedAtUtc=now;
-            QVERIFY(store.mergeUpdates("p2",feed,now,{row}).ok());
-            const auto visible=store.updatesFor(2,"p2"); QVERIFY(visible.status.ok()); QCOMPARE(visible.value->size(),1);
-            QCOMPARE(visible.value->first().sourceUrl,row.sourceUrl); QVERIFY(!visible.value->first().publishedAtUtc);
-            QVERIFY(!visible.value->first().stale); QCOMPARE(store.updatesFor(2,"p1").status.code,ErrorCode::PermissionDenied);
-            QCOMPARE(store.mergeUpdates("p2",QUrl("https://not-registered.example/feed"),now,{row}).code,ErrorCode::PermissionDenied);
-            QVERIFY(store.markSourceFailure("p2",feed).ok());
-            const auto stale=store.updatesFor(2,"p2"); QVERIFY(stale.status.ok()); QCOMPARE(stale.value->size(),1); QVERIFY(stale.value->first().stale);
-            QVERIFY(store.mergeUpdates("p2",feed,now,{}).ok());
-            const auto refreshed=store.updatesFor(2,"p2"); QVERIFY(refreshed.status.ok()); QVERIFY(!refreshed.value->first().stale);
-            db.close();
-        }
-        QSqlDatabase::removeDatabase(name);
-    }
-    void invalidOrFailedCacheRefreshIsAtomic() {
-        const QString name = QUuid::createUuid().toString();
-        {
-            auto db=QSqlDatabase::addDatabase("QSQLITE",name); db.setDatabaseName(":memory:"); QVERIFY(db.open()); QVERIFY(fixture(db));
-            person_store::SqliteStore store(db); const QUrl feed("https://example.org/feed");
-            QSqlQuery q(db); QVERIFY(q.exec("INSERT INTO person_sources(person_id,source_url) VALUES('p2','https://example.org/feed')"));
-            const qint64 now=QDateTime::currentSecsSinceEpoch();
-            cc::PersonUpdate row; row.updateId="good"; row.personId="p2"; row.title="Title";
-            row.sourceUrl=QUrl("https://example.org/article"); row.fetchedAtUtc=now;
-            auto bad=row; bad.updateId="bad"; bad.sourceUrl=QUrl("http://insecure.example/article");
-            QCOMPARE(store.mergeUpdates("p2",feed,now,{row,bad}).code,ErrorCode::InvalidArgument);
-            QVERIFY(q.exec("SELECT COUNT(*) FROM person_updates")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
-            QVERIFY(q.exec("CREATE TRIGGER fail_update BEFORE INSERT ON person_updates WHEN NEW.update_id='bad' BEGIN SELECT RAISE(ABORT,'fail'); END"));
-            bad.sourceUrl=QUrl("https://example.org/article2");
-            QCOMPARE(store.mergeUpdates("p2",feed,now,{row,bad}).code,ErrorCode::ServerError);
-            QVERIFY(q.exec("SELECT COUNT(*) FROM person_updates")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
-            db.close();
-        }
-        QSqlDatabase::removeDatabase(name);
-    }
 };
 QTEST_GUILESS_MAIN(PersonStoreSqliteTests)
 #include "person_store_sqlite_tests.moc"

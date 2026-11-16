@@ -14,6 +14,47 @@ using namespace warehouse_contract;
 class PersonSnapshotServerTests : public QObject {
     Q_OBJECT
 private slots:
+    void sqliteStoreProvidesConfirmedPeopleToRealServer() {
+        QTemporaryDir dir; const auto path=dir.filePath("store-integration.sqlite"); QString error;
+        WarehouseServer server(llm_recommendation::Config{}); QVERIFY(server.openDatabase(path,error));
+        QVERIFY(server.addUser("alice","password-123",error)); QVERIFY(server.addUser("bob","password-123",error));
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        OnlineCareClient alice,bob; bool done=false; Status status; qint64 aliceId=0;
+        for (auto* client : {&alice,&bob}) {
+            client->connectToServer("127.0.0.1",server.serverPort(),[&](Status s) { status=s; done=true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done=false;
+            client->login(client==&alice ? "alice" : "bob","password-123",[&](auto r) {
+                status=r.status; if (client==&alice && r.value) aliceId=r.value->userId; done=true;
+            });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done=false;
+        }
+        Result<WarehouseSummary> warehouse;
+        alice.createWarehouse("private",Visibility::Private,[&](auto r) { warehouse=r; done=true; });
+        QTRY_VERIFY(done); QVERIFY(warehouse.value); done=false;
+        MediaRecord media; media.id="not-person-id"; media.fileName="Film";
+        Result<WarehouseItem> item;
+        alice.addItem(warehouse.value->warehouseId,media,[&](auto r) { item=r; done=true; });
+        QTRY_VERIFY(done); QVERIFY(item.value); done=false;
+        Result<cc::ResourceSummary> resource;
+        alice.getResource({warehouse.value->warehouseId,item.value->itemId},[&](auto r) { resource=r; done=true; });
+        QTRY_VERIFY(done); QVERIFY(resource.value); const auto ref=resource.value->resource; done=false;
+        {
+            auto db=QSqlDatabase::addDatabase("QSQLITE","person-store-fixture"); db.setDatabaseName(path); QVERIFY(db.open());
+            QSqlQuery q(db); QVERIFY(q.exec("INSERT INTO person_catalog VALUES('person:test','Verified','fixture')"));
+            q.prepare("INSERT INTO person_credits VALUES('person:test',?,'actor','fixture')"); q.addBindValue(ref.workId); QVERIFY(q.exec());
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("person-store-fixture");
+        alice.getResource(ref.source,[&](auto r) { resource=r; done=true; });
+        QTRY_VERIFY(done); QVERIFY(resource.status.ok() && resource.value); QCOMPARE(resource.value->people.size(),1);
+        QCOMPARE(resource.value->people.first().personId,QStringLiteral("person:test")); done=false;
+        alice.recordBehavior({"store-view",cc::BehaviorAction::View,ref,{}},[&](Status s) { status=s; done=true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done=false;
+        const auto history=server.queryBehavior(aliceId,{0,cc::MaxUtcExclusive}); QVERIFY(history); QCOMPARE(history->size(),1);
+        QCOMPARE(history->first().peopleSnapshot.size(),1); QCOMPARE(history->first().peopleSnapshot.first().personId,QStringLiteral("person:test"));
+        bob.getResource(ref.source,[&](auto r) { status=r.status; done=true; });
+        QTRY_VERIFY(done); QCOMPARE(status.code,ErrorCode::PermissionDenied);
+    }
     void historyExtensionRejectsCorruptionAndAllowsLegacy() {
         MediaRecord media; media.id = "m"; media.fileName = "Legacy";
         const cc::ResourceRef ref{"srv:legacy", {1, 2}};
