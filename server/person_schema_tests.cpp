@@ -34,9 +34,9 @@ private slots:
                            "VALUES('person:1','update:1','https://example.org/feed','https://example.org/article','Title','release',NULL,200,100)"));
             QVERIFY(!q.exec("INSERT INTO person_updates(person_id,update_id,feed_url,source_url,title,kind,fetched_at_utc) "
                             "VALUES('person:1','update:2','https://unconfigured.example/feed','https://example.org/article','Title','news',100)"));
-            QVERIFY(q.exec("INSERT INTO person_history_snapshots(user_id,event_id,people_json) VALUES(1,'old-event','[]')"));
-            QVERIFY(q.exec("DELETE FROM behavior_events WHERE user_id=1 AND event_id='old-event'"));
-            QVERIFY(q.exec("SELECT COUNT(*) FROM person_history_snapshots")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 0);
+            // 人物快照由既有 behavior_events.media_snapshot 唯一保存，不另建第二套。
+            QVERIFY(q.exec("SELECT COUNT(*) FROM sqlite_master WHERE name='person_history_snapshots'"));
+            QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 0);
             db.close();
         }
         QSqlDatabase::removeDatabase(connection);
@@ -82,8 +82,19 @@ private slots:
         {
             auto db = QSqlDatabase::addDatabase("QSQLITE", connection); db.setDatabaseName(dir.filePath("broken.sqlite")); QVERIFY(db.open()); QVERIFY(initial(db));
             QString error; QVERIFY(db.transaction()); QVERIFY(person_schema::migrate(db, error)); QVERIFY(db.commit());
-            QSqlQuery q(db); QVERIFY(q.exec("DROP TABLE person_history_snapshots"));
-            QVERIFY(q.exec("CREATE TABLE person_history_snapshots(user_id INTEGER,event_id TEXT,people_json BLOB)"));
+            QSqlQuery q(db); QVERIFY(q.exec("DROP TABLE person_follows"));
+            QVERIFY(q.exec("CREATE TABLE person_follows(user_id INTEGER,person_id TEXT,known_name TEXT,known_roles_json BLOB)"));
+            QVERIFY(db.transaction()); QVERIFY(!person_schema::migrate(db, error)); QVERIFY(db.rollback()); db.close();
+        }
+        QSqlDatabase::removeDatabase(connection);
+    }
+    void rejectsAccidentallyNonNullableDate() {
+        QTemporaryDir dir; const auto connection = QUuid::createUuid().toString();
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", connection); db.setDatabaseName(dir.filePath("date.sqlite")); QVERIFY(db.open()); QVERIFY(initial(db));
+            QString error; QVERIFY(db.transaction()); QVERIFY(person_schema::migrate(db, error)); QVERIFY(db.commit());
+            QSqlQuery q(db); QVERIFY(q.exec("DROP TABLE person_updates"));
+            QVERIFY(q.exec("CREATE TABLE person_updates(person_id TEXT NOT NULL,update_id TEXT NOT NULL,feed_url TEXT NOT NULL,source_url TEXT NOT NULL,title TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('news','release')),published_at_utc INTEGER NOT NULL,event_at_utc INTEGER,fetched_at_utc INTEGER NOT NULL,stale INTEGER NOT NULL DEFAULT 0 CHECK(stale IN (0,1)),PRIMARY KEY(person_id,update_id,feed_url),FOREIGN KEY(person_id,feed_url) REFERENCES person_sources(person_id,source_url))"));
             QVERIFY(db.transaction()); QVERIFY(!person_schema::migrate(db, error)); QVERIFY(db.rollback()); db.close();
         }
         QSqlDatabase::removeDatabase(connection);

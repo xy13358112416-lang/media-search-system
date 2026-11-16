@@ -28,6 +28,7 @@
 - `publicEligible` 由服务器确认行为发生时及当前的公共贡献资格。`publicWorks` 只放当前公开来源；来源转私有、撤销公共贡献和清理历史后，②必须更新查询/缓存，不能继续传旧资格。
 - `publicHeat` 是所选公开时间窗口内，按同用户/作品/北京时间自然日封顶、达到三用户门槛的有效计数。②应提供完整窗口统计，不能把媒体 CSV 的累计 `viewCount` 当它使用，也不要直接拿截断的 UI 榜单充当完整统计。`publicHeatContainsSyntheticData` 必须保留统计来源标记。
 - 人物必须有服务端目录确认的 `personId`。姓名不构成身份，算法不会把同名演员/导演自动合并。原始 CSV 中只有姓名时，关联未确认的 `people` 应为空。
+- `care_person_snapshot.h` 的 `attachConfirmedPeople` 将可信 `PersonContext` 按完整资源三元组接入当前授权资源。历史 `workSnapshot` 保持原样；不能用当前人物目录补造旧历史。真实服务器装配、内部仓储和可选热点模型摘要模块见 `PERSON_INTEGRATION.md`。
 
 ## 各模块行为
 

@@ -51,6 +51,7 @@ public:
     QList<WorksCall> worksCalls;
     QList<UpdatesCall> updatesCalls;
     Callback<TemporalRecommendationResult> recommendationDone;
+    BrowseScene lastScene = BrowseScene::Neutral;
     Callback<FootprintReport> footprintDone;
     FootprintRequest footprintRequest;
     QStringList cancelledHandles;
@@ -81,8 +82,9 @@ public:
     void getFootprint(const FootprintRequest& request, Callback<FootprintReport> done) override
     { footprintRequest = request; footprintDone = std::move(done); }
     warehouse_contract::RecommendationHandle recommendTemporal(
-        const TemporalRecommendationRequest&, Callback<TemporalRecommendationResult> done) override
+        const TemporalRecommendationRequest& request, Callback<TemporalRecommendationResult> done) override
     {
+        lastScene = request.scene;
         if (immediateRecommendationFailure) {
             done({{warehouse_contract::ErrorCode::NotAuthenticated, QStringLiteral("请登录")}, std::nullopt});
             return {};
@@ -203,6 +205,19 @@ private slots:
         QVERIFY(news->item(0)->text().contains(QStringLiteral("乙资讯")));
         QVERIFY(!worksMore->isEnabled());
         QVERIFY(!updatesMore->isEnabled());
+    }
+
+    void temporalRequestsUseCurrentScene()
+    {
+        FakeCareService service;
+        auto selected = BrowseScene::Relax;
+        std::unique_ptr<CarePage> page(createTemporalPage(service, [&] { return selected; }));
+        page->activate();
+        QCOMPARE(service.lastScene, BrowseScene::Relax);
+        page->deactivate();
+        selected = BrowseScene::Explore;
+        page->activate();
+        QCOMPARE(service.lastScene, BrowseScene::Explore);
     }
 
     void destructionCancelsWithoutSynchronousCallbackReentry()

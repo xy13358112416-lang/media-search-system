@@ -33,7 +33,6 @@ bool migrate(QSqlDatabase& db, QString& error) {
         "CREATE TABLE person_follows(user_id INTEGER NOT NULL REFERENCES network_users(id),person_id TEXT NOT NULL REFERENCES person_catalog(person_id),known_name TEXT NOT NULL,known_roles_json BLOB NOT NULL,PRIMARY KEY(user_id,person_id))",
         "CREATE TABLE person_sources(person_id TEXT NOT NULL REFERENCES person_catalog(person_id),source_url TEXT NOT NULL,last_success_utc INTEGER,stale INTEGER NOT NULL DEFAULT 0 CHECK(stale IN (0,1)),PRIMARY KEY(person_id,source_url))",
         "CREATE TABLE person_updates(person_id TEXT NOT NULL,update_id TEXT NOT NULL,feed_url TEXT NOT NULL,source_url TEXT NOT NULL,title TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('news','release')),published_at_utc INTEGER,event_at_utc INTEGER,fetched_at_utc INTEGER NOT NULL,stale INTEGER NOT NULL DEFAULT 0 CHECK(stale IN (0,1)),PRIMARY KEY(person_id,update_id,feed_url),FOREIGN KEY(person_id,feed_url) REFERENCES person_sources(person_id,source_url))",
-        "CREATE TABLE person_history_snapshots(user_id INTEGER NOT NULL,event_id TEXT NOT NULL,people_json BLOB NOT NULL,PRIMARY KEY(user_id,event_id),FOREIGN KEY(user_id,event_id) REFERENCES behavior_events(user_id,event_id) ON DELETE CASCADE)",
         "INSERT INTO server_schema_migrations(version) VALUES(2)"
     };
     const auto normalized = [](const QString& sql) {
@@ -56,14 +55,12 @@ bool migrate(QSqlDatabase& db, QString& error) {
         {"person_credits", {"person_id", "work_id", "role", "credit_source"}},
         {"person_follows", {"user_id", "person_id", "known_name", "known_roles_json"}},
         {"person_sources", {"person_id", "source_url", "last_success_utc", "stale"}},
-        {"person_updates", {"person_id", "update_id", "feed_url", "source_url", "title", "kind", "published_at_utc", "event_at_utc", "fetched_at_utc", "stale"}},
-        {"person_history_snapshots", {"user_id", "event_id", "people_json"}}
+        {"person_updates", {"person_id", "update_id", "feed_url", "source_url", "title", "kind", "published_at_utc", "event_at_utc", "fetched_at_utc", "stale"}}
     };
     const QMap<QString, QStringList> primaryKeys{
         {"person_catalog", {"person_id"}}, {"person_aliases", {"person_id", "alias"}},
         {"person_credits", {"person_id", "work_id", "role"}}, {"person_follows", {"user_id", "person_id"}},
-        {"person_sources", {"person_id", "source_url"}}, {"person_updates", {"person_id", "update_id", "feed_url"}},
-        {"person_history_snapshots", {"user_id", "event_id"}}
+        {"person_sources", {"person_id", "source_url"}}, {"person_updates", {"person_id", "update_id", "feed_url"}}
     };
     const QMap<QString, QSet<QString>> nullable{
         {"person_sources", {"last_success_utc"}}, {"person_updates", {"published_at_utc", "event_at_utc"}}
@@ -81,8 +78,7 @@ bool migrate(QSqlDatabase& db, QString& error) {
         {"person_credits", {"person_catalog|person_id|person_id|NO ACTION"}},
         {"person_follows", {"network_users|user_id|id|NO ACTION", "person_catalog|person_id|person_id|NO ACTION"}},
         {"person_sources", {"person_catalog|person_id|person_id|NO ACTION"}},
-        {"person_updates", {"person_sources|person_id|person_id|NO ACTION", "person_sources|feed_url|source_url|NO ACTION"}},
-        {"person_history_snapshots", {"behavior_events|user_id|user_id|CASCADE", "behavior_events|event_id|event_id|CASCADE"}}
+        {"person_updates", {"person_sources|person_id|person_id|NO ACTION", "person_sources|feed_url|source_url|NO ACTION"}}
     };
     for (auto it = required.cbegin(); it != required.cend(); ++it) {
         q.prepare("SELECT type,sql FROM sqlite_master WHERE name=?"); q.addBindValue(it.key());
@@ -106,8 +102,9 @@ bool migrate(QSqlDatabase& db, QString& error) {
                     error = QStringLiteral("人物数据库字段类型或默认值不匹配。"); return false;
                 }
                 const int keyPosition = q.value(5).toInt(); if (keyPosition > 0) primary.insert(keyPosition, name);
-                if (it.value().contains(name) && !nullable.value(it.key()).contains(name) && q.value(3).toInt() != 1) {
-                    error = QStringLiteral("人物数据库缺少非空约束。"); return false;
+                if (it.value().contains(name) &&
+                    (q.value(3).toInt() == 0) != nullable.value(it.key()).contains(name)) {
+                    error = QStringLiteral("人物数据库非空约束不匹配。"); return false;
                 }
             }
             if (q.lastError().isValid()) { error = QStringLiteral("无法读取人物数据库字段。"); return false; }
@@ -122,7 +119,7 @@ bool migrate(QSqlDatabase& db, QString& error) {
                 ++foreignGroups[q.value(0).toInt()];
             }
             if (q.lastError().isValid() || actualForeign != foreignKeys.value(it.key()) ||
-                ((it.key() == "person_updates" || it.key() == "person_history_snapshots") &&
+                ((it.key() == "person_updates") &&
                  (foreignGroups.size() != 1 || foreignGroups.first() != 2))) {
                 error = QStringLiteral("人物数据库外键不匹配。"); return false;
             }

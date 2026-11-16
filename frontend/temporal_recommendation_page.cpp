@@ -1,5 +1,7 @@
 #include "temporal_recommendation_page.h"
 
+#include <QSignalBlocker>
+
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QListWidget>
@@ -63,6 +65,15 @@ public:
     }
 
     void activate() override { reloadView(); }
+
+    void resetSession() override
+    {
+        deactivate();
+        const QSignalBlocker blocker(blocked_);
+        blocked_->setChecked(false);
+        category_->setCurrentIndex(0);
+        type_->setCurrentIndex(0);
+    }
 
     void deactivate() override
     {

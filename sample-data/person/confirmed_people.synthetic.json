@@ -1,0 +1,35 @@
+{
+  "schema": "care-person-fixture-v1",
+  "synthetic": true,
+  "productionLoaderEnabled": false,
+  "provenance": "Hand-authored test data. All people, works, identities and associations are fictional; names are not evidence of identity.",
+  "credits": [
+    {
+      "resource": {"workId": "wk_7a1", "source": {"warehouseId": 1, "itemId": 10}},
+      "mediaRowId": "42",
+      "people": [
+        {"personId": "ps_2c4", "name": "  Alex   Vale ", "roles": ["Director", "Actor", "Director"]},
+        {"personId": "ps_2c4", "name": "Alex Vale", "roles": ["Musician"]},
+        {"personId": "ps_8f0", "name": "Alex Vale", "roles": ["Actor"]}
+      ]
+    },
+    {
+      "resource": {"workId": "wk_7a1", "source": {"warehouseId": 2, "itemId": 10}},
+      "mediaRowId": "42",
+      "people": [{"personId": "ps_8f0", "name": "Alex Vale", "roles": ["Actor"]}]
+    },
+    {
+      "resource": {"workId": "wk_4b9", "source": {"warehouseId": 1, "itemId": 11}},
+      "mediaRowId": "42",
+      "rawCsvActors": ["Alex Vale", "Morgan Reed"],
+      "people": [],
+      "explanation": "Unknown: CSV names and matching local row IDs do not establish a person association."
+    },
+    {
+      "resource": {"workId": "wk_9e2", "source": {"warehouseId": 99, "itemId": 99}},
+      "people": [{"personId": "ps_6d3", "name": "Morgan Reed", "roles": ["Musician"]}],
+      "explanation": "An unrelated valid directory record must not enter a caller's readable scope."
+    }
+  ],
+  "followedPeople": ["ps_2c4", "ps_6d3"]
+}

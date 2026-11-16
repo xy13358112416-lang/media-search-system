@@ -5,6 +5,7 @@
 #include "person_schema.h"
 #include "care_trending.h"
 #include "care_temporal.h"
+#include "person_snapshot_json.h"
 
 #include <QDateTime>
 #include <QJsonArray>
@@ -333,7 +334,11 @@ std::optional<QList<StoredBehavior>> WarehouseServer::queryBehavior(qint64 userI
             snapshotBytes += bytes.size();
             if (snapshotBytes > 16 * 1024 * 1024) return std::nullopt;
             MediaRecord media; QString error;
-            if (!media_json::fromJson(QJsonDocument::fromJson(bytes).object(), media, error)) return std::nullopt;
+            const auto object = QJsonDocument::fromJson(bytes).object();
+            if (!media_json::fromJson(object, media, error)) return std::nullopt;
+            const auto people = person_snapshot_json::decode(object, *record.event.resource, media);
+            if (!people) return std::nullopt;
+            stored.peopleSnapshot = *people;
             stored.mediaSnapshot = media;
         } else if (action == "search") {
             record.event.action = care_contract::BehaviorAction::Search;
@@ -348,6 +353,27 @@ std::optional<QList<StoredBehavior>> WarehouseServer::queryBehavior(qint64 userI
     }
     if (query.lastError().isValid()) return std::nullopt;
     return result;
+}
+
+care_contract::Result<care_algorithms::PersonContext> WarehouseServer::loadPersonContext(
+    qint64 userId, const QList<care_contract::ResourceSummary>& authorizedWorks)
+{
+    if (!personContextLoader_) return {{}, care_algorithms::PersonContext{}};
+    QList<care_contract::ResourceRef> refs;
+    refs.reserve(authorizedWorks.size());
+    for (const auto& work : authorizedWorks) refs.append(work.resource);
+    return personContextLoader_(userId, refs);
+}
+
+care_contract::Result<care_algorithms::CatalogSnapshot> WarehouseServer::personCatalog(
+    qint64 userId, const QList<care_contract::ResourceSummary>& authorizedWorks)
+{
+    const auto context = loadPersonContext(userId, authorizedWorks);
+    if (!context.status.ok() || !context.value)
+        return {{ErrorCode::ServerError, QStringLiteral("人物目录读取失败。")}, {}};
+    care_algorithms::CatalogSnapshot catalog;
+    catalog.readableWorks = authorizedWorks;
+    return care_algorithms::attachConfirmedPeople(catalog, *context.value);
 }
 
 void WarehouseServer::readRequests(QTcpSocket* socket, const std::shared_ptr<Session>& session)
@@ -552,7 +578,7 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
             care_algorithms::ObservedBehavior event;
             event.userKey = snapshot.userKey; event.record = stored.record; event.publicEligible = stored.publicEligible;
             if (stored.record.event.resource && stored.mediaSnapshot)
-                event.workSnapshot = care_contract::ResourceSummary{*stored.record.event.resource, *stored.mediaSnapshot, {}};
+                event.workSnapshot = care_contract::ResourceSummary{*stored.record.event.resource, *stored.mediaSnapshot, stored.peopleSnapshot};
             snapshot.events.append(event);
         }
         // The recommendation uses the complete seven-day public heat window, not the truncated UI top list.
@@ -586,11 +612,16 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
             snapshot.publicHeat.insert(it.key(), effective);
             if (syntheticHeat.contains(it.key())) snapshot.publicHeatContainsSyntheticData = true;
         }
-        const auto recommended = care_algorithms::recommendTemporal(input, snapshot);
+        const auto context = loadPersonContext(session.userId, snapshot.readableWorks);
+        if (!context.status.ok() || !context.value) return dbError();
+        const auto enriched = care_algorithms::attachConfirmedPeople(snapshot, *context.value);
+        if (!enriched.status.ok() || !enriched.value) return dbError();
+        const auto recommended = care_algorithms::recommendTemporal(input, *enriched.value);
         if (!recommended.status.ok() || !recommended.value) return fail("ServerError", recommended.status.message);
         QJsonArray rows;
         for (const auto& item : recommended.value->items) rows.append(QJsonObject{{"work", workJson(item.work)}, {"reason", item.reason}});
-        const QString note = QStringLiteral("人物关注尚未接入，当前使用历史、公开热度、发行日期及不感兴趣设置。");
+        const QString note = personContextLoader_ ? QStringLiteral("人物和关注只使用服务端确认的关联。") :
+            QStringLiteral("人物目录尚未配置，当前使用历史、公开热度、发行日期及不感兴趣设置。");
         return success({{"result", QJsonObject{{"items", rows}, {"message", recommended.value->message + note},
             {"fallback", recommended.value->fallback}, {"engine", "temporal"},
             {"generated_at_utc", QString::number(recommended.value->generatedAtUtc)},
@@ -706,6 +737,7 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
                 care_contract::ResourceSummary work;
                 work.resource = *item.record.event.resource;
                 work.media = *item.mediaSnapshot;
+                work.people = item.peopleSnapshot;
                 event.workSnapshot = work;
             }
             snapshot.events.append(event);
@@ -714,7 +746,7 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         if (!report.status.ok() || !report.value)
             return fail(report.status.code == ErrorCode::InvalidArgument ? "InvalidArgument" : "ServerError", report.status.message);
         QJsonObject output{{"current", periodJson(report.value->current)}, {"generated_at_utc", QString::number(report.value->generatedAtUtc)},
-            {"message", report.value->message + QStringLiteral(" 人物关联尚未接入，人物统计暂为空。")},
+            {"message", report.value->message + QStringLiteral(" 未确认的人物关联不纳入人物统计。")},
             {"contains_synthetic_data", report.value->containsSyntheticData}};
         if (report.value->comparison) output.insert("comparison", periodJson(*report.value->comparison));
         return success({{"report", output}});
@@ -743,9 +775,11 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         query.prepare("SELECT work_id FROM work_sources WHERE warehouse_id=? AND item_id=?");
         query.addBindValue(warehouseId); query.addBindValue(itemId);
         if (!query.exec() || !query.next()) return dbError();
-        const QJsonObject cleanSource{{"warehouse_id", QString::number(warehouseId)}, {"item_id", QString::number(itemId)}};
-        const QJsonObject ref{{"work_id", query.value(0).toString()}, {"source", cleanSource}};
-        return success({{"work", QJsonObject{{"resource", ref}, {"media", media}, {"people", QJsonArray{}}}}});
+        const care_contract::ResourceSummary work{{query.value(0).toString(), {warehouseId, itemId}}, decoded, {}};
+        query.finish();
+        const auto catalog = personCatalog(session.userId, {work});
+        if (!catalog.status.ok() || !catalog.value) return dbError();
+        return success({{"work", workJson(catalog.value->readableWorks.first())}});
     }
     if (type == "get_participation_settings") {
         query.prepare("SELECT history_enabled,personalization_enabled,contribute_public_trends FROM behavior_settings WHERE user_id=?");
@@ -844,6 +878,16 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         const bool publicEligible = hasSettings && query.value(1).toBool() && sourcePublic;
         query.finish();
         if (!historyEnabled) return success();
+        if (value.resource) {
+            auto object = QJsonDocument::fromJson(snapshot).object();
+            MediaRecord media; QString error;
+            if (!media_json::fromJson(object, media, error)) return dbError();
+            const auto catalog = personCatalog(session.userId, {{*value.resource, media, {}}});
+            if (!catalog.status.ok() || !catalog.value) return dbError();
+            object.insert(person_snapshot_json::Field,
+                person_snapshot_json::encode(catalog.value->readableWorks.first().people));
+            snapshot = QJsonDocument(object).toJson(QJsonDocument::Compact);
+        }
         query.prepare("INSERT INTO behavior_events(user_id,event_id,action,query,occurred_at_utc,public_eligible,work_id,warehouse_id,item_id,media_snapshot) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,event_id) DO NOTHING");
         query.addBindValue(session.userId);
         query.addBindValue(value.eventId);
