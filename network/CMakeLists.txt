@@ -13,6 +13,10 @@ target_compile_features(care_contract PUBLIC cxx_std_17)
 target_link_libraries(care_contract PUBLIC Qt6::Core)
 target_compile_options(care_contract PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
+# These independently delivered pure modules consume the shared contract, not SQLite or a network session.
+include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_algorithm_core.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_person.cmake)
+
 # PR 4 将其替换为包含 warehouse_client.cpp 的实际实现。
 add_library(warehouse_client INTERFACE)
 target_link_libraries(warehouse_client INTERFACE warehouse_protocol)
