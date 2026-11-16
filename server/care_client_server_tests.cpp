@@ -1,5 +1,6 @@
 #include "online_care_client.h"
 #include "warehouse_server.h"
+#include <QDateTime>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -39,7 +40,7 @@ private slots:
         care_contract::CareService* care = &client;
         int calls = 0;
         Status status;
-        care->getFootprint({}, [&](auto result) { ++calls; status = result.status; QVERIFY(!result.value); });
+        care->searchPeople({}, [&](auto result) { ++calls; status = result.status; QVERIFY(!result.value); });
         QCOMPARE(calls, 1); QCOMPARE(status.code, ErrorCode::ServerError);
         calls = 0;
         care->recordBehavior({"search-1", BehaviorAction::Search, std::nullopt, "music"},
@@ -56,6 +57,7 @@ private slots:
         WarehouseServer server(llm_recommendation::Config{});
         QVERIFY(server.openDatabase(directory.filePath("server.sqlite"), error));
         QVERIFY(server.addUser("alice", "alice-demo", error));
+        QVERIFY(server.addUser("bob", "bob-demo", error));
         QVERIFY(server.listen(QHostAddress::LocalHost));
         OnlineCareClient client;
         bool done = false;
@@ -82,6 +84,32 @@ private slots:
         QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
         auto history = server.queryBehavior(1, {0, MaxUtcExclusive});
         QVERIFY(history.has_value()); QCOMPARE(history->size(), 1);
+        const qint64 now = QDateTime::currentSecsSinceEpoch();
+        Result<care_contract::FootprintReport> footprint;
+        client.getFootprint({{now - 60, now + 60}, std::nullopt}, [&](auto r) { footprint = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY2(footprint.status.ok(), qPrintable(footprint.status.message));
+        QVERIFY(footprint.value); QCOMPARE(footprint.value->current.views, 1);
+        QCOMPARE(footprint.value->current.uniqueWorks, 1); done = false;
+        QCOMPARE(footprint.value->current.categories.size(), 1);
+        QCOMPARE(footprint.value->current.categories.first().label, QStringLiteral("music"));
+        QVERIFY(footprint.value->message.contains(QStringLiteral("人物")));
+        client.removeItem(warehouse.value->warehouseId, item.value->itemId, [&](Status s) { status = s; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        client.getFootprint({{now - 60, now + 60}, care_contract::TimeRange{now - 180, now - 60}},
+                            [&](auto r) { footprint = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(footprint.status.ok()); QVERIFY(footprint.value->comparison);
+        QCOMPARE(footprint.value->current.views, 1);
+        QCOMPARE(footprint.value->current.categories.first().label, QStringLiteral("music"));
+        QCOMPARE(footprint.value->comparison->views, 0); done = false;
+        OnlineCareClient bob;
+        bob.connectToServer("127.0.0.1", server.serverPort(), [&](Status s) { status = s; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        bob.login("bob", "bob-demo", [&](auto r) { status = r.status; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        bob.getFootprint({{now - 60, now + 60}, std::nullopt}, [&](auto r) { footprint = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(footprint.status.ok()); QCOMPARE(footprint.value->current.views, 0); done = false;
+        client.getFootprint({{now, now}, std::nullopt}, [&](auto r) { footprint = r; done = true; });
+        QVERIFY(done); QCOMPARE(footprint.status.code, ErrorCode::InvalidArgument); done = false;
         Result<ParticipationSettings> settings;
         client.getParticipationSettings([&](auto r) { settings = r; done = true; });
         QTRY_VERIFY(done); QVERIFY(settings.status.ok()); QVERIFY(settings.value); QVERIFY(settings.value->historyEnabled); done = false;
@@ -92,6 +120,9 @@ private slots:
         QTRY_VERIFY(done); QVERIFY(status.ok());
         history = server.queryBehavior(1, {0, MaxUtcExclusive});
         QVERIFY(history.has_value()); QVERIFY(history->isEmpty());
+        done = false;
+        client.getFootprint({{now - 60, now + 60}, std::nullopt}, [&](auto r) { footprint = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(footprint.status.ok()); QCOMPARE(footprint.value->current.views, 0);
     }
 };
 QTEST_GUILESS_MAIN(CareClientServerTests)

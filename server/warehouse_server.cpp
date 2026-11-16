@@ -1,6 +1,7 @@
 #include "warehouse_server.h"
 #include "media_json.h"
 #include "behavior_contract.h"
+#include "care_footprint.h"
 
 #include <QDateTime>
 #include <QJsonArray>
@@ -21,6 +22,44 @@ QString userKey(const QString& name)
 {
     return name.trimmed().normalized(QString::NormalizationForm_C).toCaseFolded()
         .normalized(QString::NormalizationForm_C);
+}
+
+bool readUtc(const QJsonValue& value, qint64& result)
+{
+    if (!value.isString()) return false;
+    static const QRegularExpression format(QStringLiteral("\\A(?:0|[1-9][0-9]*)\\z"));
+    const auto text = value.toString();
+    bool ok = false; result = text.toLongLong(&ok);
+    return ok && format.match(text).hasMatch();
+}
+bool readRange(const QJsonValue& value, care_contract::TimeRange& range)
+{
+    if (!value.isObject()) return false;
+    const auto o = value.toObject();
+    return readUtc(o.value("begin_utc"), range.beginUtc) && readUtc(o.value("end_utc"), range.endUtc) &&
+           care_contract::validate(range).ok();
+}
+QJsonObject rangeJson(const care_contract::TimeRange& range)
+{
+    return {{"begin_utc", QString::number(range.beginUtc)}, {"end_utc", QString::number(range.endUtc)}};
+}
+QJsonObject periodJson(const care_contract::PeriodFootprint& period)
+{
+    QJsonArray categories, people, days;
+    for (const auto& item : period.categories)
+        categories.append(QJsonObject{{"key", item.key}, {"label", item.label}, {"count", QString::number(item.count)}});
+    for (const auto& item : period.people) {
+        const QString role = item.role == care_contract::PersonRole::Actor ? "actor" :
+                             item.role == care_contract::PersonRole::Director ? "director" : "musician";
+        people.append(QJsonObject{{"person_id", item.personId}, {"name", item.name}, {"role", role}, {"count", QString::number(item.count)}});
+    }
+    for (const auto& item : period.days)
+        days.append(QJsonObject{{"local_date", item.localDate}, {"views", QString::number(item.views)}, {"searches", QString::number(item.searches)}});
+    QJsonObject result{{"range", rangeJson(period.range)}, {"views", QString::number(period.views)},
+        {"searches", QString::number(period.searches)}, {"unique_works", QString::number(period.uniqueWorks)},
+        {"active_days", QString::number(period.activeDays)}, {"categories", categories}, {"people", people}, {"days", days}};
+    if (period.coverageStartUtc) result.insert("coverage_start_utc", QString::number(*period.coverageStartUtc));
+    return result;
 }
 
 qint64 readId(const QJsonValue& value)
@@ -346,6 +385,44 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         session.userId = 0;
         session.token.clear();
         return success();
+    }
+    if (type == "get_footprint") {
+        care_contract::FootprintRequest input;
+        if (!readRange(payload.value("range"), input.range)) return invalid();
+        const auto comparison = payload.value("comparison");
+        if (!comparison.isUndefined() && !comparison.isNull()) {
+            care_contract::TimeRange range;
+            if (!readRange(comparison, range)) return invalid();
+            input.comparison = range;
+        }
+        const auto valid = care_contract::validate(input);
+        if (!valid.ok()) return fail("InvalidArgument", valid.message);
+        const auto history = queryBehavior(session.userId, {0, care_contract::MaxUtcExclusive});
+        if (!history) return dbError();
+        care_algorithms::PersonalSnapshot snapshot;
+        snapshot.userKey = QString::number(session.userId);
+        snapshot.nowUtc = QDateTime::currentSecsSinceEpoch();
+        for (const auto& item : *history) {
+            care_algorithms::ObservedBehavior event;
+            event.userKey = snapshot.userKey;
+            event.record = item.record;
+            event.publicEligible = item.publicEligible;
+            if (item.record.event.resource && item.mediaSnapshot) {
+                care_contract::ResourceSummary work;
+                work.resource = *item.record.event.resource;
+                work.media = *item.mediaSnapshot;
+                event.workSnapshot = work;
+            }
+            snapshot.events.append(event);
+        }
+        const auto report = care_algorithms::buildFootprint(input, snapshot);
+        if (!report.status.ok() || !report.value)
+            return fail(report.status.code == ErrorCode::InvalidArgument ? "InvalidArgument" : "ServerError", report.status.message);
+        QJsonObject output{{"current", periodJson(report.value->current)}, {"generated_at_utc", QString::number(report.value->generatedAtUtc)},
+            {"message", report.value->message + QStringLiteral(" 人物关联尚未接入，人物统计暂为空。")},
+            {"contains_synthetic_data", report.value->containsSyntheticData}};
+        if (report.value->comparison) output.insert("comparison", periodJson(*report.value->comparison));
+        return success({{"report", output}});
     }
     if (type == "get_resource") {
         if (!payload.value("source").isObject()) return invalid();
