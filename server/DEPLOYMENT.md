@@ -62,7 +62,13 @@ Copy-Item D:\media-server\formal\server.sqlite D:\media-server\backups\server-in
   --config D:\ops\person-sources.json
 ```
 
-feed 配置格式和函数接口见 `PERSON_SOURCE_CONFIG.md`。该工具只追加，不删除来源、不修改已有成功时间或刷新代次，也不会清空资讯缓存。服务器没有接收客户端任意抓取 URL 的 RPC；Qt/provider 读取已配置来源后再调用仓储刷新接口。
+feed 配置格式和函数接口见 `PERSON_SOURCE_CONFIG.md`。该工具只追加，不删除来源、不修改已有成功时间或刷新代次，也不会清空资讯缓存。服务器没有接收客户端任意抓取 URL 的 RPC；服务端运维工具使用已配置的来源刷新缓存：
+
+~~~powershell
+& .\media_person_source_config.exe --db D:\demo\server.sqlite --refresh-person person:example
+~~~
+
+将示例人物 ID 换成已导入并确认来源的稳定 ID。刷新成功后可在关注中心重新选择该人物查看资讯。刷新失败时旧资讯会标记为过期缓存。
 
 配置错误必须明确失败。例如未知 `person_id` 返回 `NotFound` 且整批不写入；HTTP、带账号密码或带 fragment 的 URL 返回 `InvalidArgument`。不要通过改数据库绕过这些检查。
 

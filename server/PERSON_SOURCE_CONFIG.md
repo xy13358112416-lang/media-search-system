@@ -55,7 +55,17 @@
 {"inserted":1,"unchanged":0}
 ```
 
-再次执行相同配置输出 `{"inserted":0,"unchanged":1}`。工具不下载 feed，也不修改资讯缓存。
+再次执行相同配置输出 `{"inserted":0,"unchanged":1}`。登记命令只维护配置。运行下面的刷新命令后，服务端可读取更新后的缓存。
+
+## 刷新已登记来源
+
+~~~powershell
+& .\media_person_source_config.exe --db D:\demo\server.sqlite --refresh-person person:example
+~~~
+
+工具只访问该人物已登记的 HTTPS feed，支持 RSS 2.0 和 Atom 新闻。单个请求最多等待 15 秒，最多处理 2 MiB、500 条条目。禁止自动跳转。缺失的发布日期保留为空，发布日历依赖另行确认的发行数据。
+
+某个来源失败时，已有缓存保留并标记为过期，命令以失败退出。其余已登记来源仍会尝试刷新。刷新后，用户可在关注中心重新选择该人物以读取缓存。发布现场应记录实际核验的 feed 地址及人工确认依据。
 
 ## 程序接口
 

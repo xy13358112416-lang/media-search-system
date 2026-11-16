@@ -220,7 +220,7 @@ private:
                     const auto date = update.eventAtUtc ? update.eventAtUtc : update.publishedAtUtc;
                     auto* item = new QListWidgetItem(QStringLiteral("%1\n%2 · %3 %4")
                         .arg(update.title, date ? care_ui::timestamp(*date) : QStringLiteral("日期未知"),
-                             update.stale ? QStringLiteral("缓存") : QStringLiteral("更新于"),
+                             update.stale ? QStringLiteral("已过期缓存 · 获取于") : QStringLiteral("更新于"),
                              care_ui::timestamp(update.fetchedAtUtc)), list);
                     item->setData(Qt::UserRole, update.sourceUrl);
                 }

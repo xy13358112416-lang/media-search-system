@@ -302,6 +302,20 @@ private slots:
         QVERIFY(!more->isEnabled());
     }
 
+    void staleNewsIsIdentifiedAsCached()
+    {
+        FakeCareService service;
+        std::unique_ptr<CarePage> page(createFollowCenter(service));
+        page->activate();
+        auto oldArticle = update(QStringLiteral("之前的资讯"));
+        oldArticle.stale = true;
+        service.finishUpdates(0, {{oldArticle}, std::nullopt});
+        auto* news = qobject_cast<QListWidget*>(page->findChild<QTabWidget*>()->widget(1));
+        QVERIFY(news && news->count() == 1);
+        QVERIFY(news->item(0)->text().contains(QStringLiteral("之前的资讯")));
+        QVERIFY(news->item(0)->text().contains(QStringLiteral("已过期缓存")));
+    }
+
     void updatesSecondPageIsReachable()
     {
         FakeCareService service;

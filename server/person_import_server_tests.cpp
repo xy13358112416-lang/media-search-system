@@ -2,10 +2,16 @@
 #include "warehouse_server.h"
 #include "person_credit_import.h"
 #include "person_store_sqlite.h"
+#include "person_feed_refresh.h"
+#include "person_source_config.h"
 #include "care_person.h"
 #include <QDateTime>
 #include <QFile>
 #include <QJsonDocument>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QTimer>
+#include <cstring>
 #include <QProcess>
 #include <QSqlQuery>
 #include <QTemporaryDir>
@@ -16,6 +22,60 @@ using warehouse_contract::WarehouseSummary;
 using warehouse_contract::WarehouseItem;
 using warehouse_contract::Visibility;
 using warehouse_contract::ErrorCode;
+
+namespace {
+class FeedReply final : public QNetworkReply {
+public:
+    FeedReply(const QNetworkRequest& request, int status, QByteArray content, QObject* parent)
+        : QNetworkReply(parent), content_(std::move(content))
+    {
+        setRequest(request);
+        setUrl(request.url());
+        setAttribute(QNetworkRequest::HttpStatusCodeAttribute, status);
+        open(QIODevice::ReadOnly | QIODevice::Unbuffered);
+        QTimer::singleShot(0, this, [this] {
+            if (isFinished()) return;
+            emit readyRead();
+            if (!isFinished()) {
+                setFinished(true);
+                emit finished();
+            }
+        });
+    }
+    void abort() override
+    {
+        if (isFinished()) return;
+        setError(QNetworkReply::OperationCanceledError, QStringLiteral("Aborted"));
+        setFinished(true);
+        emit finished();
+    }
+    qint64 bytesAvailable() const override { return content_.size() + QNetworkReply::bytesAvailable(); }
+protected:
+    qint64 readData(char* buffer, qint64 maxSize) override
+    {
+        if (content_.isEmpty()) return -1;
+        const auto count = qMin(maxSize, qint64(content_.size()));
+        std::memcpy(buffer, content_.constData(), size_t(count));
+        content_.remove(0, count);
+        return count;
+    }
+private:
+    QByteArray content_;
+};
+
+class FeedNetwork final : public QNetworkAccessManager {
+public:
+    int status = 200;
+    QByteArray content;
+    QUrl requestedUrl;
+protected:
+    QNetworkReply* createRequest(Operation, const QNetworkRequest& request, QIODevice*) override
+    {
+        requestedUrl = request.url();
+        return new FeedReply(request, status, content, this);
+    }
+};
+} // namespace
 
 class PersonImportServerTests : public QObject {
     Q_OBJECT
@@ -112,13 +172,21 @@ private slots:
                 db.setDatabaseName(path); QVERIFY(db.open());
                 QSqlQuery q(db); QVERIFY(q.exec("PRAGMA foreign_keys=ON"));
                 const QUrl feed("https://example.invalid/feed");
-                QVERIFY(q.exec("INSERT INTO person_sources(person_id,source_url) VALUES('person:demo','https://example.invalid/feed')"));
+                const person_source_config::Batch config{"Fictional test feed", {{"person:demo", feed}}};
+                const auto saved = person_source_config::registerBatch(db, config);
+                QVERIFY(saved.status.ok() && saved.value);
+                const auto sources = person_source_config::listSourcesForPerson(db, "person:demo", {});
+                QVERIFY(sources.value && sources.value->items.size() == 1);
                 person_store::SqliteStore store(db);
-                const auto gen=store.beginUpdatesRefresh("person:demo",feed);
-                QVERIFY(gen.status.ok() && gen.value);
-                const PersonUpdate newsItem{"news:demo","person:demo","Fictional story",UpdateKind::News,
-                                            QUrl("https://example.invalid/story"),std::nullopt,std::nullopt,now,false};
-                QVERIFY(store.mergeUpdates("person:demo",feed,*gen.value,now,{newsItem}).ok());
+                FeedNetwork network;
+                network.content = R"(<rss version="2.0"><channel>
+                    <title>Example</title><item><title>Fictional story</title>
+                    <link>https://example.invalid/story</link></item>
+                    </channel></rss>)";
+                person_feed_refresh::refresh(store, network, sources.value->items.first(),
+                    [&](Status outcome) { status = std::move(outcome); done = true; });
+                QTRY_VERIFY(done); QVERIFY2(status.ok(), qPrintable(status.message)); done = false;
+                QCOMPARE(network.requestedUrl, feed);
                 db.close();
             }
             QSqlDatabase::removeDatabase("person-import-updates-test");
@@ -129,6 +197,56 @@ private slots:
             QCOMPARE(news.value->items.size(),1);
             QCOMPARE(news.value->items.first().title,QStringLiteral("Fictional story"));
             QVERIFY(!news.value->items.first().publishedAtUtc);
+            QVERIFY(!news.value->items.first().stale);
+            QCOMPARE(news.value->items.first().sourceUrl, QUrl("https://example.invalid/story"));
+            {
+                auto db = QSqlDatabase::addDatabase("QSQLITE", "person-import-failed-refresh");
+                db.setDatabaseName(path); QVERIFY(db.open());
+                const auto sources = person_source_config::listSourcesForPerson(db, "person:demo", {});
+                QVERIFY(sources.value && sources.value->items.size() == 1);
+                person_store::SqliteStore store(db);
+                FeedNetwork network;
+                network.content = "<feed xmlns=\"http://www.w3.org/2005/Atom\">"
+                                  "<title>Example</title><entry><title>Fictional story</title>"
+                                  "<link rel=\"alternate\" href=\"/story\"/></entry></feed>";
+                const auto refresh = [&] {
+                    person_feed_refresh::refresh(store, network, sources.value->items.first(),
+                        [&](Status outcome) { status = std::move(outcome); done = true; });
+                };
+                refresh();
+                QTRY_VERIFY(done); QVERIFY2(status.ok(), qPrintable(status.message)); done = false;
+                network.status = 503;
+                refresh();
+                QTRY_VERIFY(done); QCOMPARE(status.code, ErrorCode::ServerError); done = false;
+                network.status = 200;
+                network.content = "<html>Unexpected response</html>";
+                refresh();
+                QTRY_VERIFY(done); QCOMPARE(status.code, ErrorCode::ServerError); done = false;
+            }
+            QSqlDatabase::removeDatabase("person-import-failed-refresh");
+            alice.getPersonUpdates(updates, [&](auto r){news=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(news.status.ok() && news.value); done = false;
+            QCOMPARE(news.value->items.size(), 1);
+            QCOMPARE(news.value->items.first().title, QStringLiteral("Fictional story"));
+            QVERIFY(news.value->items.first().stale);
+
+            Result<WarehouseSummary> publicWarehouse;
+            alice.createWarehouse("Public demo", Visibility::Public, [&](auto r){publicWarehouse=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(publicWarehouse.status.ok() && publicWarehouse.value); done = false;
+            const auto publicId = publicWarehouse.value->warehouseId;
+            Result<WarehouseItem> publicItem;
+            alice.addItem(publicId, media, [&](auto r){publicItem=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(publicItem.status.ok() && publicItem.value); done = false;
+            Result<warehouse_contract::WarehouseDetail> publicRead;
+            bob.getWarehouse(publicId, [&](auto r){publicRead=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(publicRead.status.ok() && publicRead.value); done = false;
+            QCOMPARE(publicRead.value->items.size(), 1);
+            bob.addItem(publicId, media, [&](auto r){status=r.status;done=true;});
+            QTRY_VERIFY(done); QCOMPARE(status.code, ErrorCode::PermissionDenied); done = false;
+            bob.removeItem(publicId, publicItem.value->itemId, [&](Status s){status=s;done=true;});
+            QTRY_VERIFY(done); QCOMPARE(status.code, ErrorCode::PermissionDenied); done = false;
+            alice.removeItem(publicId, publicItem.value->itemId, [&](Status s){status=s;done=true;});
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
 
             bob.getResource(ref.source,[&](auto r){work=r;done=true;});
             QTRY_VERIFY(done);QCOMPARE(work.status.code,ErrorCode::PermissionDenied);done=false;
