@@ -39,4 +39,18 @@ ctest --test-dir build -R "care_(simulation|footprint|trending|temporal|person)"
 
 先在指定演示数据库建立映射：user_ref → 网络用户；media_id/work_id → 已确认的作品及仓库条目。fixture 中 warehouse=1、item=行号只在离线工具成立，不可照搬到实际库。人物标识须独立确认。演示用户的公共参与由独立导入工具明确设置；真实客户端无权指定时间、身份、synthetic 或 public_eligible。
 
-`(映射用户,event_id)` 幂等导入；重复两次事件数不增长。20 号应无历史；所有导入事件均标记 synthetic；不写入真实用户数据库，不使用真实密码。**本目录尚未实现 SQLite 导入器、RPC 或 Qt 页面。**
+## 快速创建演示数据库
+
+先按上面的步骤生成 `algorithm_fixture.json`，构建后运行：
+
+```powershell
+cmake --build build --target media_demo_import media_server
+.\build\server\media_demo_import.exe --demo-db build\media-demo.sqlite --fixture build\simulation\algorithm_fixture.json
+.\build\server\media_server.exe --db build\media-demo.sqlite --port 8765
+```
+
+账号是 `sim_user_01` 至 `sim_user_20`，默认演示密码为 `demo-only-123`。也可在首次创建时附加 `--demo-password-stdin` 并从标准输入输入一个仅用于演示的密码；程序不会把明文密码写入数据库。第 20 个用户没有历史。所有导入事件标为模拟数据，用户和媒体 ID 会映射到实际网络用户和仓库条目。
+
+`--demo-db` 必须是**新路径**或此前由该工具创建且仍与同一数据文件匹配的演示库。重跑匹配的演示库不会添加重复记录；如果内容已被改动或数据文件不同，程序会拒绝导入。既有未标记数据库不会被修改。如果首次创建中途失败，请使用新的演示库路径重试。
+
+此工具只准备服务器演示数据，不实现 CareService RPC 或 Qt 页面；这些功能需使用相应服务端和客户端分支。
