@@ -1,4 +1,7 @@
 #include "../warehouse_page.h"
+#include "../participation_settings_dialog.h"
+#include <QCheckBox>
+#include <QDialog>
 #include "online_care_client.h"
 #include "../footprint_page.h"
 #include <memory>
@@ -216,6 +219,153 @@ private slots:
         QTRY_VERIFY(!page.isSignedIn() && login->isEnabled());
         QVERIFY(counts->text().isEmpty());
         QVERIFY(footprintStatus->text().contains(QStringLiteral("登录服务器账号")));
+    }
+
+    void publicSearchAndSettingsUseCurrentServerAccount()
+    {
+        QTemporaryDir temporary;
+        WarehouseServer server(llm_recommendation::Config{});
+        QString error;
+        QVERIFY2(server.openDatabase(temporary.filePath("public-search.sqlite"), error), qPrintable(error));
+        QVERIFY(server.addUser("alice", "alice-demo", error));
+        QVERIFY(server.addUser("bob", "bob-demo", error));
+        QVERIFY(server.addUser("carol", "carol-demo", error));
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+
+        OnlineCareClient client;
+        WarehousePage page(client, [] { return QList<MediaRecord>{}; });
+        page.show();
+        signIn(page, server.serverPort(), "alice", "alice-demo");
+        QTRY_VERIFY(page.isSignedIn());
+
+        auto* dialog = createParticipationSettingsDialog(client, &page);
+        dialog->open();
+        auto* history = matching<QCheckBox>(*dialog, QStringLiteral("保存浏览和搜索历史"));
+        auto* personalization = matching<QCheckBox>(*dialog, QStringLiteral("根据历史生成个性化推荐"));
+        auto* contribution = matching<QCheckBox>(*dialog, QStringLiteral("允许行为计入公开热榜"));
+        auto* save = matching<QPushButton>(*dialog, QStringLiteral("保存设置"));
+        QVERIFY(history && personalization && contribution && save);
+        QTRY_VERIFY(save->isEnabled());
+        QVERIFY(history->isChecked());
+        QVERIFY(personalization->isChecked());
+        QVERIFY(!contribution->isChecked());
+        personalization->setChecked(false);
+        contribution->setChecked(true);
+        QSignalSpy settingsSaved(dialog, &QDialog::accepted);
+        save->click();
+        QTRY_COMPARE(settingsSaved.count(), 1);
+
+        int created = 0;
+        std::optional<Result<WarehouseSummary>> publicWarehouse;
+        client.createWarehouse("Room", Visibility::Public, [&](auto result) {
+            publicWarehouse = std::move(result);
+        });
+        client.createWarehouse("Private room", Visibility::Private, [&](auto result) {
+            if (result.status.ok()) ++created;
+        });
+        QTRY_VERIFY(publicWarehouse && publicWarehouse->status.ok() && publicWarehouse->value);
+        QTRY_COMPARE(created, 1);
+        std::optional<Result<WarehouseItem>> item;
+        MediaRecord media;
+        media.id = "demo:search";
+        media.fileName = "Quiet Film";
+        client.addItem(publicWarehouse->value->warehouseId, media, [&](auto result) { item = std::move(result); });
+        QTRY_VERIFY(item && item->status.ok() && item->value);
+        auto* publicOnly = matching<QCheckBox>(page, QStringLiteral("查看公开仓库"));
+        auto* search = named<QLineEdit>(page, "warehousePublicSearch");
+        auto* submit = matching<QPushButton>(page, QStringLiteral("搜索当前公开仓库"));
+        auto* clear = matching<QPushButton>(page, QStringLiteral("清除搜索"));
+        auto* items = named<QListWidget>(page, "onlineWarehouseItems");
+        auto* warehouses = named<QListWidget>(page, "onlineWarehouseList");
+        QVERIFY(publicOnly && search && submit && clear && items && warehouses);
+        publicOnly->setChecked(true);
+        QTRY_COMPARE(items->count(), 1);
+        QTRY_VERIFY(search->isVisible());
+        search->setText("quiet");
+
+        using namespace care_contract;
+        const auto date = care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
+        const TimeRange range{care_ui::midnight(date), care_ui::midnight(date.addDays(1))};
+        auto verifySearches = [&](qint64 expected) {
+            std::optional<warehouse_contract::Result<FootprintReport>> report;
+            client.getFootprint({range, {}}, [&](auto result) { report = std::move(result); });
+            QTRY_VERIFY(report && report->status.ok() && report->value);
+            QCOMPARE(report->value->current.views, qint64(0));
+            QCOMPARE(report->value->current.searches, expected);
+        };
+        verifySearches(0); // Typing did not send a search.
+        submit->click();
+        QVERIFY(!items->item(0)->isHidden());
+        verifySearches(1);
+
+        std::optional<warehouse_contract::Result<TrendingResult>> trend;
+        client.getTrending({TrendingKind::SearchTerms, range, 20}, [&](auto result) { trend = std::move(result); });
+        QTRY_VERIFY(trend && trend->status.ok() && trend->value);
+        QVERIFY(trend->value->items.isEmpty()); // A single member cannot publish a term.
+
+        for (const QString& name : {QStringLiteral("bob"), QStringLiteral("carol")}) {
+            std::optional<Status> status;
+            std::optional<warehouse_contract::Result<UserInfo>> login;
+            OnlineCareClient contributor;
+            contributor.connectToServer("127.0.0.1", server.serverPort(), [&](auto result) { status = result; });
+            QTRY_VERIFY(status && status->ok());
+            contributor.login(name, name + "-demo", [&](auto result) { login = std::move(result); });
+            QTRY_VERIFY(login && login->status.ok());
+            status.reset();
+            contributor.setParticipationSettings({true, true, true}, [&](auto result) { status = result; });
+            QTRY_VERIFY(status && status->ok());
+            status.reset();
+            contributor.recordBehavior({name + "-search", BehaviorAction::Search, std::nullopt, "Quiet"},
+                                       [&](auto result) { status = result; });
+            QTRY_VERIFY(status && status->ok());
+        }
+        trend.reset();
+        client.getTrending({TrendingKind::SearchTerms, range, 20}, [&](auto result) { trend = std::move(result); });
+        QTRY_VERIFY(trend && trend->status.ok() && trend->value);
+        QCOMPARE(trend->value->items.size(), 1);
+        QCOMPARE(trend->value->items.first().term, QStringLiteral("quiet"));
+        QCOMPARE(trend->value->items.first().distinctUsers, qint64(3));
+
+        search->setText("missing");
+        QTest::keyClick(search, Qt::Key_Return);
+        QVERIFY(items->item(0)->isHidden());
+        clear->click();
+        QVERIFY(!items->item(0)->isHidden());
+        verifySearches(2);
+        publicOnly->setChecked(false);
+        QTRY_COMPARE(warehouses->count(), 2);
+        for (int row = 0; row < warehouses->count(); ++row)
+            if (warehouses->item(row)->text().startsWith("Private room"))
+                warehouses->setCurrentRow(row);
+        QTRY_VERIFY(!search->isVisible());
+        verifySearches(2);
+
+        matching<QPushButton>(page, QStringLiteral("退出仓库"))->click();
+        QTRY_VERIFY(matching<QPushButton>(page, QStringLiteral("连接并登录"))->isEnabled());
+        signIn(page, server.serverPort(), "alice", "alice-demo");
+        QTRY_VERIFY(page.isSignedIn());
+        std::optional<warehouse_contract::Result<ParticipationSettings>> settings;
+        client.getParticipationSettings([&](auto result) { settings = std::move(result); });
+        QTRY_VERIFY(settings && settings->status.ok() && settings->value);
+        QVERIFY(!settings->value->personalizationEnabled);
+        QVERIFY(settings->value->contributePublicTrends);
+
+        std::optional<Status> paused;
+        client.setParticipationSettings({false, false, false}, [&](auto result) { paused = result; });
+        QTRY_VERIFY(paused && paused->ok());
+        publicOnly->setChecked(true);
+        QTRY_VERIFY(search->isVisible());
+        search->setText("quiet");
+        submit->click();
+        verifySearches(2);
+        QTest::mouseClick(items->viewport(), Qt::LeftButton, Qt::NoModifier,
+                          items->visualItemRect(items->item(0)).center());
+        verifySearches(2); // First read can precede resource resolution.
+        verifySearches(2);
+        trend.reset();
+        client.getTrending({TrendingKind::SearchTerms, range, 20}, [&](auto result) { trend = std::move(result); });
+        QTRY_VERIFY(trend && trend->status.ok() && trend->value);
+        QVERIFY(trend->value->items.isEmpty()); // Alice withdrew her previous public contributions.
     }
 
     void refreshKeepsSelectionChangedWhileLoading()

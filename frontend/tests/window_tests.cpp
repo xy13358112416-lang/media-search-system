@@ -434,7 +434,7 @@ private slots:
         window.show();
         auto* tabs = window.findChild<QTabBar*>();
         QVERIFY(tabs);
-        QCOMPARE(tabs->count(), 5);
+        QCOMPARE(tabs->count(), 7);
         QCOMPARE(tabs->tabText(2), QStringLiteral("今日推荐"));
         QCOMPARE(tabs->tabText(3), QStringLiteral("资源仓库"));
         QCOMPARE(tabs->tabText(4), QStringLiteral("个人足迹"));
@@ -445,14 +445,20 @@ private slots:
         QVERIFY(!host->isVisible());
         tabs->setCurrentIndex(3);
         QVERIFY(host->isVisible());
-        tabs->setCurrentIndex(4);
-        auto* footprint = window.findChild<QWidget*>(QStringLiteral("onlineFootprintPage"));
-        QVERIFY(footprint && footprint->isVisible());
-        QVERIFY(!host->isVisible());
-        const auto* footprintStatus = footprint->findChild<QLabel*>(QStringLiteral("careStatus"));
-        QVERIFY(footprintStatus && footprintStatus->text().contains(QStringLiteral("登录服务器账号")));
+        const auto* signedOut = window.findChild<QLabel*>(QStringLiteral("onlineCareSignedOut"));
+        const auto* settings = window.findChild<QPushButton*>(QStringLiteral("onlineParticipationSettings"));
+        QVERIFY(signedOut && signedOut->text().contains(QStringLiteral("登录服务器账号")));
+        QVERIFY(settings);
+        QCOMPARE(tabs->tabText(5), QStringLiteral("全站热榜"));
+        QCOMPARE(tabs->tabText(6), QStringLiteral("动态推荐"));
+        for (int index : {4, 5, 6}) {
+            tabs->setCurrentIndex(index);
+            QVERIFY(signedOut->isVisible());
+            QVERIFY(!settings->isVisible());
+            QVERIFY(!host->isVisible());
+        }
         tabs->setCurrentIndex(3);
-        QVERIFY(!footprint->isVisible());
+        QVERIFY(!signedOut->isVisible());
         QVERIFY(host->isVisible());
         for (auto* card : window.findChildren<QFrame*>(QStringLiteral("recommendCard")))
             QVERIFY(!card->isVisible());
@@ -467,6 +473,10 @@ private slots:
         tabs->setCurrentIndex(0);
         auto* table = window.findChild<QTableWidget*>();
         QVERIFY(table && table->isVisible());
+        QCOMPARE(warm_mode::browseScene(warm_mode::Scene::Neutral), care_contract::BrowseScene::Neutral);
+        QCOMPARE(warm_mode::browseScene(warm_mode::Scene::Relax), care_contract::BrowseScene::Relax);
+        QCOMPARE(warm_mode::browseScene(warm_mode::Scene::Focus), care_contract::BrowseScene::Focus);
+        QCOMPARE(warm_mode::browseScene(warm_mode::Scene::Explore), care_contract::BrowseScene::Explore);
     }
 
     void externalChangeStillRecovers() {

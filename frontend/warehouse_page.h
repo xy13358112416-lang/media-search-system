@@ -31,6 +31,8 @@ private:
     void resetSession(bool disconnect = true);
     void refresh();
     void refreshDetail();
+    void searchPublicWarehouse();
+    void applyPublicSearch();
     void recordMediaView(const care_contract::WarehouseItemRef& source);
     void createWarehouse();
     void addLocalMedia();
@@ -64,6 +66,9 @@ private:
     quint64 listEpoch_ = 0;
     quint64 detailEpoch_ = 0;
     quint64 recommendationEpoch_ = 0;
+    bool detailLoaded_ = false;
+    quint64 searchGeneration_ = 0;
+    QString activeSearch_;
     bool connecting_ = false;
     bool recommending_ = false;
     bool writing_ = false;
@@ -90,6 +95,10 @@ private:
     QCheckBox* publicOnly_;
     QCheckBox* useTarget_;
     QLineEdit* query_;
+    QWidget* publicSearchBar_ = nullptr;
+    QLineEdit* publicSearch_ = nullptr;
+    QPushButton* submitSearch_ = nullptr;
+    QLabel* searchStatus_ = nullptr;
     QLabel* reason_;
     QLabel* recommendationStatus_ = nullptr;
 };
