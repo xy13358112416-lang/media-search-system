@@ -2,14 +2,20 @@
 #include "personalrecommendation_service.h"
 #include "window_test_support.h"
 
+#include <QCheckBox>
+#include <QPropertyAnimation>
+#include <QSettings>
 #include <QtTest>
 
 using namespace UiTest;
 
 class WindowTests : public QObject {
     Q_OBJECT
+    QTemporaryDir settingsDir_;
 private slots:
     void initTestCase() {
+        QVERIFY(settingsDir_.isValid());
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDir_.path());
         qApp->setStyle(QStringLiteral("Fusion"));
         qApp->setStyleSheet(libraryStyle());
     }
@@ -288,6 +294,48 @@ private slots:
         QVERIFY(button(f.window.get(), QStringLiteral("删除"))->isHidden());
         QVERIFY(accounts.loadMediaHistory(reader.value->userId).value->isEmpty());
         f.window.reset();
+    }
+
+    void warmScenesAndMotionPreference() {
+        using warm_mode::Scene;
+        using media_mood::Mood;
+        const auto noRecommendations = [] {};
+        QList<Scene> scenes;
+        Mood mood = Mood::Any;
+        const auto search = [&](const QString&, Mood value, const QString&, bool) { mood = value; };
+        const auto sceneChanged = [&](Scene scene) { scenes.append(scene); };
+        {
+            AssistantDialog dialog(nullptr, search, sceneChanged, noRecommendations, QStringLiteral("推荐"));
+            dialog.show();
+            auto* motion = dialog.findChild<QCheckBox*>(QStringLiteral("warmAnimationEnabled"));
+            auto* animation = dialog.findChild<QPropertyAnimation*>(QStringLiteral("warmSceneAnimation"));
+            auto* panel = dialog.findChild<QFrame*>(QStringLiteral("warmSceneCard"));
+            QVERIFY(motion && animation && panel);
+            QCOMPARE(scenes.last(), Scene::Neutral);
+            QVERIFY(motion->isChecked());
+            const auto neutral = panel->styleSheet();
+            button(&dialog, QStringLiteral("放松"))->click();
+            QCOMPARE(scenes.last(), Scene::Relax);
+            QVERIFY(panel->styleSheet() != neutral);
+            QCOMPARE(animation->state(), QAbstractAnimation::Running);
+            motion->setChecked(false);
+            QCOMPARE(animation->state(), QAbstractAnimation::Stopped);
+            button(&dialog, QStringLiteral("查本地媒体"))->click();
+            QCOMPARE(mood, Mood::Relaxing);
+            dialog.show();
+            for (const auto& label : {QStringLiteral("专注"), QStringLiteral("探索"), QStringLiteral("默认")}) {
+                button(&dialog, label)->click();
+                QCOMPARE(animation->state(), QAbstractAnimation::Stopped);
+            }
+            QCOMPARE(scenes.mid(2), (QList<Scene>{Scene::Focus, Scene::Explore, Scene::Neutral}));
+            QCOMPARE(panel->styleSheet(), neutral);
+            button(&dialog, QStringLiteral("查本地媒体"))->click();
+            QCOMPARE(mood, Mood::Any);
+        }
+        AssistantDialog dialog(nullptr, search, sceneChanged, noRecommendations, QStringLiteral("推荐"));
+        auto* motion = dialog.findChild<QCheckBox*>(QStringLiteral("warmAnimationEnabled"));
+        QVERIFY(motion && !motion->isChecked());
+        QCOMPARE(scenes.last(), Scene::Neutral);
     }
 
     void assistantSearchesLocalMediaByMood() {
