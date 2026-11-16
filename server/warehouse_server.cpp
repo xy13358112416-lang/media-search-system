@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QRegularExpression>
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QTcpSocket>
 #include <QUuid>
@@ -225,6 +226,7 @@ std::optional<QList<StoredBehavior>> WarehouseServer::queryBehavior(qint64 userI
         stored.publicEligible = query.value(9).toBool();
         result.append(stored);
     }
+    if (query.lastError().isValid()) return std::nullopt;
     return result;
 }
 
@@ -393,6 +395,21 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         } else return invalid();
         const auto status = care_contract::validate(value);
         if (!status.ok()) return fail("InvalidArgument", status.message);
+        // Check the authenticated user's existing event before looking up a resource:
+        // retries must remain idempotent even if that resource was later deleted.
+        query.prepare("SELECT action,query,work_id,warehouse_id,item_id FROM behavior_events WHERE user_id=? AND event_id=?");
+        query.addBindValue(session.userId);
+        query.addBindValue(value.eventId);
+        if (!query.exec()) return dbError();
+        if (query.next()) {
+            if (query.value(0).toString() != action || query.value(1).toString() != value.query ||
+                (value.resource && (query.value(2).toString() != value.resource->workId ||
+                  query.value(3).toLongLong() != value.resource->source.warehouseId || query.value(4).toLongLong() != value.resource->source.itemId)))
+                return fail("InvalidArgument", QStringLiteral("行为编号已用于其他内容。"));
+            return success();
+        }
+        if (query.lastError().isValid()) return dbError();
+        query.finish();
         if (value.resource) {
             query.prepare("SELECT w.owner_id,w.is_public,i.media,s.work_id FROM warehouses w "
                           "JOIN warehouse_items i ON i.warehouse_id=w.id "
@@ -414,18 +431,6 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         const bool publicEligible = hasSettings && query.value(1).toBool() && sourcePublic;
         query.finish();
         if (!historyEnabled) return success();
-        query.prepare("SELECT action,query,work_id,warehouse_id,item_id FROM behavior_events WHERE user_id=? AND event_id=?");
-        query.addBindValue(session.userId);
-        query.addBindValue(value.eventId);
-        if (!query.exec()) return dbError();
-        if (query.next()) {
-            if (query.value(0).toString() != action || query.value(1).toString() != value.query ||
-                (value.resource && (query.value(2).toString() != value.resource->workId ||
-                  query.value(3).toLongLong() != value.resource->source.warehouseId || query.value(4).toLongLong() != value.resource->source.itemId)))
-                return fail("InvalidArgument", QStringLiteral("行为编号已用于其他内容。"));
-            return success();
-        }
-        query.finish();
         query.prepare("INSERT INTO behavior_events(user_id,event_id,action,query,occurred_at_utc,public_eligible,work_id,warehouse_id,item_id,media_snapshot) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,event_id) DO NOTHING");
         query.addBindValue(session.userId);
         query.addBindValue(value.eventId);
