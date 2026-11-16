@@ -1,6 +1,9 @@
 #include "medialibrary.h"
 #include "online_care_client.h"
 #include "footprint_page.h"
+#include "participation_settings_dialog.h"
+#include "temporal_recommendation_page.h"
+#include "trending_page.h"
 #include "warehouse_page.h"
 #include "mediarecommendation.h"
 #include "library_style.h"
@@ -235,6 +238,7 @@ public:
                             tabs_->setCurrentIndex(1);
                         keywordInput_->setFocus();
                     }, [this, banner](warm_mode::Scene scene) {
+                        warmScene_ = scene;
                         const auto theme = warm_mode::theme(scene);
                         banner->setStyleSheet(scene == warm_mode::Scene::Neutral ? QString()
                             : QStringLiteral("QFrame#banner { background: %1; }").arg(theme.banner));
@@ -281,6 +285,8 @@ public:
         tabs_->addTab(today_ ? QStringLiteral("今日推荐") : QStringLiteral("推荐"));
         tabs_->addTab(QStringLiteral("资源仓库"));
         tabs_->addTab(QStringLiteral("个人足迹"));
+        tabs_->addTab(QStringLiteral("全站热榜"));
+        tabs_->addTab(QStringLiteral("动态推荐"));
         layout->addWidget(tabs_);
 
         auto* libraryControls = new QWidget;
@@ -476,16 +482,67 @@ public:
         warehousePage_->hide();
         layout->addWidget(warehousePage_, 1);
         auto* footprint = createFootprintPage(*client, [this] { return warehousePage_->isSignedIn(); });
-        footprintPage_ = footprint;
         footprint->setObjectName(QStringLiteral("onlineFootprintPage"));
-        layout->addWidget(footprint, 1);
-        footprint->hide();
-        warehousePage_->setSessionChangedCallback([page = QPointer<CarePage>(footprint)] {
-            if (page) {
-                page->deactivate();
-                if (page->isVisible())
-                    page->activate();
+        auto* trending = createTrendingPage(*client);
+        trending->setObjectName(QStringLiteral("onlineTrendingPage"));
+        auto* temporal = createTemporalPage(*client, [this] { return warm_mode::browseScene(warmScene_); });
+        temporal->setObjectName(QStringLiteral("onlineTemporalPage"));
+        onlineCarePages_ = {footprint, trending, temporal};
+
+        onlineCareArea_ = new QWidget;
+        auto* careLayout = new QVBoxLayout(onlineCareArea_);
+        careLayout->setContentsMargins(0, 0, 0, 0);
+        auto* careActions = new QHBoxLayout;
+        careActions->addStretch();
+        auto* settings = new QPushButton(QStringLiteral("参与设置"));
+        settings->setObjectName(QStringLiteral("onlineParticipationSettings"));
+        careActions->addWidget(settings);
+        careLayout->addLayout(careActions);
+
+        auto* careStack = new QStackedWidget;
+        auto* signedOut = new QLabel(QStringLiteral("请先在「资源仓库」登录服务器账号。"));
+        signedOut->setObjectName(QStringLiteral("onlineCareSignedOut"));
+        signedOut->setAlignment(Qt::AlignCenter);
+        careStack->addWidget(signedOut);
+        for (auto* page : onlineCarePages_)
+            careStack->addWidget(page);
+        careLayout->addWidget(careStack, 1);
+        onlineCareArea_->hide();
+        layout->addWidget(onlineCareArea_, 1);
+
+        const auto showOnlineCare = [this, careStack, settings] {
+            const auto index = tabs_->currentIndex() - firstOnlineCareTab;
+            const bool onCareTab = index >= 0 && index < static_cast<int>(onlineCarePages_.size());
+            if (activeCarePage_)
+                activeCarePage_->deactivate();
+            activeCarePage_ = nullptr;
+            const bool signedIn = warehousePage_->isSignedIn();
+            settings->setVisible(signedIn);
+            careStack->setCurrentIndex(onCareTab && signedIn ? index + 1 : 0);
+            onlineCareArea_->setVisible(onCareTab);
+            if (onCareTab && signedIn) {
+                activeCarePage_ = onlineCarePages_.at(index);
+                activeCarePage_->activate();
             }
+        };
+        warehousePage_->setSessionChangedCallback([this, showOnlineCare] {
+            if (settingsDialog_)
+                settingsDialog_->reject();
+            // Clear choices and pending callbacks before starting the next session.
+            activeCarePage_ = nullptr;
+            for (auto* page : onlineCarePages_)
+                page->resetSession();
+            showOnlineCare();
+        });
+        connect(settings, &QPushButton::clicked, this, [this, client, showOnlineCare] {
+            if (!warehousePage_->isSignedIn() || settingsDialog_)
+                return;
+            settingsDialog_ = createParticipationSettingsDialog(*client, this);
+            connect(settingsDialog_, &QDialog::accepted, this, [this, showOnlineCare] {
+                if (warehousePage_->isSignedIn())
+                    showOnlineCare();
+            });
+            settingsDialog_->open();
         });
         trace_->setObjectName(QStringLiteral("tracePanel"));
         trace_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
@@ -512,11 +569,10 @@ public:
         trace_->hide();
         layout->addWidget(trace_);
 
-        connect(tabs_, &QTabBar::currentChanged, this, [this, splitter, footprint](int index) {
+        connect(tabs_, &QTabBar::currentChanged, this, [this, splitter, showOnlineCare](int index) {
             const bool showToday = index == 2 && today_ && identity_;
             const bool showWarehouse = index == 3;
-            const bool showFootprint = index == 4;
-            const bool showLibrary = !showWarehouse && !showFootprint;
+            const bool showLibrary = index < 3;
             controls_->setVisible(showLibrary);
             splitter->setVisible(showLibrary && !showToday);
             count_->setVisible(showLibrary && !showToday);
@@ -526,13 +582,7 @@ public:
             if (warehousePage_->isVisible() && !showWarehouse)
                 warehousePage_->suspend();
             warehousePage_->setVisible(showWarehouse);
-            if (showFootprint) {
-                footprint->show();
-                footprint->activate();
-            } else if (!footprint->isHidden()) {
-                footprint->deactivate();
-                footprint->hide();
-            }
+            showOnlineCare();
             if (showLibrary)
                 controls_->setCurrentIndex(index);
             trace_->setVisible(index == 1);
@@ -594,8 +644,10 @@ public:
 
     ~LibraryWindow() override
     {
-        // Both pages must be gone before the shared client is destroyed.
-        delete footprintPage_;
+        // Pages hold references to the shared client.
+        warehousePage_->setSessionChangedCallback({});
+        delete settingsDialog_.data();
+        delete onlineCareArea_;
         delete warehousePage_;
     }
 
@@ -1076,7 +1128,11 @@ private:
     QLabel* todayStatus_ = new QLabel;
     QGridLayout* todayGrid_ = nullptr;
     WarehousePage* warehousePage_ = nullptr;
-    CarePage* footprintPage_ = nullptr;
+    static constexpr int firstOnlineCareTab = 4;
+    QWidget* onlineCareArea_ = nullptr;
+    std::array<CarePage*, 3> onlineCarePages_{};
+    CarePage* activeCarePage_ = nullptr;
+    QPointer<QDialog> settingsDialog_;
     QLabel* recommendationReason_ = new QLabel;
     MediaLibrary& library_;            // Loaded business service, owned by main.
     QList<MediaRecord> records_;       // Visible records in table row order.
@@ -1084,6 +1140,7 @@ private:
     SearchQuery query_; // Last submitted combination of search fields.
     AssistantDialog* assistant_ = nullptr;
     bool sceneSearch_ = false;
+    warm_mode::Scene warmScene_ = warm_mode::Scene::Neutral;
     QTabBar* tabs_ = new QTabBar; // Switch between browsing and searching.
     QStackedWidget* controls_ = new QStackedWidget; // Controls for the selected tab.
     QLineEdit* director_ = new QLineEdit; // Director full-name query.

@@ -27,6 +27,7 @@ public:
 
     virtual void activate() {}
     virtual void deactivate() { ++epoch_; }
+    virtual void resetSession() { deactivate(); }
 
 protected:
     template<class Callback>

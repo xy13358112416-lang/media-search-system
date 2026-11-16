@@ -25,7 +25,7 @@ public:
         filters->addStretch();
         filters->addWidget(refresh);
         layout->addLayout(filters);
-        layout->addWidget(new QLabel(QStringLiteral("北京时间 · 仅统计公开贡献 · 同一用户对同一项每日最多计一次。")));
+        layout->addWidget(new QLabel(QStringLiteral("北京时间 · 同一项至少有 3 位用户公开贡献才展示 · 每人每项每日最多计一次。")));
         summary_->setTextFormat(Qt::PlainText);
         summary_->setWordWrap(true);
         layout->addWidget(summary_);
