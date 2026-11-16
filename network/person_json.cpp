@@ -205,6 +205,17 @@ bool decodePageRequest(const QJsonObject& payload, PageRequest& page)
     return true;
 }
 
+bool decodeTimeRange(const QJsonValue& value, TimeRange& range)
+{
+    const auto object = value.toObject();
+    TimeRange parsed;
+    if (!decimal(object.value("begin_utc"), parsed.beginUtc) ||
+        !decimal(object.value("end_utc"), parsed.endUtc) || !validate(parsed).ok())
+        return false;
+    range = parsed;
+    return true;
+}
+
 QJsonObject encode(const Page<PersonSummary>& page) { return encodePage(page); }
 QJsonObject encode(const Page<ResourceSummary>& page) { return encodePage(page); }
 QJsonObject encode(const Page<PersonUpdate>& page) { return encodePage(page); }

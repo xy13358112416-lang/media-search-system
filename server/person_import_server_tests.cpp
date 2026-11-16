@@ -70,11 +70,66 @@ private slots:
                 QCOMPARE(imported.value->peopleInserted,1);QCOMPARE(imported.value->creditsInserted,2);
                 const auto again=person_credit_import::importBatch(db,batch,{true});
                 QVERIFY(again.status.ok() && again.value);QCOMPARE(again.value->creditsInserted,0);
-                person_store::SqliteStore store(db);
-                QVERIFY(store.setFollow(aliceId,"person:demo",true).ok());
                 db.close();
             }
             QSqlDatabase::removeDatabase("person-import-live-test");
+
+            Result<Page<PersonSummary>> found;
+            bob.searchPeople({"Demo alias", {}}, [&](auto r){found=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(found.value && found.value->items.isEmpty()); done=false;
+            alice.searchPeople({QStringLiteral("Ｄｅｍｏ alias"), {}}, [&](auto r){found=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(found.status.ok() && found.value); done=false;
+            QCOMPARE(found.value->items.size(), 1);
+            QCOMPARE(found.value->items.first().personId, QStringLiteral("person:demo"));
+            QCOMPARE(found.value->items.first().roles.size(),2);
+            QVERIFY(!found.value->items.first().followed);
+
+            Result<Page<ResourceSummary>> linked;
+            bob.getPersonWorks("person:demo", {}, [&](auto r){linked=r;done=true;});
+            QTRY_VERIFY(done); QCOMPARE(linked.status.code, ErrorCode::NotFound); done=false;
+            alice.getPersonWorks("person:demo", {}, [&](auto r){linked=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(linked.status.ok() && linked.value); done=false;
+            QCOMPARE(linked.value->items.size(), 1);
+            QCOMPARE(linked.value->items.first().resource.source.itemId, ref.source.itemId);
+
+            bob.setFollow("person:demo", true, [&](Status s){status=s;done=true;});
+            QTRY_VERIFY(done); QCOMPARE(status.code,ErrorCode::PermissionDenied); done=false;
+            alice.setFollow("person:demo", true, [&](Status s){status=s;done=true;});
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done=false;
+            bob.listFollows({}, [&](auto r){found=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(found.value && found.value->items.isEmpty()); done=false;
+            alice.listFollows({}, [&](auto r){found=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(found.value && found.value->items.size()==1); done=false;
+
+            const auto now = QDateTime::currentSecsSinceEpoch();
+            const PersonUpdatesRequest updates{"person:demo", {now-3600,now+86400}, {}};
+            Result<Page<PersonUpdate>> news;
+            alice.getPersonUpdates(updates, [&](auto r){news=r;done=true;});
+            QTRY_VERIFY(done); QCOMPARE(news.status.code,ErrorCode::ServerError); done=false;
+            QVERIFY(news.status.message.contains(QStringLiteral("尚未配置")));
+            {
+                auto db=QSqlDatabase::addDatabase("QSQLITE","person-import-updates-test");
+                db.setDatabaseName(path); QVERIFY(db.open());
+                QSqlQuery q(db); QVERIFY(q.exec("PRAGMA foreign_keys=ON"));
+                const QUrl feed("https://example.invalid/feed");
+                QVERIFY(q.exec("INSERT INTO person_sources(person_id,source_url) VALUES('person:demo','https://example.invalid/feed')"));
+                person_store::SqliteStore store(db);
+                const auto gen=store.beginUpdatesRefresh("person:demo",feed);
+                QVERIFY(gen.status.ok() && gen.value);
+                const PersonUpdate newsItem{"news:demo","person:demo","Fictional story",UpdateKind::News,
+                                            QUrl("https://example.invalid/story"),std::nullopt,std::nullopt,now,false};
+                QVERIFY(store.mergeUpdates("person:demo",feed,*gen.value,now,{newsItem}).ok());
+                db.close();
+            }
+            QSqlDatabase::removeDatabase("person-import-updates-test");
+            bob.getPersonUpdates(updates, [&](auto r){news=r;done=true;});
+            QTRY_VERIFY(done); QCOMPARE(news.status.code,ErrorCode::PermissionDenied); done=false;
+            alice.getPersonUpdates(updates, [&](auto r){news=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(news.status.ok() && news.value); done=false;
+            QCOMPARE(news.value->items.size(),1);
+            QCOMPARE(news.value->items.first().title,QStringLiteral("Fictional story"));
+            QVERIFY(!news.value->items.first().publishedAtUtc);
+
             bob.getResource(ref.source,[&](auto r){work=r;done=true;});
             QTRY_VERIFY(done);QCOMPARE(work.status.code,ErrorCode::PermissionDenied);done=false;
             alice.getResource(ref.source,[&](auto r){work=r;done=true;});
@@ -96,7 +151,15 @@ private slots:
             const auto history=server.queryBehavior(aliceId,{0,MaxUtcExclusive});
             QVERIFY(history);QCOMPARE(history->size(),1);QCOMPARE(history->first().peopleSnapshot.size(),1);
             alice.removeItem(ref.source.warehouseId,ref.source.itemId,[&](Status s){status=s;done=true;});
-            QTRY_VERIFY(done);QVERIFY(status.ok());
+            QTRY_VERIFY(done);QVERIFY(status.ok()); done=false;
+            alice.getPersonWorks("person:demo", {}, [&](auto r){linked=r;done=true;});
+            QTRY_VERIFY(done); QCOMPARE(linked.status.code,ErrorCode::NotFound); done=false;
+            alice.listFollows({}, [&](auto r){found=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(found.value && found.value->items.size()==1); done=false;
+            alice.setFollow("person:demo", false, [&](Status s){status=s;done=true;});
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done=false;
+            alice.listFollows({}, [&](auto r){found=r;done=true;});
+            QTRY_VERIFY(done); QVERIFY(found.value && found.value->items.isEmpty());
         }
         {
             WarehouseServer server(llm_recommendation::Config{});

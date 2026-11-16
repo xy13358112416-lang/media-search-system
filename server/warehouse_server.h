@@ -52,6 +52,10 @@ private:
         QHash<QString, Pending> pending;
     };
     QJsonObject dispatch(Session& session, const QJsonObject& request);
+    std::optional<care_contract::Result<QJsonObject>> dispatchPersonQuery(
+        qint64 userId, const QString& type, const QJsonObject& payload);
+    care_contract::Result<care_algorithms::CatalogSnapshot> readablePersonCatalog(
+        qint64 userId, const QString& personId, bool includeAliases);
     care_contract::Result<care_algorithms::PersonContext> loadPersonContext(
         qint64 userId, const QList<care_contract::ResourceSummary>& authorizedWorks);
     care_contract::Result<care_algorithms::CatalogSnapshot> personCatalog(

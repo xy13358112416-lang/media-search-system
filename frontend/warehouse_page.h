@@ -19,6 +19,8 @@ public:
     ~WarehousePage() override;
     void suspend();
     void connectionLost();
+    void recordMediaView(const care_contract::WarehouseItemRef& source,
+                         care_contract::Callback<care_contract::ResourceSummary> opened = {});
     bool isSignedIn() const { return user_.has_value(); }
     void setSessionChangedCallback(std::function<void()> callback) { sessionChanged_ = std::move(callback); }
 
@@ -33,7 +35,6 @@ private:
     void refreshDetail();
     void searchPublicWarehouse();
     void applyPublicSearch();
-    void recordMediaView(const care_contract::WarehouseItemRef& source);
     void createWarehouse();
     void addLocalMedia();
     void removeItem();

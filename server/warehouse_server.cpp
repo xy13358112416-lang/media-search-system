@@ -466,6 +466,16 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         session.token.clear();
         return success();
     }
+    if (const auto person = dispatchPersonQuery(session.userId, type, payload)) {
+        if (person->status.ok() && person->value)
+            return success(*person->value);
+        switch (person->status.code) {
+        case ErrorCode::InvalidArgument: return fail("InvalidArgument", person->status.message);
+        case ErrorCode::PermissionDenied: return fail("PermissionDenied", person->status.message);
+        case ErrorCode::NotFound: return fail("NotFound", person->status.message);
+        default: return fail("ServerError", person->status.message);
+        }
+    }
     if (type == "set_work_feedback") {
         care_contract::ResourceRef ref;
         if (!readResource(payload.value("resource"), ref) || !payload.value("feedback").isString()) return invalid();

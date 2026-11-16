@@ -207,6 +207,38 @@ private slots:
         QVERIFY(!updatesMore->isEnabled());
     }
 
+    void workDetailsRequireAnExplicitActionAndDiscardLateReplies()
+    {
+        FakeCareService service;
+        int views = 0;
+        WarehouseItemRef selected;
+        Callback<ResourceSummary> pending;
+        std::unique_ptr<CarePage> page(createFollowCenter(service, [&](const auto& source, auto done) {
+            ++views;
+            selected = source;
+            pending = std::move(done);
+        }));
+        page->activate();
+        auto entry = work(QStringLiteral("作品"));
+        entry.resource.source = {17, 29};
+        service.finishWorks(0, {{entry}, std::nullopt});
+        auto* list = qobject_cast<QListWidget*>(page->findChild<QTabWidget*>()->widget(0));
+        auto* open = button(*page, QStringLiteral("查看作品详情"));
+        QVERIFY(list && open && !open->isEnabled());
+        list->setCurrentRow(0);
+        QCOMPARE(views, 0);
+        open->click();
+        QCOMPARE(views, 1);
+        QCOMPARE(selected.warehouseId, qint64(17));
+        QCOMPARE(selected.itemId, qint64(29));
+        page->resetSession();
+        entry.media.fileName = QStringLiteral("迟到的详情");
+        pending(success(entry));
+        QVERIFY(list->count() == 0);
+        for (const auto* label : page->findChildren<QLabel*>())
+            QVERIFY(!label->text().contains(entry.media.fileName));
+    }
+
     void temporalRequestsUseCurrentScene()
     {
         FakeCareService service;

@@ -13,7 +13,8 @@ namespace {
 
 class FollowCenter final : public CarePage {
 public:
-    explicit FollowCenter(CareService& service) : CarePage(QStringLiteral("人物关注中心")), service_(service)
+    FollowCenter(CareService& service, PersonWorkViewer viewWork)
+        : CarePage(QStringLiteral("人物关注中心")), service_(service), viewWork_(std::move(viewWork))
     {
         auto* searchBar = new QHBoxLayout;
         query_->setPlaceholderText(QStringLiteral("输入演员、导演或音乐人姓名"));
@@ -29,15 +30,24 @@ public:
 
         auto* split = new QHBoxLayout;
         people_->setAccessibleName(QStringLiteral("人物列表"));
+        for (auto* list : {people_, works_, news_, calendar_})
+            list->setProperty("careList", true);
         split->addWidget(people_, 2);
         auto* tabs = new QTabWidget;
+        tabs->setDocumentMode(true);
         tabs->addTab(works_, QStringLiteral("关联作品"));
         tabs->addTab(news_, QStringLiteral("资讯"));
         tabs->addTab(calendar_, QStringLiteral("发布日历"));
         split->addWidget(tabs, 3);
         layout->addLayout(split, 1);
+        for (auto* note : {updatesStatus_, workDetails_}) {
+            note->setTextFormat(Qt::PlainText);
+            note->setWordWrap(true);
+            layout->addWidget(note);
+        }
         auto* actions = new QHBoxLayout;
         actions->addWidget(toggle_);
+        actions->addWidget(openWork_);
         actions->addWidget(worksMore_);
         actions->addWidget(updatesMore_);
         actions->addStretch();
@@ -61,6 +71,12 @@ public:
         connect(updatesMore_, &QPushButton::clicked, this, [this] { if (nextUpdates_) loadUpdates(*nextUpdates_); });
         connect(people_, &QListWidget::currentRowChanged, this, [this] { loadPerson(); });
         connect(toggle_, &QPushButton::clicked, this, [this] { toggleFollow(); });
+        connect(openWork_, &QPushButton::clicked, this, [this] { openSelectedWork(); });
+        connect(works_, &QListWidget::currentRowChanged, this, [this] {
+            invalidate(4);
+            workDetails_->clear();
+            updateActions();
+        });
         connect(news_, &QListWidget::itemSelectionChanged, this, [this] { updateActions(); });
         connect(calendar_, &QListWidget::itemSelectionChanged, this, [this] { updateActions(); });
         connect(tabs, &QTabWidget::currentChanged, this, [this](int index) {
@@ -91,6 +107,8 @@ public:
         people_->clear();
         entries_.clear();
         query_->clear();
+        submitted_.clear();
+        clearDetails();
         next_.reset();
         more_->setEnabled(false);
         status->clear();
@@ -129,19 +147,28 @@ private:
             service_.searchPeople({submitted_, {offset, 20}}, done);
     }
 
-    void loadPerson()
+    void clearDetails()
     {
         invalidate(1);
         invalidate(2);
+        invalidate(4);
+        linkedWorks_.clear();
         works_->clear();
         news_->clear();
         calendar_->clear();
+        updatesStatus_->clear();
+        workDetails_->clear();
         nextWorks_.reset();
         nextUpdates_.reset();
         worksMore_->setEnabled(false);
         updatesMore_->setEnabled(false);
         selectedPersonId_.clear();
         updateActions();
+    }
+
+    void loadPerson()
+    {
+        clearDetails();
         const auto row = people_->currentRow();
         if (row < 0 || row >= entries_.size())
             return;
@@ -162,8 +189,11 @@ private:
                 return;
             }
             nextWorks_ = result.value->nextOffset;
-            for (const auto& item : result.value->items)
+            for (const auto& item : result.value->items) {
+                linkedWorks_.append(item.resource.source);
                 works_->addItem(item.media.fileName);
+            }
+            updateActions();
             worksMore_->setEnabled(nextWorks_.has_value());
             if (works_->count() == 0 && !nextWorks_)
                 works_->addItem(QStringLiteral("暂无关联作品"));
@@ -177,9 +207,11 @@ private:
             latest(2, [this](Result<Page<PersonUpdate>> result) {
                 if (!result.status.ok() || !result.value) {
                     updatesMore_->setEnabled(nextUpdates_.has_value());
-                    reportError(result);
+                    updatesStatus_->setText(result.status.message.isEmpty()
+                        ? QStringLiteral("无法读取人物资讯，请稍后再试。") : result.status.message);
                     return;
                 }
+                updatesStatus_->clear();
                 nextUpdates_ = result.value->nextOffset;
                 for (const auto& update : result.value->items) {
                     if (update.kind == UpdateKind::Release && !update.eventAtUtc)
@@ -208,12 +240,35 @@ private:
         return url.scheme() == QStringLiteral("https") && !url.host().isEmpty() ? url : QUrl();
     }
 
+    void openSelectedWork()
+    {
+        const int row = works_->currentRow();
+        if (!viewWork_ || row < 0 || row >= linkedWorks_.size())
+            return;
+        workDetails_->setText(QStringLiteral("正在读取作品详情…"));
+        viewWork_(linkedWorks_.at(row), latest(4, [this](Result<ResourceSummary> result) {
+            if (!result.status.ok() || !result.value) {
+                workDetails_->setText(result.status.message.isEmpty()
+                    ? QStringLiteral("无法读取作品详情。") : result.status.message);
+                return;
+            }
+            const auto& media = result.value->media;
+            QStringList details{media.fileName};
+            for (const auto& field : {media.category, media.fileType, media.director,
+                                      media.releaseDate.toString(Qt::ISODate)})
+                if (!field.isEmpty()) details.append(field);
+            workDetails_->setText(details.join(QStringLiteral(" · ")));
+        }));
+    }
+
     void updateActions()
     {
         const auto row = people_->currentRow();
         const bool selected = row >= 0 && row < entries_.size();
         toggle_->setEnabled(selected && !writing_);
         toggle_->setText(selected && entries_.at(row).followed ? QStringLiteral("取消关注") : QStringLiteral("关注"));
+        const int workRow = works_->currentRow();
+        openWork_->setEnabled(viewWork_ && activeTab_ == 0 && workRow >= 0 && workRow < linkedWorks_.size());
         const auto url = selectedSource();
         source_->setEnabled(!url.isEmpty());
         source_->setToolTip(url.host());
@@ -247,6 +302,11 @@ private:
     }
 
     CareService& service_;
+    PersonWorkViewer viewWork_;
+    QList<WarehouseItemRef> linkedWorks_;
+    QLabel* updatesStatus_ = new QLabel;
+    QLabel* workDetails_ = new QLabel;
+    QPushButton* openWork_ = new QPushButton(QStringLiteral("查看作品详情"));
     QLineEdit* query_ = new QLineEdit;
     QListWidget* people_ = new QListWidget;
     QListWidget* works_ = new QListWidget;
@@ -271,4 +331,7 @@ private:
 
 } // namespace
 
-CarePage* createFollowCenter(CareService& service) { return new FollowCenter(service); }
+CarePage* createFollowCenter(CareService& service, PersonWorkViewer viewWork)
+{
+    return new FollowCenter(service, std::move(viewWork));
+}

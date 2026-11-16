@@ -10,6 +10,7 @@ namespace person_json {
 // Requests use offset and limit at the payload level. Successful lists carry a page object.
 QJsonObject encodePageRequest(const care_contract::PageRequest& page);
 bool decodePageRequest(const QJsonObject& payload, care_contract::PageRequest& page);
+bool decodeTimeRange(const QJsonValue& value, care_contract::TimeRange& range);
 
 QJsonObject encode(const care_contract::Page<care_contract::PersonSummary>& page);
 QJsonObject encode(const care_contract::Page<care_contract::ResourceSummary>& page);

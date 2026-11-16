@@ -4,7 +4,8 @@ pkg_check_modules(SODIUM REQUIRED IMPORTED_TARGET libsodium)
 
 add_library(warehouse_server STATIC warehouse_server.cpp recommendation_router.cpp person_schema.cpp person_snapshot_json.cpp)
 target_sources(warehouse_server PRIVATE person_store_sqlite.cpp)
-target_sources(warehouse_server PRIVATE person_credit_import.cpp)
+target_sources(warehouse_server PRIVATE person_credit_import.cpp person_query_router.cpp)
+target_link_libraries(warehouse_server PRIVATE care_person person_json)
 target_link_libraries(warehouse_server PUBLIC warehouse_protocol care_contract care_footprint care_trending care_temporal care_person_snapshot llm_recommendation Qt6::Sql PRIVATE PkgConfig::SODIUM)
 target_compile_options(warehouse_server PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
