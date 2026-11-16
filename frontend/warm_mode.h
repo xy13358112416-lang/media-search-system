@@ -1,6 +1,7 @@
 #pragma once
 
 #include "media_mood.h"
+#include "care_contract.h"
 
 namespace warm_mode {
 
@@ -12,6 +13,18 @@ struct Theme {
     QString surface;
     media_mood::Mood mood = media_mood::Mood::Any;
 };
+
+inline care_contract::BrowseScene browseScene(Scene scene)
+{
+    using care_contract::BrowseScene;
+    switch (scene) {
+    case Scene::Relax: return BrowseScene::Relax;
+    case Scene::Focus: return BrowseScene::Focus;
+    case Scene::Explore: return BrowseScene::Explore;
+    case Scene::Neutral: return BrowseScene::Neutral;
+    }
+    return BrowseScene::Neutral;
+}
 
 inline Theme theme(Scene scene)
 {

@@ -1,5 +1,7 @@
 #include "warehouse_page.h"
 
+#include <algorithm>
+
 #include <QCheckBox>
 #include <QDialog>
 #include <QFormLayout>
@@ -94,6 +96,35 @@ WarehousePage::WarehousePage(WarehouseService& service,
     toolbar->addWidget(add_);
     toolbar->addWidget(remove_);
     layout->addLayout(toolbar);
+
+    publicSearchBar_ = new QWidget;
+    auto* searchBar = new QHBoxLayout(publicSearchBar_);
+    searchBar->setContentsMargins(0, 0, 0, 0);
+    publicSearch_ = new QLineEdit;
+    publicSearch_->setObjectName(QStringLiteral("warehousePublicSearch"));
+    publicSearch_->setAccessibleName(QStringLiteral("当前公开仓库的作品关键字"));
+    publicSearch_->setPlaceholderText(QStringLiteral("片名、类别、导演或演员"));
+    publicSearch_->setMaxLength(care_contract::MaxQueryUnits);
+    submitSearch_ = new QPushButton(QStringLiteral("搜索当前公开仓库"));
+    submitSearch_->setToolTip(QStringLiteral("搜索历史和公开热榜贡献遵循当前服务器账号的参与设置。"));
+    auto* clearSearch = new QPushButton(QStringLiteral("清除搜索"));
+    searchBar->addWidget(publicSearch_, 1);
+    searchBar->addWidget(submitSearch_);
+    searchBar->addWidget(clearSearch);
+    layout->addWidget(publicSearchBar_);
+    searchStatus_ = new QLabel;
+    searchStatus_->setTextFormat(Qt::PlainText);
+    searchStatus_->setWordWrap(true);
+    layout->addWidget(searchStatus_);
+    connect(submitSearch_, &QPushButton::clicked, this, [this] { searchPublicWarehouse(); });
+    connect(publicSearch_, &QLineEdit::returnPressed, this, [this] { searchPublicWarehouse(); });
+    connect(publicSearch_, &QLineEdit::textChanged, this, [this] { updateControls(); });
+    connect(clearSearch, &QPushButton::clicked, this, [this] {
+        ++searchGeneration_;
+        publicSearch_->clear();
+        activeSearch_.clear();
+        applyPublicSearch();
+    });
 
     auto* panes = new QHBoxLayout;
     const auto addPane = [&](const QString& title, QListWidget* list, int stretch) {
@@ -198,6 +229,12 @@ void WarehousePage::updateControls()
     refresh_->setEnabled(signedIn && !writing_);
     publicOnly_->setEnabled(signedIn && !writing_);
     create_->setEnabled(signedIn && !writing_);
+    const auto warehouse = selection();
+    const bool canSearch = signedIn && care_ && detailLoaded_ && warehouse &&
+                           warehouse->visibility == Visibility::Public;
+    publicSearchBar_->setVisible(canSearch);
+    searchStatus_->setVisible(canSearch);
+    submitSearch_->setEnabled(canSearch && !publicSearch_->text().trimmed().isEmpty());
     const bool canWrite = ownsSelection() && !writing_;
     add_->setEnabled(canWrite);
     remove_->setEnabled(canWrite && itemList_->currentRow() >= 0);
@@ -261,6 +298,11 @@ void WarehousePage::resetSession(bool disconnect)
         service_.disconnectFromServer();
     password_->clear();
     query_->clear();
+    ++searchGeneration_;
+    detailLoaded_ = false;
+    activeSearch_.clear();
+    publicSearch_->clear();
+    searchStatus_->clear();
     publicOnly_->setChecked(false);
     warehouses_.clear();
     warehouseList_->clear();
@@ -356,6 +398,11 @@ void WarehousePage::refresh()
 void WarehousePage::refreshDetail()
 {
     const auto generation = ++detailEpoch_;
+    ++searchGeneration_;
+    detailLoaded_ = false;
+    activeSearch_.clear();
+    publicSearch_->clear();
+    searchStatus_->clear();
     items_.clear();
     itemList_->clear();
     updateControls();
@@ -369,6 +416,10 @@ void WarehousePage::refreshDetail()
             displayStatus(result.status);
             return;
         }
+        const int selectedRow = warehouseList_->currentRow();
+        if (selectedRow >= 0 && selectedRow < warehouses_.size())
+            warehouses_[selectedRow].visibility = result.value->warehouse.visibility;
+        detailLoaded_ = true;
         items_ = result.value->items;
         for (const auto& item : items_) {
             const auto& media = item.media;
@@ -382,6 +433,45 @@ void WarehousePage::refreshDetail()
             status_->setText(QStringLiteral("这个仓库还没有条目。"));
         updateControls();
     }));
+}
+
+void WarehousePage::searchPublicWarehouse()
+{
+    if (!submitSearch_->isEnabled())
+        return;
+    activeSearch_ = publicSearch_->text().trimmed();
+    applyPublicSearch();
+    const auto generation = ++searchGeneration_;
+    const auto eventId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    care_->recordBehavior({eventId, care_contract::BehaviorAction::Search, std::nullopt, activeSearch_},
+        inSession([this, generation](Status status) {
+            if (status.ok() || generation != searchGeneration_)
+                return;
+            const auto message = status.code == ErrorCode::OutcomeUnknown
+                ? QStringLiteral("服务器记录结果未知。")
+                : QStringLiteral("搜索历史：%1").arg(status.message.isEmpty() ? QStringLiteral("记录失败。") : status.message);
+            searchStatus_->setText(searchStatus_->text() + QStringLiteral(" ") + message);
+        }));
+}
+
+void WarehousePage::applyPublicSearch()
+{
+    itemList_->setCurrentRow(-1);
+    int shown = 0;
+    for (int row = 0; row < items_.size(); ++row) {
+        const auto& media = items_.at(row).media;
+        const auto matches = [this](const QString& value) {
+            return value.contains(activeSearch_, Qt::CaseInsensitive);
+        };
+        const bool visible = activeSearch_.isEmpty() || matches(media.fileName) ||
+            matches(media.category) || matches(media.director) ||
+            std::any_of(media.actors.cbegin(), media.actors.cend(), matches);
+        itemList_->item(row)->setHidden(!visible);
+        if (visible)
+            ++shown;
+    }
+    searchStatus_->setText(activeSearch_.isEmpty() ? QString() :
+        QStringLiteral("当前公开仓库：找到 %1 项。").arg(shown));
 }
 
 void WarehousePage::recordMediaView(const care_contract::WarehouseItemRef& source)

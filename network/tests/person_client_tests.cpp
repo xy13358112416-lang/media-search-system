@@ -51,6 +51,12 @@ private slots:
         client.searchPeople({"person", {0, 1}}, [&](auto r) { search = r; searchDone = true; });
         client.listFollows({0, 1}, [&](auto r) { follows = r; followDone = true; });
         QTRY_COMPARE(fake.requests.size(), 2);
+        QCOMPARE(fake.requests[0].second.value("type").toString(), QStringLiteral("search_people"));
+        QCOMPARE(fake.requests[0].second.value("payload").toObject(),
+                 (QJsonObject{{"query", "person"}, {"offset", "0"}, {"limit", 1}}));
+        QCOMPARE(fake.requests[1].second.value("type").toString(), QStringLiteral("list_follows"));
+        QCOMPARE(fake.requests[1].second.value("payload").toObject(),
+                 (QJsonObject{{"offset", "0"}, {"limit", 1}}));
         const QJsonObject person{{"person_id", "person:1"}, {"name", "Person"}, {"roles", QJsonArray{"actor", "director"}}, {"followed", true}};
         PersonFakeServer::reply(fake.requests[1].first, fake.requests[1].second, {{"page", QJsonObject{{"items", QJsonArray{person}}}}});
         PersonFakeServer::reply(fake.requests[0].first, fake.requests[0].second, {{"page", QJsonObject{{"items", QJsonArray{person}}, {"next_offset", "1"}}}});
@@ -63,6 +69,9 @@ private slots:
         Result<Page<ResourceSummary>> works;
         client.getPersonWorks("person:1", {0, 10}, [&](auto r) { works = r; done = true; });
         QTRY_COMPARE(fake.requests.size(), 3);
+        QCOMPARE(fake.requests[2].second.value("type").toString(), QStringLiteral("get_person_works"));
+        QCOMPARE(fake.requests[2].second.value("payload").toObject(),
+                 (QJsonObject{{"person_id", "person:1"}, {"offset", "0"}, {"limit", 10}}));
         PersonFakeServer::reply(fake.requests[2].first, fake.requests[2].second, {{"page", QJsonObject{{"items", QJsonArray{work}}}}});
         QTRY_VERIFY(done); QVERIFY(works.status.ok() && works.value); QCOMPARE(works.value->items.first().resource.workId, QStringLiteral("work:1"));
     }
