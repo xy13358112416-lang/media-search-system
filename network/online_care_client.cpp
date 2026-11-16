@@ -72,6 +72,35 @@ QJsonObject rangeJson(const TimeRange& range) {
     return {{"begin_utc", QString::number(range.beginUtc)}, {"end_utc", QString::number(range.endUtc)}};
 }
 bool sameRange(const TimeRange& a, const TimeRange& b) { return a.beginUtc == b.beginUtc && a.endUtc == b.endUtc; }
+bool parseWork(const QJsonValue& value, ResourceSummary& result) {
+    const auto work = value.toObject(); const auto refValue = work.value("resource"); const auto ref = refValue.toObject();
+    const auto sourceValue = ref.value("source"); const auto source = sourceValue.toObject(); QString error;
+    if (!value.isObject() || !refValue.isObject() || !sourceValue.isObject() || !ref.value("work_id").isString() ||
+        !positiveId(source.value("warehouse_id"), result.resource.source.warehouseId) ||
+        !positiveId(source.value("item_id"), result.resource.source.itemId) || !work.value("media").isObject() ||
+        !media_json::fromJson(work.value("media").toObject(), result.media, error) || !work.value("people").isArray()) return false;
+    result.resource.workId = ref.value("work_id").toString();
+    if (!validate(result.resource).ok()) return false;
+    for (const auto& entry : work.value("people").toArray()) {
+        const auto p = entry.toObject();
+        if (!entry.isObject() || !p.value("person_id").isString() || p.value("person_id").toString().isEmpty() ||
+            !p.value("name").isString() || !p.value("roles").isArray() || !p.value("followed").isBool()) return false;
+        PersonSummary person{p.value("person_id").toString(), p.value("name").toString(), {}, p.value("followed").toBool()};
+        for (const auto& role : p.value("roles").toArray()) {
+            if (role == "actor") person.roles.append(PersonRole::Actor);
+            else if (role == "director") person.roles.append(PersonRole::Director);
+            else if (role == "musician") person.roles.append(PersonRole::Musician);
+            else return false;
+        }
+        result.people.append(person);
+    }
+    return true;
+}
+QJsonObject preferenceJson(const recommendation_contract::PreferenceSelection& value) {
+    using recommendation_contract::PreferenceMode;
+    const QString mode = value.mode == PreferenceMode::Auto ? "auto" : value.mode == PreferenceMode::Any ? "any" : "explicit";
+    return {{"mode", mode}, {"value", value.value}};
+}
 }
 
 void OnlineCareClient::recordBehavior(const BehaviorEvent& event, StatusCallback done) {
@@ -228,5 +257,30 @@ void OnlineCareClient::getFootprint(const FootprintRequest& requestValue, Callba
         done({{}, report});
     });
 }
-warehouse_contract::RecommendationHandle OnlineCareClient::recommendTemporal(const TemporalRecommendationRequest&, Callback<TemporalRecommendationResult> done) { unavailableResult(std::move(done)); return {}; }
+warehouse_contract::RecommendationHandle OnlineCareClient::recommendTemporal(const TemporalRecommendationRequest& input, Callback<TemporalRecommendationResult> done) {
+    const auto valid = validate(input);
+    if (!valid.ok()) { done({valid, {}}); return {}; }
+    const QString scene = input.scene == BrowseScene::Neutral ? "neutral" : input.scene == BrowseScene::Relax ? "relax" :
+                          input.scene == BrowseScene::Focus ? "focus" : "explore";
+    const auto id = request("recommend_temporal", {{"category", preferenceJson(input.category)}, {"file_type", preferenceJson(input.fileType)},
+        {"scene", scene}, {"limit", input.limit}}, [this, input, done=std::move(done)](Status status, QJsonObject payload) {
+        if (!status.ok()) { done({status, {}}); return; }
+        const auto value = payload.value("result"); const auto object = value.toObject();
+        TemporalRecommendationResult result;
+        bool ok = value.isObject() && object.value("items").isArray() && object.value("items").toArray().size() <= input.limit &&
+            object.value("message").isString() && object.value("fallback").isBool() && object.value("engine") == "temporal" &&
+            object.value("contains_synthetic_data").isBool() && nonnegative(object.value("generated_at_utc"), result.generatedAtUtc) &&
+            result.generatedAtUtc < MaxUtcExclusive;
+        for (const auto& entry : object.value("items").toArray()) {
+            const auto row = entry.toObject(); RecommendedResource item;
+            if (!entry.isObject() || !row.value("reason").isString() || !parseWork(row.value("work"), item.work)) { ok = false; break; }
+            item.reason = row.value("reason").toString(); result.items.append(item);
+        }
+        if (!ok) { abortProtocol(); done({malformed(), {}}); return; }
+        result.message = object.value("message").toString(); result.fallback = object.value("fallback").toBool();
+        result.engine = RecommendationEngine::Temporal; result.containsSyntheticData = object.value("contains_synthetic_data").toBool();
+        done({{}, result});
+    });
+    return id.isEmpty() ? warehouse_contract::RecommendationHandle{} : handlePrefix_ + id;
+}
 bool OnlineCareClient::cancelRecommendation(const warehouse_contract::RecommendationHandle& handle) { return WarehouseClient::cancelRecommendation(handle); }

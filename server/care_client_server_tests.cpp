@@ -16,6 +16,173 @@ using care_contract::ResourceSummary;
 class CareClientServerTests : public QObject {
     Q_OBJECT
 private slots:
+    void temporalUsesCompletePublicHeatBeyondTopFifty()
+    {
+        QTemporaryDir dir; QString error;
+        WarehouseServer server(llm_recommendation::Config{});
+        QVERIFY(server.openDatabase(dir.filePath("heat.sqlite"), error));
+        for (const char* user : {"alice", "bob", "carol", "dave"}) QVERIFY(server.addUser(user, "password-123", error));
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        OnlineCareClient alice, dave; bool done = false; Status status;
+        for (auto* client : {&alice, &dave}) {
+            client->connectToServer("127.0.0.1", server.serverPort(), [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            client->login(client == &alice ? "alice" : "dave", "password-123", [&](auto r) { status = r.status; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        }
+        Result<WarehouseSummary> warehouse;
+        alice.createWarehouse("public", Visibility::Public, [&](auto r) { warehouse = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(warehouse.status.ok() && warehouse.value); done = false;
+        MediaRecord music; music.id = "music"; music.fileName = "Music"; music.category = "music";
+        MediaRecord film = music; film.id = "film"; film.fileName = "Film"; film.category = "film";
+        Result<WarehouseItem> musicItem, filmItem;
+        alice.addItem(warehouse.value->warehouseId, music, [&](auto r) { musicItem = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(musicItem.status.ok() && musicItem.value); done = false;
+        alice.addItem(warehouse.value->warehouseId, film, [&](auto r) { filmItem = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(filmItem.status.ok() && filmItem.value); done = false;
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", "heat-fixture");
+            db.setDatabaseName(dir.filePath("heat.sqlite")); QVERIFY(db.open()); QSqlQuery q(db);
+            q.prepare("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<49) "
+                      "INSERT INTO warehouse_items(warehouse_id,media) SELECT warehouse_id,media FROM warehouse_items,n WHERE id=?");
+            q.addBindValue(musicItem.value->itemId); QVERIFY(q.exec());
+            q.prepare("INSERT INTO work_sources(warehouse_id,item_id,work_id) SELECT warehouse_id,id,printf('work:%03d',row_number() OVER (ORDER BY id)) "
+                      "FROM warehouse_items WHERE id<>?");
+            q.addBindValue(filmItem.value->itemId); QVERIFY(q.exec());
+            q.prepare("INSERT INTO work_sources(warehouse_id,item_id,work_id) VALUES(?,?,'work:051')");
+            q.addBindValue(warehouse.value->warehouseId); q.addBindValue(filmItem.value->itemId); QVERIFY(q.exec());
+            QVERIFY(q.exec("INSERT INTO behavior_settings SELECT id,1,1,1 FROM network_users WHERE id<=3"));
+            QVERIFY(q.exec("INSERT INTO behavior_events(user_id,event_id,action,query,occurred_at_utc,synthetic,public_eligible,work_id,warehouse_id,item_id) "
+                "SELECT u.id,'event-'||s.work_id,'view','',strftime('%s','now'),s.work_id='work:051',1,s.work_id,s.warehouse_id,s.item_id "
+                "FROM work_sources s CROSS JOIN network_users u WHERE u.id<=3"));
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("heat-fixture");
+        care_contract::TemporalRecommendationRequest request;
+        request.category = {recommendation_contract::PreferenceMode::Explicit, "film"};
+        Result<care_contract::TemporalRecommendationResult> result;
+        dave.recommendTemporal(request, [&](auto r) { result = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY2(result.status.ok(), qPrintable(result.status.message)); QVERIFY(result.value);
+        QVERIFY(!result.value->items.isEmpty());
+        QCOMPARE(result.value->items.first().work.resource.workId, QStringLiteral("work:051"));
+        QVERIFY(result.value->items.first().reason.contains(QStringLiteral("公共热度=1.000000")));
+        QVERIFY(result.value->containsSyntheticData);
+    }
+    void temporalMapsFiveHundredNewCandidates()
+    {
+        QTemporaryDir dir; QString error;
+        WarehouseServer server(llm_recommendation::Config{});
+        QVERIFY(server.openDatabase(dir.filePath("bulk.sqlite"), error));
+        QVERIFY(server.addUser("alice", "password-123", error)); QVERIFY(server.listen(QHostAddress::LocalHost));
+        OnlineCareClient alice; bool done = false; Status status;
+        alice.connectToServer("127.0.0.1", server.serverPort(), [&](Status s) { status = s; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        alice.login("alice", "password-123", [&](auto r) { status = r.status; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        Result<WarehouseSummary> warehouse;
+        alice.createWarehouse("bulk", Visibility::Public, [&](auto r) { warehouse = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(warehouse.status.ok() && warehouse.value); done = false;
+        MediaRecord media; media.id = "sample"; media.fileName = "Sample"; media.category = "music";
+        Result<WarehouseItem> seed;
+        alice.addItem(warehouse.value->warehouseId, media, [&](auto r) { seed = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(seed.status.ok() && seed.value); done = false;
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", "temporal-bulk");
+            db.setDatabaseName(dir.filePath("bulk.sqlite")); QVERIFY(db.open());
+            QSqlQuery q(db);
+            q.prepare("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<499) "
+                      "INSERT INTO warehouse_items(warehouse_id,media) SELECT warehouse_id,media FROM warehouse_items,n WHERE id=?");
+            q.addBindValue(seed.value->itemId); QVERIFY(q.exec()); db.close();
+        }
+        QSqlDatabase::removeDatabase("temporal-bulk");
+        Result<care_contract::TemporalRecommendationResult> result;
+        alice.recommendTemporal({}, [&](auto r) { result = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY2(result.status.ok(), qPrintable(result.status.message)); QVERIFY(result.value); done = false;
+        QCOMPARE(result.value->items.size(), 5); const auto first = result.value->items.first().work.resource.workId;
+        alice.recommendTemporal({}, [&](auto r) { result = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(result.status.ok() && result.value); QCOMPARE(result.value->items.first().work.resource.workId, first);
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", "temporal-bulk-check");
+            db.setDatabaseName(dir.filePath("bulk.sqlite")); QVERIFY(db.open());
+            QSqlQuery q(db); QVERIFY(q.exec("SELECT COUNT(*) FROM work_sources")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 500);
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("temporal-bulk-check");
+    }
+    void temporalRecommendationsRespectSessionHistoryAndPermissions()
+    {
+        QTemporaryDir dir; QString error;
+        WarehouseServer server(llm_recommendation::Config{});
+        QVERIFY(server.openDatabase(dir.filePath("temporal.sqlite"), error));
+        QVERIFY(server.addUser("alice", "password-123", error)); QVERIFY(server.addUser("bob", "password-123", error));
+        QVERIFY(server.addUser("carol", "password-123", error));
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        OnlineCareClient alice, bob, carol;
+        bool done = false; Status status;
+        for (auto* client : {&alice, &bob, &carol}) {
+            client->connectToServer("127.0.0.1", server.serverPort(), [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            client->login(client == &alice ? "alice" : client == &bob ? "bob" : "carol", "password-123", [&](auto r) { status = r.status; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        }
+        Result<WarehouseSummary> publicWarehouse, privateWarehouse;
+        alice.createWarehouse("public", Visibility::Public, [&](auto r) { publicWarehouse = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(publicWarehouse.status.ok() && publicWarehouse.value); done = false;
+        alice.createWarehouse("private", Visibility::Private, [&](auto r) { privateWarehouse = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(privateWarehouse.status.ok() && privateWarehouse.value); done = false;
+        MediaRecord music; music.id = "music"; music.fileName = "Music"; music.category = "music";
+        MediaRecord film = music; film.id = "film"; film.fileName = "Film"; film.category = "film";
+        Result<WarehouseItem> pubItem, privateItem;
+        alice.addItem(publicWarehouse.value->warehouseId, music, [&](auto r) { pubItem = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(pubItem.status.ok() && pubItem.value); done = false;
+        alice.addItem(privateWarehouse.value->warehouseId, film, [&](auto r) { privateItem = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(privateItem.status.ok() && privateItem.value); done = false;
+        Result<ResourceSummary> viewed;
+        alice.getResource({privateWarehouse.value->warehouseId, privateItem.value->itemId}, [&](auto r) { viewed = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(viewed.status.ok() && viewed.value); done = false;
+        alice.recordBehavior({"view-film", BehaviorAction::View, viewed.value->resource, {}}, [&](Status s) { status = s; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        care_contract::TemporalRecommendationRequest request;
+        Result<care_contract::TemporalRecommendationResult> result;
+        alice.recommendTemporal(request, [&](auto r) { result = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY2(result.status.ok(), qPrintable(result.status.message)); QVERIFY(result.value); done = false;
+        QVERIFY(!result.value->items.isEmpty()); QCOMPARE(result.value->items.first().work.media.category, QStringLiteral("film"));
+        request.category = {recommendation_contract::PreferenceMode::Explicit, "music"};
+        alice.recommendTemporal(request, [&](auto r) { result = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(result.status.ok() && result.value); QVERIFY(!result.value->items.isEmpty()); done = false;
+        QCOMPARE(result.value->items.first().work.media.category, QStringLiteral("music"));
+        request.category = {};
+        Result<ResourceSummary> publicResource;
+        alice.getResource({publicWarehouse.value->warehouseId, pubItem.value->itemId}, [&](auto r) { publicResource = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(publicResource.status.ok() && publicResource.value); done = false;
+        for (auto* client : {&alice, &bob, &carol}) {
+            client->setParticipationSettings({true, true, true}, [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+            client->recordBehavior({"public-heat", BehaviorAction::View, publicResource.value->resource, {}}, [&](Status s) { status = s; done = true; });
+            QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        }
+        bob.recommendTemporal(request, [&](auto r) { result = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(result.status.ok() && result.value); done = false;
+        QVERIFY(!result.value->items.isEmpty());
+        for (const auto& row : result.value->items) QCOMPARE(row.work.resource.source.warehouseId, publicWarehouse.value->warehouseId);
+        QVERIFY(result.value->items.first().reason.contains(QStringLiteral("公共热度=1.000000")));
+        carol.setParticipationSettings({true, true, false}, [&](Status s) { status = s; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        bob.recommendTemporal(request, [&](auto r) { result = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(result.status.ok() && result.value && !result.value->items.isEmpty()); done = false;
+        QVERIFY(result.value->items.first().reason.contains(QStringLiteral("公共热度=0.000000")));
+        bob.setParticipationSettings({true, false, true}, [&](Status s) { status = s; done = true; });
+        QTRY_VERIFY(done); QVERIFY(status.ok()); done = false;
+        bob.recommendTemporal(request, [&](auto r) { result = r; done = true; });
+        QTRY_VERIFY(done); QVERIFY(result.status.ok() && result.value && !result.value->items.isEmpty()); done = false;
+        QVERIFY(result.value->items.first().reason.contains(QStringLiteral("长期兴趣=0.000000")));
+        QVERIFY(result.value->items.first().reason.contains(QStringLiteral("近期兴趣=0.000000")));
+        int calls = 0;
+        const auto handle = bob.recommendTemporal(request, [&](auto r) { result = r; ++calls; });
+        QVERIFY(!handle.isEmpty()); QVERIFY(bob.cancelRecommendation(handle));
+        QCOMPARE(calls, 1); QCOMPARE(result.status.code, ErrorCode::Cancelled);
+        QTest::qWait(100); QCOMPARE(calls, 1);
+    }
     void publicTrendingUsesOptedInUsersAndDeduplicates()
     {
         QTemporaryDir dir; QString error;
@@ -144,7 +311,7 @@ private slots:
         QCOMPARE(calls, 1); QCOMPARE(status.code, ErrorCode::NotConnected);
         calls = 0;
         const auto handle = care->recommendTemporal({}, [&](auto result) { ++calls; status = result.status; });
-        QVERIFY(handle.isEmpty()); QCOMPARE(calls, 1); QCOMPARE(status.code, ErrorCode::ServerError);
+        QVERIFY(handle.isEmpty()); QCOMPARE(calls, 1); QCOMPARE(status.code, ErrorCode::NotConnected);
     }
     void realServerBehaviorFlow()
     {
