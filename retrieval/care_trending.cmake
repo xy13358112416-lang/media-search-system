@@ -1,0 +1,15 @@
+add_library(care_trending STATIC "${CMAKE_CURRENT_LIST_DIR}/care_trending.cpp")
+target_include_directories(care_trending PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../include"
+                          PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
+target_compile_features(care_trending PUBLIC cxx_std_17)
+target_link_libraries(care_trending PUBLIC care_algorithm_core)
+target_compile_options(care_trending PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+
+if(BUILD_TESTING)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+    add_executable(care_trending_tests "${CMAKE_CURRENT_LIST_DIR}/care_trending_tests.cpp")
+    set_target_properties(care_trending_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(care_trending_tests PRIVATE care_trending Qt6::Test)
+    target_compile_options(care_trending_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    add_test(NAME care_trending COMMAND care_trending_tests)
+endif()
