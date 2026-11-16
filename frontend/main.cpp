@@ -1,4 +1,6 @@
 #include "medialibrary.h"
+#include "warehouse_client.h"
+#include "warehouse_page.h"
 #include "mediarecommendation.h"
 #include "library_style.h"
 #include "account_dialog.h"
@@ -467,14 +469,9 @@ public:
         todayPage_->hide();
         layout->addWidget(todayPage_, 1);
 
-        auto* warehouseLayout = new QVBoxLayout(warehousePage_);
-        auto* warehouseTitle = new QLabel(QStringLiteral("资源仓库"));
-        warehouseTitle->setObjectName(QStringLiteral("sectionTitle"));
-        warehouseLayout->addWidget(warehouseTitle);
-        auto* warehouseStatus = new QLabel(QStringLiteral("连接服务器后可查看我的仓库和公开仓库。当前版本尚未接入仓库服务。"));
-        warehouseStatus->setWordWrap(true);
-        warehouseLayout->addWidget(warehouseStatus);
-        warehouseLayout->addStretch();
+        auto* client = new WarehouseClient(this);
+        warehousePage_ = new WarehousePage(*client, [this] { return library_.records(); });
+        client->setParent(warehousePage_);
         warehousePage_->hide();
         layout->addWidget(warehousePage_, 1);
         trace_->setObjectName(QStringLiteral("tracePanel"));
@@ -505,13 +502,17 @@ public:
         connect(tabs_, &QTabBar::currentChanged, this, [this, splitter](int index) {
             const bool showToday = index == 2 && today_ && identity_;
             const bool showWarehouse = index == 3;
+            controls_->setVisible(!showWarehouse);
             splitter->setVisible(!showToday && !showWarehouse);
             count_->setVisible(!showToday && !showWarehouse);
             order_->setVisible(!showToday && !showWarehouse);
             todayTitle_->setVisible(showToday);
             todayPage_->setVisible(showToday);
+            if (warehousePage_->isVisible() && !showWarehouse)
+                warehousePage_->suspend();
             warehousePage_->setVisible(showWarehouse);
-            controls_->setCurrentIndex(index);
+            if (!showWarehouse)
+                controls_->setCurrentIndex(index);
             trace_->setVisible(index == 1);
             recommendationReason_->setVisible(index == 2 && !recommendationReason_->text().isEmpty());
             order_->setText(index == 2 ? QStringLiteral("按推荐顺序")
@@ -1045,7 +1046,7 @@ private:
     QLabel* todayTitle_ = new QLabel;
     QLabel* todayStatus_ = new QLabel;
     QGridLayout* todayGrid_ = nullptr;
-    QWidget* warehousePage_ = new QWidget;
+    WarehousePage* warehousePage_ = nullptr;
     QLabel* recommendationReason_ = new QLabel;
     MediaLibrary& library_;            // Loaded business service, owned by main.
     QList<MediaRecord> records_;       // Visible records in table row order.
