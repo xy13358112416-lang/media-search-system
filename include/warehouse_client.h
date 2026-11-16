@@ -25,6 +25,7 @@ public:
                             warehouse_contract::Callback<warehouse_contract::WarehouseRecommendationResult> done) override;
     bool cancelRecommendation(const warehouse_contract::RecommendationHandle& handle) override;
 private:
+    friend class OnlineCareClient;
     using Response = std::function<void(warehouse_contract::Status, QJsonObject)>;
     struct Pending { QString responseType; Response callback; bool mutation = false; };
     static warehouse_contract::Status pendingFailure(const Pending& pending, warehouse_contract::Status status);

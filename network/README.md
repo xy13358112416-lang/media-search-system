@@ -1,5 +1,13 @@
 # 仓库网络契约（PR 0）
 
+## 行为接口接入（依赖 R05 服务器）
+
+使用 `OnlineCareClient` 同时作为 `WarehouseService` 和 `CareService`：同一个对象连接服务器并登录后，先对仓库条目的 `warehouseId`、`itemId` 调用 `getResource`，再用结果中的 `resource` 构造 View 事件并调用 `recordBehavior`。Search 事件直接传入用户明确提交的搜索词；每次主动操作创建新的 `eventId`，同一操作因结果未知而重试时复用原 ID 和原内容。刷新、翻页、自动选中首行不产生 View 事件。
+
+`getParticipationSettings`、`setParticipationSettings` 和 `clearHistory` 已接入 R05；回调可能同步触发，界面需处理状态失败、登出和对象生命周期。写请求发送后发生断线、超时等情况下可能返回 `OutcomeUnknown`，请先查询或依据幂等规则确认，不要盲目重复清理或修改设置。
+
+`getFootprint` 已使用服务器保存的真实事件生成统计；目前历史人物关联尚未接入，返回的人物统计为空并在报告说明中标记。人物、关注、反馈、热榜、时序推荐的 `CareService` 方法尚未接通，本客户端会明确返回错误，不返回模拟成功。Qt 关怀页面仍需后续装配和联调。
+
 网络模块提供共享类型、媒体 JSON 编解码、TCP 帧编解码和异步仓库客户端；`server/` 提供独立服务器。服务器 SQLite 与本地账户数据库分离，传输的是媒体元数据快照，不传音视频文件。
 
 ## 帧和消息
