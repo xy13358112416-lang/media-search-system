@@ -2,4 +2,7 @@
 
 #include "care_page.h"
 
-CarePage* createFollowCenter(care_contract::CareService& service);
+using PersonWorkViewer = std::function<void(const care_contract::WarehouseItemRef&,
+                                            care_contract::Callback<care_contract::ResourceSummary>)>;
+
+CarePage* createFollowCenter(care_contract::CareService& service, PersonWorkViewer viewWork = {});

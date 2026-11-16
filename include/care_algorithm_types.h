@@ -34,6 +34,7 @@ struct CatalogSnapshot {
     bool dataAvailable = true;
     QList<care_contract::ResourceSummary> readableWorks;
     QSet<QString> followedPeople;
+    QHash<QString, QStringList> aliasesByPerson;
 };
 constexpr int MaxReportDays = 3660; // Resource cap for zero-filled reports, including custom ranges.
 } // namespace care_algorithms

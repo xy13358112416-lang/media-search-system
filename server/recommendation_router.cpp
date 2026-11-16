@@ -10,6 +10,13 @@ using namespace warehouse_contract;
 
 void WarehouseServer::cancelPending(Session& session, QTcpSocket* socket, bool notify)
 {
+    const auto summaries = std::exchange(session.summaries, {});
+    for (auto it = summaries.cbegin(); it != summaries.cend(); ++it) {
+        trendSummarizer_.cancel(it->modelId);
+        if (notify)
+            sendResponse(socket, {{"type", "error_resp"}, {"req_id", it.key()},
+                                  {"code", "Cancelled"}, {"message", QStringLiteral("摘要已取消。")}});
+    }
     const auto pending = std::exchange(session.pending, {});
     for (auto it = pending.cbegin(); it != pending.cend(); ++it) {
         recommender_.cancel(it->modelId);
@@ -40,6 +47,14 @@ void WarehouseServer::startRecommendation(QTcpSocket* socket, const std::shared_
             fail("InvalidArgument", QStringLiteral("取消编号无效。")); return;
         }
         const QString target = targetValue.toString();
+        auto summary = session->summaries.find(target);
+        if (summary != session->summaries.end()) {
+            const auto modelId = summary->modelId;
+            session->summaries.erase(summary);
+            trendSummarizer_.cancel(modelId);
+            if (!sendResponse(socket, {{"type", "error_resp"}, {"req_id", target}, {"code", "Cancelled"},
+                                       {"message", QStringLiteral("摘要已取消。")}})) return;
+        }
         auto it = session->pending.find(target);
         if (it != session->pending.end()) {
             const auto modelId = it->modelId;

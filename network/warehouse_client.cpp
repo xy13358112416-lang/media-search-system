@@ -109,9 +109,9 @@ void WarehouseClient::cancelSessionRequests() {
     QList<Pending> cancelled;
     const auto ids = pending_.keys();
     for (const auto& id : ids) {
-        const bool recommendation = pending_.value(id).responseType == "recommend_resources_resp";
+        const bool cancelOnServer = pending_.value(id).cancelOnServer;
         cancelled.append(pending_.take(id));
-        if (recommendation) sendCancellation(id);
+        if (cancelOnServer) sendCancellation(id);
     }
     for (auto& p : cancelled)
         p.callback(pendingFailure(p, fail(ErrorCode::Cancelled, QStringLiteral("会话已切换，请求已取消"))), {});
@@ -172,15 +172,17 @@ QString WarehouseClient::request(const QString& type, const QJsonObject& payload
     const bool mutation = type == "create_warehouse" || type == "add_item" || type == "remove_item" ||
                           type == "record_behavior" || type == "set_participation_settings" || type == "clear_history" ||
                           type == "set_work_feedback" || type == "set_follow";
-    pending_.insert(id, {type + QStringLiteral("_resp"), std::move(callback), mutation});
+    const bool cancelOnServer = type == "recommend_resources" ||
+        (type == "get_trending" && payload.value("summary_mode") == "model");
+    pending_.insert(id, {type + QStringLiteral("_resp"), std::move(callback), mutation, cancelOnServer});
     if (socket_.write(frame) < 0) {
         auto p = pending_.take(id); p.callback(fail(ErrorCode::NotConnected, socket_.errorString()), {}); return {};
     }
-    const int timeout = type == "recommend_resources" ? recommendationTimeoutMs_ : TimeoutMs;
+    const int timeout = cancelOnServer ? recommendationTimeoutMs_ : TimeoutMs;
     QTimer::singleShot(timeout, this, [this, id] {
         if (!pending_.contains(id)) return;
         auto p = pending_.take(id);
-        if (p.responseType == "recommend_resources_resp") sendCancellation(id);
+        if (p.cancelOnServer) sendCancellation(id);
         p.callback(pendingFailure(p, fail(ErrorCode::Timeout, QStringLiteral("请求超时"))), {});
     });
     return id;

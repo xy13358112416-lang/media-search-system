@@ -39,6 +39,14 @@ Result<Directory> directory(const CatalogSnapshot& snapshot) {
         }
     }
     for (auto& person : result.people) {
+        const auto aliases = snapshot.aliasesByPerson.constFind(person.personId);
+        if (aliases != snapshot.aliasesByPerson.cend()) {
+            for (const auto& name : aliases.value()) {
+                const auto alias = detail::normalizeText(name);
+                if (!alias.isEmpty())
+                    result.aliases[person.personId].insert(alias);
+            }
+        }
         std::sort(person.roles.begin(), person.roles.end(), [](const auto a, const auto b) { return static_cast<int>(a) < static_cast<int>(b); });
         person.roles.erase(std::unique(person.roles.begin(), person.roles.end()), person.roles.end());
     }

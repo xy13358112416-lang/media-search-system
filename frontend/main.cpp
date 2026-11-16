@@ -1,6 +1,7 @@
 #include "medialibrary.h"
 #include "online_care_client.h"
 #include "footprint_page.h"
+#include "follow_center.h"
 #include "participation_settings_dialog.h"
 #include "temporal_recommendation_page.h"
 #include "trending_page.h"
@@ -287,6 +288,7 @@ public:
         tabs_->addTab(QStringLiteral("个人足迹"));
         tabs_->addTab(QStringLiteral("全站热榜"));
         tabs_->addTab(QStringLiteral("动态推荐"));
+        tabs_->addTab(QStringLiteral("关注中心"));
         layout->addWidget(tabs_);
 
         auto* libraryControls = new QWidget;
@@ -487,7 +489,11 @@ public:
         trending->setObjectName(QStringLiteral("onlineTrendingPage"));
         auto* temporal = createTemporalPage(*client, [this] { return warm_mode::browseScene(warmScene_); });
         temporal->setObjectName(QStringLiteral("onlineTemporalPage"));
-        onlineCarePages_ = {footprint, trending, temporal};
+        auto* people = createFollowCenter(*client, [this](const auto& source, auto opened) {
+            warehousePage_->recordMediaView(source, std::move(opened));
+        });
+        people->setObjectName(QStringLiteral("onlineFollowCenter"));
+        onlineCarePages_ = {footprint, trending, temporal, people};
 
         onlineCareArea_ = new QWidget;
         auto* careLayout = new QVBoxLayout(onlineCareArea_);
@@ -1130,7 +1136,7 @@ private:
     WarehousePage* warehousePage_ = nullptr;
     static constexpr int firstOnlineCareTab = 4;
     QWidget* onlineCareArea_ = nullptr;
-    std::array<CarePage*, 3> onlineCarePages_{};
+    std::array<CarePage*, 4> onlineCarePages_{};
     CarePage* activeCarePage_ = nullptr;
     QPointer<QDialog> settingsDialog_;
     QLabel* recommendationReason_ = new QLabel;

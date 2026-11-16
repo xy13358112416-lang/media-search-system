@@ -56,7 +56,7 @@ const auto job = summaryClient.summarize(alreadyAuthorizedTrendingResult,
 
 无 Key、空榜、坏数据、超时、HTTP/格式错误时保留规则摘要，`summaryFromModel=false`。成功才置 true；原始榜单条目、排序、区间、计数、生成时间和模拟标记不改。不自动重试、不跟随重定向。
 
-**本次未把 `get_trending` 改成异步网络操作，也未装配页面。** Qt 后续须把此模块接到真实服务器请求生命周期：认证后聚合，显式启动异步摘要，超时/取消清理，发送前重新检查会话/公共贡献资格；资格发生变化时丢弃过时摘要，重建当前规则榜单。不要在同步 dispatch 里阻塞等待模型，也不要每次切页自动产生付费请求。真实服务调用需另行验证。
+**S05 已接通异步 `get_trending` 模型模式和热榜页面的显式按钮。** `server/trending_summary_router.cpp` 复用现有聚合，认证后调用摘要模块；退出/断线/超时/销毁时取消，发送前重新检查会话和当前公共榜单。条目、计数或公开资格影响结果时丢弃旧摘要，返回重新生成的当前规则榜单，其生成时间对应最后一次聚合。普通切页、筛选和刷新仅请求规则摘要，不自动产生付费调用。网络字段、兼容和取消语义见 `CARE_CONTRACT.md`。真实模型服务调用仍需单独人工验收。
 
 ## 验证入口
 
@@ -65,3 +65,5 @@ const auto job = summaryClient.summarize(alreadyAuthorizedTrendingResult,
 `person_snapshot_server_tests` 使用真实本机客户端和服务器，验证权限先于目录调用、人物捕获、重试/暂停/异常、删除/重启后的足迹、时序 RPC 的关注/设置/反馈以及旧快照兼容和损坏检测。
 
 `llm_trend_summary` 使用假模型服务器验证请求最小化、真实成功路径、精确大计数、超时/取消、坏响应、过大响应、重定向、无 Key 和回退。已有全量 CTest 与演示 E2E 继续运行。
+
+`trending_summary_server_tests` 使用真实本机客户端/服务器与假 HTTP，验证显式触发、规则兼容、模型成功与回退、公开贡献/计数/来源变化后的重新核验、并发普通请求以及退出/断线/服务器销毁时真正取消上游连接。`trending_client_tests` 和 `care_pages_tests` 验证等待时间、取消、按钮和迟到响应。

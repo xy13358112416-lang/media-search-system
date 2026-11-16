@@ -474,17 +474,23 @@ void WarehousePage::applyPublicSearch()
         QStringLiteral("当前公开仓库：找到 %1 项。").arg(shown));
 }
 
-void WarehousePage::recordMediaView(const care_contract::WarehouseItemRef& source)
+void WarehousePage::recordMediaView(const care_contract::WarehouseItemRef& source,
+                                    care_contract::Callback<care_contract::ResourceSummary> opened)
 {
-    if (!care_ || !user_)
+    if (!care_ || !user_) {
+        if (opened) opened({{ErrorCode::NotAuthenticated, QStringLiteral("请重新登录服务器账号。")}, {}});
         return;
+    }
     const auto detail = detailEpoch_;
     const auto eventId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    care_->getResource(source, inSession([this, detail, eventId](Result<care_contract::ResourceSummary> result) {
+    care_->getResource(source, inSession([this, detail, eventId, opened = std::move(opened)](Result<care_contract::ResourceSummary> result) {
         if (!result.status.ok() || !result.value) {
-            if (detail == detailEpoch_)
-                displayStatus(result.status.ok()
-                    ? Status{ErrorCode::ProtocolError, QStringLiteral("无法识别所选媒体。")} : result.status);
+            if (result.status.ok())
+                result.status = {ErrorCode::ProtocolError, QStringLiteral("无法识别所选媒体。")};
+            if (opened)
+                opened(std::move(result));
+            else if (detail == detailEpoch_)
+                displayStatus(result.status);
             return;
         }
         care_->recordBehavior({eventId, care_contract::BehaviorAction::View, result.value->resource, {}},
@@ -492,6 +498,8 @@ void WarehousePage::recordMediaView(const care_contract::WarehouseItemRef& sourc
                 if (!result.ok() && detail == detailEpoch_)
                     displayStatus(result);
             }));
+        if (opened)
+            opened(std::move(result));
     }));
 }
 

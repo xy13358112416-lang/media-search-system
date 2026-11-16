@@ -3,6 +3,7 @@
 #include "warehouse_contract.h"
 #include "warehouse_protocol.h"
 #include "llm_recommendation.h"
+#include "llm_trend_summary.h"
 #include <QHash>
 #include <QSet>
 #include "behavior_contract.h"
@@ -50,8 +51,14 @@ private:
         QString token;
         qint64 userId = 0;
         QHash<QString, Pending> pending;
+        struct SummaryPending { quint64 modelId = 0; QString token; qint64 userId = 0; };
+        QHash<QString, SummaryPending> summaries;
     };
     QJsonObject dispatch(Session& session, const QJsonObject& request);
+    std::optional<care_contract::Result<QJsonObject>> dispatchPersonQuery(
+        qint64 userId, const QString& type, const QJsonObject& payload);
+    care_contract::Result<care_algorithms::CatalogSnapshot> readablePersonCatalog(
+        qint64 userId, const QString& personId, bool includeAliases);
     care_contract::Result<care_algorithms::PersonContext> loadPersonContext(
         qint64 userId, const QList<care_contract::ResourceSummary>& authorizedWorks);
     care_contract::Result<care_algorithms::CatalogSnapshot> personCatalog(
@@ -60,7 +67,12 @@ private:
     bool sendResponse(QTcpSocket* socket, const QJsonObject& response);
     void startRecommendation(QTcpSocket* socket, const std::shared_ptr<Session>& session, const QJsonObject& request);
     void cancelPending(Session& session, QTcpSocket* socket, bool notify);
+    static care_contract::Status parseTrendingRequest(const QJsonObject& payload, care_contract::TrendingRequest& input);
+    static QJsonObject trendingJson(const care_contract::TrendingResult& result);
+    care_contract::Result<care_contract::TrendingResult> currentTrending(const care_contract::TrendingRequest& input);
+    void startTrendingSummary(QTcpSocket* socket, const std::shared_ptr<Session>& session, const QJsonObject& request);
     llm_recommendation::Client recommender_;
+    llm_trend_summary::Client trendSummarizer_;
     QString dbName_;
     QSqlDatabase db_;
     std::unique_ptr<person_store::SqliteStore> personStore_;

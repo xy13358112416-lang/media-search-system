@@ -434,7 +434,7 @@ private slots:
         window.show();
         auto* tabs = window.findChild<QTabBar*>();
         QVERIFY(tabs);
-        QCOMPARE(tabs->count(), 7);
+        QCOMPARE(tabs->count(), 8);
         QCOMPARE(tabs->tabText(2), QStringLiteral("今日推荐"));
         QCOMPARE(tabs->tabText(3), QStringLiteral("资源仓库"));
         QCOMPARE(tabs->tabText(4), QStringLiteral("个人足迹"));
@@ -451,7 +451,8 @@ private slots:
         QVERIFY(settings);
         QCOMPARE(tabs->tabText(5), QStringLiteral("全站热榜"));
         QCOMPARE(tabs->tabText(6), QStringLiteral("动态推荐"));
-        for (int index : {4, 5, 6}) {
+        QCOMPARE(tabs->tabText(7), QStringLiteral("关注中心"));
+        for (int index : {4, 5, 6, 7}) {
             tabs->setCurrentIndex(index);
             QVERIFY(signedOut->isVisible());
             QVERIFY(!settings->isVisible());

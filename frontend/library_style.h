@@ -72,7 +72,7 @@ inline QString libraryStyle()
         QHeaderView::section { background: #e7eef9; color: #27476e; border: none;
                                 padding: 9px 8px; font-weight: 700; }
         QListWidget#onlineWarehouseList, QListWidget#onlineWarehouseItems,
-        QListWidget#onlineWarehouseRecommendations, QListWidget#careTemporalList {
+        QListWidget#onlineWarehouseRecommendations, QListWidget#careTemporalList, QListWidget[careList="true"] {
             background: #ffffff; border: 1px solid #d7e1ef; border-radius: 8px;
             selection-background-color: #dceaff; selection-color: #143362; padding: 4px;
         }
