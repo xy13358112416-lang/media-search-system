@@ -144,7 +144,67 @@ void OnlineCareClient::listFollows(const PageRequest&, Callback<Page<PersonSumma
 void OnlineCareClient::setFollow(const QString&, bool, StatusCallback done) { done(unavailable()); }
 void OnlineCareClient::getPersonWorks(const QString&, const PageRequest&, Callback<Page<ResourceSummary>> done) { unavailableResult(std::move(done)); }
 void OnlineCareClient::getPersonUpdates(const PersonUpdatesRequest&, Callback<Page<PersonUpdate>> done) { unavailableResult(std::move(done)); }
-void OnlineCareClient::getTrending(const TrendingRequest&, Callback<TrendingResult> done) { unavailableResult(std::move(done)); }
+void OnlineCareClient::getTrending(const TrendingRequest& requestValue, Callback<TrendingResult> done) {
+    const auto valid = validate(requestValue);
+    if (!valid.ok()) { done({valid, {}}); return; }
+    const QString kind = requestValue.kind == TrendingKind::Works ? "works" : "search_terms";
+    request("get_trending", {{"kind", kind}, {"range", rangeJson(requestValue.range)}, {"limit", requestValue.limit}},
+            [this, requestValue, kind, done=std::move(done)](Status status, QJsonObject payload) {
+        if (!status.ok()) { done({status, {}}); return; }
+        const auto value = payload.value("result"); const auto object = value.toObject();
+        TrendingResult result; result.kind = requestValue.kind;
+        bool ok = value.isObject() && object.value("kind") == kind && parseRange(object.value("range"), result.range) &&
+            sameRange(result.range, requestValue.range) && nonnegative(object.value("generated_at_utc"), result.generatedAtUtc) &&
+            result.generatedAtUtc < MaxUtcExclusive && object.value("summary").isString() &&
+            object.value("summary_from_model").isBool() && object.value("contains_synthetic_data").isBool() &&
+            object.value("items").isArray() && object.value("items").toArray().size() <= requestValue.limit;
+        for (const auto& entry : object.value("items").toArray()) {
+            if (!entry.isObject()) { ok = false; break; }
+            const auto row = entry.toObject(); TrendingItem item;
+            if (!row.value("term").isString() || !nonnegative(row.value("distinct_users"), item.distinctUsers) ||
+                !nonnegative(row.value("effective_events"), item.effectiveEvents) || item.distinctUsers < 3 ||
+                item.effectiveEvents < item.distinctUsers) { ok = false; break; }
+            item.term = row.value("term").toString();
+            if (requestValue.kind == TrendingKind::Works) {
+                const auto workValue = row.value("work"); const auto work = workValue.toObject();
+                const auto refValue = work.value("resource"); const auto ref = refValue.toObject();
+                const auto srcValue = ref.value("source"); const auto src = srcValue.toObject();
+                ResourceSummary resource; QString error;
+                if (!item.term.isEmpty() || !workValue.isObject() || !refValue.isObject() || !srcValue.isObject() ||
+                    !ref.value("work_id").isString() || !positiveId(src.value("warehouse_id"), resource.resource.source.warehouseId) ||
+                    !positiveId(src.value("item_id"), resource.resource.source.itemId) || !work.value("media").isObject() ||
+                    !media_json::fromJson(work.value("media").toObject(), resource.media, error) ||
+                    !work.value("people").isArray()) { ok = false; break; }
+                resource.resource.workId = ref.value("work_id").toString();
+                if (!validate(resource.resource).ok()) { ok = false; break; }
+                for (const auto& personValue : work.value("people").toArray()) {
+                    const auto p = personValue.toObject();
+                    if (!personValue.isObject() || !p.value("person_id").isString() || p.value("person_id").toString().isEmpty() ||
+                        !p.value("name").isString() || !p.value("roles").isArray() || !p.value("followed").isBool()) { ok = false; break; }
+                    PersonSummary person{p.value("person_id").toString(), p.value("name").toString(), {}, p.value("followed").toBool()};
+                    for (const auto& role : p.value("roles").toArray()) {
+                        if (role == "actor") person.roles.append(PersonRole::Actor);
+                        else if (role == "director") person.roles.append(PersonRole::Director);
+                        else if (role == "musician") person.roles.append(PersonRole::Musician);
+                        else { ok = false; break; }
+                    }
+                    if (!ok) break;
+                    resource.people.append(person);
+                }
+                if (!ok) break;
+                item.work = resource;
+            } else if (item.term.isEmpty() || (!row.value("work").isUndefined() && !row.value("work").isNull())) {
+                ok = false; break;
+            }
+            result.items.append(item);
+        }
+        if (!ok) { abortProtocol(); done({malformed(), {}}); return; }
+        result.summary = object.value("summary").toString();
+        result.summaryFromModel = object.value("summary_from_model").toBool();
+        result.containsSyntheticData = object.value("contains_synthetic_data").toBool();
+        done({{}, result});
+    });
+}
 void OnlineCareClient::getFootprint(const FootprintRequest& requestValue, Callback<FootprintReport> done) {
     const auto valid = validate(requestValue);
     if (!valid.ok()) { done({valid, {}}); return; }
