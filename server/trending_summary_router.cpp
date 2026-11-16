@@ -139,6 +139,10 @@ void WarehouseServer::startTrendingSummary(QTcpSocket* socket,const std::shared_
     TrendingRequest input;
     const auto valid=parseTrendingRequest(request.value("payload").toObject(),input);
     if(!valid.ok()) {fail("InvalidArgument",valid.message);return;}
+    if (!session->summaries.isEmpty()) {
+        fail("ServerError", QStringLiteral("当前会话已有一个热榜 AI 摘要请求，请稍后再试。"));
+        return;
+    }
     const auto original=currentTrending(input);
     if(!original.status.ok() || !original.value) {fail("ServerError",original.status.message);return;}
     const auto evidence=publicContents(trendingJson(*original.value));
@@ -162,5 +166,6 @@ void WarehouseServer::startTrendingSummary(QTcpSocket* socket,const std::shared_
             sendResponse(guarded,{{"type","get_trending_resp"},{"req_id",id},
                                  {"payload",QJsonObject{{"result",trendingJson(*current.value)}}}});
         });
-    session->summaries[id].modelId=modelId;
+    if (auto pending = session->summaries.find(id); pending != session->summaries.end())
+        pending->modelId = modelId;
 }

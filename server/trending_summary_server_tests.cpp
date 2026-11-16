@@ -251,6 +251,45 @@ private slots:
         const auto settings=waitResult<ParticipationSettings>([&](auto cb){f.alice.getParticipationSettings(cb);});
         QVERIFY(settings.status.ok());QVERIFY(!done);f.http.releaseLast();QVERIFY(spin([&]{return done;}));
     }
+    void onePendingSummaryPerSessionAndCapacityRecovers()
+    {
+        Fixture f;
+        QVERIFY(f.start(false, 3500));
+        f.http.hold = true;
+        auto model = f.request;
+        model.summaryMode = TrendingSummaryMode::Model;
+        int aliceCalls = 0, bobCalls = 0;
+        Result<TrendingResult> aliceResult, bobResult;
+        auto cleanup = qScopeGuard([&] {
+            f.alice.disconnectFromServer();
+            f.bob.disconnectFromServer();
+        });
+        f.alice.getTrending(model, [&](auto result) { aliceResult = std::move(result); ++aliceCalls; });
+        QVERIFY(spin([&] { return f.http.bodies.size() == 1; }));
+        const auto duplicate = waitResult<TrendingResult>([&](auto done) { f.alice.getTrending(model, done); });
+        QCOMPARE(duplicate.status.code, ErrorCode::ServerError);
+        QVERIFY(duplicate.status.message.contains(QStringLiteral("当前会话")));
+        QCOMPARE(aliceCalls, 0);
+        QCOMPARE(f.http.bodies.size(), 1);
+        QVERIFY(f.rules().status.ok());
+
+        f.bob.getTrending(model, [&](auto result) { bobResult = std::move(result); ++bobCalls; });
+        QVERIFY(spin([&] { return f.http.bodies.size() == 2; }));
+        f.http.releaseAt(1);
+        QVERIFY(spin([&] { return bobCalls == 1; }));
+        QVERIFY(bobResult.status.ok() && bobResult.value && bobResult.value->summaryFromModel);
+        QCOMPARE(aliceCalls, 0);
+        f.http.releaseAt(0);
+        QVERIFY(spin([&] { return aliceCalls == 1; }));
+        QVERIFY(aliceResult.status.ok() && aliceResult.value && aliceResult.value->summaryFromModel);
+        f.http.hold = false;
+        const auto after = waitResult<TrendingResult>([&](auto done) { f.alice.getTrending(model, done); });
+        QVERIFY(after.status.ok() && after.value && after.value->summaryFromModel);
+        QCOMPARE(f.http.bodies.size(), 3);
+        QCOMPARE(aliceCalls, 1);
+        QCOMPARE(bobCalls, 1);
+    }
+
     void cancellingWarehouseRecommendationDoesNotCancelSummaryWithSameModelId() {
         Fixture f;QVERIFY(f.start());QVERIFY(f.publicWork());f.http.hold=true;
         f.request.summaryMode=TrendingSummaryMode::Model;
