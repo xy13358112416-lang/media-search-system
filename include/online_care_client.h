@@ -8,6 +8,10 @@
 class OnlineCareClient final : public WarehouseClient, public care_contract::CareService {
 public:
     using WarehouseClient::WarehouseClient;
+    QMetaObject::Connection onDisconnected(QObject* context, std::function<void()> callback)
+    {
+        return connect(&socket_, &QTcpSocket::disconnected, context, std::move(callback));
+    }
     void recordBehavior(const care_contract::BehaviorEvent&, care_contract::StatusCallback) override;
     void getParticipationSettings(care_contract::Callback<care_contract::ParticipationSettings>) override;
     void setParticipationSettings(const care_contract::ParticipationSettings&, care_contract::StatusCallback) override;

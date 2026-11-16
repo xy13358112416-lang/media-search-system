@@ -434,15 +434,25 @@ private slots:
         window.show();
         auto* tabs = window.findChild<QTabBar*>();
         QVERIFY(tabs);
-        QCOMPARE(tabs->count(), 4);
+        QCOMPARE(tabs->count(), 5);
         QCOMPARE(tabs->tabText(2), QStringLiteral("今日推荐"));
         QCOMPARE(tabs->tabText(3), QStringLiteral("资源仓库"));
+        QCOMPARE(tabs->tabText(4), QStringLiteral("个人足迹"));
         auto* host = window.findChild<QLineEdit*>(QStringLiteral("warehouseHost"));
         QVERIFY(host); // Real WarehousePage, rather than the old placeholder.
         tabs->setCurrentIndex(2);
         QVERIFY(!window.findChildren<QFrame*>(QStringLiteral("recommendCard")).isEmpty());
         QVERIFY(!host->isVisible());
         tabs->setCurrentIndex(3);
+        QVERIFY(host->isVisible());
+        tabs->setCurrentIndex(4);
+        auto* footprint = window.findChild<QWidget*>(QStringLiteral("onlineFootprintPage"));
+        QVERIFY(footprint && footprint->isVisible());
+        QVERIFY(!host->isVisible());
+        const auto* footprintStatus = footprint->findChild<QLabel*>(QStringLiteral("careStatus"));
+        QVERIFY(footprintStatus && footprintStatus->text().contains(QStringLiteral("登录服务器账号")));
+        tabs->setCurrentIndex(3);
+        QVERIFY(!footprint->isVisible());
         QVERIFY(host->isVisible());
         for (auto* card : window.findChildren<QFrame*>(QStringLiteral("recommendCard")))
             QVERIFY(!card->isVisible());

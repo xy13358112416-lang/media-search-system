@@ -13,6 +13,7 @@
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include <QUuid>
 #include <utility>
 
 using namespace warehouse_contract;
@@ -27,7 +28,8 @@ QString itemLabel(const MediaRecord& record)
 
 WarehousePage::WarehousePage(WarehouseService& service,
                              std::function<QList<MediaRecord>()> localRecords, QWidget* parent)
-    : QWidget(parent), service_(service), localRecords_(std::move(localRecords)),
+    : QWidget(parent), service_(service), care_(dynamic_cast<care_contract::CareService*>(&service)),
+      localRecords_(std::move(localRecords)),
       host_(new QLineEdit(QStringLiteral("127.0.0.1"))), port_(new QSpinBox),
       username_(new QLineEdit), password_(new QLineEdit),
       identity_(new QLabel), status_(new QLabel), login_(new QPushButton(QStringLiteral("连接并登录"))),
@@ -114,6 +116,11 @@ WarehousePage::WarehousePage(WarehouseService& service,
     recommendationBar->addWidget(recommend_);
     recommendationBar->addWidget(cancel_);
     layout->addLayout(recommendationBar);
+    recommendationStatus_ = new QLabel;
+    recommendationStatus_->setObjectName(QStringLiteral("warehouseRecommendationStatus"));
+    recommendationStatus_->setTextFormat(Qt::PlainText);
+    recommendationStatus_->setWordWrap(true);
+    layout->addWidget(recommendationStatus_);
     auto* recommendationFooter = new QHBoxLayout;
     recommendationFooter->addWidget(reason_, 1);
     recommendationFooter->addWidget(addSuggestion_);
@@ -128,21 +135,33 @@ WarehousePage::WarehousePage(WarehouseService& service,
     connect(remove_, &QPushButton::clicked, this, [this] { removeItem(); });
     connect(publicOnly_, &QCheckBox::toggled, this, [this] { refresh(); });
     connect(warehouseList_, &QListWidget::currentRowChanged, this, [this] {
-        if (useTarget_->isChecked())
-            clearRecommendation();
+        clearRecommendation();
         refreshDetail();
     });
     connect(itemList_, &QListWidget::currentRowChanged, this, [this] { updateControls(); });
+    connect(itemList_, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
+        const auto row = itemList_->row(item);
+        const auto warehouse = selection();
+        if (warehouse && row >= 0 && row < items_.size())
+            recordMediaView({warehouse->warehouseId, items_.at(row).itemId});
+    });
     connect(recommendationList_, &QListWidget::currentRowChanged, this, [this](int row) {
         reason_->setText(row >= 0 && row < suggestions_.size() ? suggestions_.at(row).reason : QString());
         updateControls();
+    });
+    connect(recommendationList_, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
+        const auto row = recommendationList_->row(item);
+        if (row >= 0 && row < suggestions_.size()) {
+            const auto& choice = suggestions_.at(row);
+            recordMediaView({choice.warehouseId, choice.itemId});
+        }
     });
     connect(useTarget_, &QCheckBox::toggled, this, [this] { clearRecommendation(); });
     connect(recommend_, &QPushButton::clicked, this, [this] { recommend(); });
     connect(query_, &QLineEdit::returnPressed, this, [this] { recommend(); });
     connect(cancel_, &QPushButton::clicked, this, [this] {
         clearRecommendation();
-        status_->setText(QStringLiteral("已取消推荐。"));
+        recommendationStatus_->setText(QStringLiteral("已取消推荐。"));
     });
     connect(addSuggestion_, &QPushButton::clicked, this, [this] { addSuggestion(); });
     updateControls();
@@ -151,6 +170,7 @@ WarehousePage::WarehousePage(WarehouseService& service,
 WarehousePage::~WarehousePage()
 {
     ++sessionEpoch_;
+    user_.reset();
     service_.disconnectFromServer();
 }
 
@@ -221,6 +241,8 @@ void WarehousePage::connectAndLogin()
             user_ = *result.value;
             connecting_ = false;
             updateControls();
+            if (sessionChanged_)
+                sessionChanged_();
             refresh();
         }));
     }));
@@ -229,7 +251,9 @@ void WarehousePage::connectAndLogin()
 void WarehousePage::resetSession(bool disconnect)
 {
     ++sessionEpoch_;
+    const bool wasSignedIn = isSignedIn();
     user_.reset();
+    writeOutcomeUnknown_ = false;
     connecting_ = false;
     writing_ = false;
     clearRecommendation();
@@ -243,6 +267,8 @@ void WarehousePage::resetSession(bool disconnect)
     items_.clear();
     itemList_->clear();
     updateControls();
+    if (wasSignedIn && sessionChanged_)
+        sessionChanged_();
 }
 
 void WarehousePage::signOut()
@@ -266,10 +292,22 @@ void WarehousePage::signOut()
 void WarehousePage::displayStatus(const Status& status)
 {
     if (!status.ok()) {
+        writeOutcomeUnknown_ = status.code == ErrorCode::OutcomeUnknown;
         if (status.code == ErrorCode::NotConnected || status.code == ErrorCode::NotAuthenticated)
             resetSession();
         status_->setText(status.message.isEmpty() ? QStringLiteral("仓库请求失败。") : status.message);
     }
+}
+
+void WarehousePage::connectionLost()
+{
+    if (!isSignedIn())
+        return;
+    const bool unknown = writeOutcomeUnknown_;
+    resetSession(false);
+    status_->setText(unknown
+        ? QStringLiteral("连接已断开，最后一次写入结果未知。重新登录后请先查询。")
+        : QStringLiteral("连接已断开，请重新登录仓库。"));
 }
 
 void WarehousePage::refresh()
@@ -303,7 +341,8 @@ void WarehousePage::refresh()
             warehouseList_->setCurrentRow(selectedRow >= 0 ? selectedRow : (warehouses_.isEmpty() ? -1 : 0));
         }
         const auto current = selection();
-        if (useTarget_->isChecked() && (!current || current->warehouseId != previousId))
+        const auto currentId = current ? current->warehouseId : 0;
+        if (currentId != previousId)
             clearRecommendation();
         status_->setText(warehouses_.isEmpty() ? QStringLiteral("当前列表没有仓库。") : QString());
         refreshDetail();
@@ -342,6 +381,27 @@ void WarehousePage::refreshDetail()
         if (items_.isEmpty())
             status_->setText(QStringLiteral("这个仓库还没有条目。"));
         updateControls();
+    }));
+}
+
+void WarehousePage::recordMediaView(const care_contract::WarehouseItemRef& source)
+{
+    if (!care_ || !user_)
+        return;
+    const auto detail = detailEpoch_;
+    const auto eventId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    care_->getResource(source, inSession([this, detail, eventId](Result<care_contract::ResourceSummary> result) {
+        if (!result.status.ok() || !result.value) {
+            if (detail == detailEpoch_)
+                displayStatus(result.status.ok()
+                    ? Status{ErrorCode::ProtocolError, QStringLiteral("无法识别所选媒体。")} : result.status);
+            return;
+        }
+        care_->recordBehavior({eventId, care_contract::BehaviorAction::View, result.value->resource, {}},
+            inSession([this, detail](Status result) {
+                if (!result.ok() && detail == detailEpoch_)
+                    displayStatus(result);
+            }));
     }));
 }
 
@@ -451,7 +511,7 @@ void WarehousePage::recommend()
         return;
     const auto query = query_->text().trimmed();
     if (query.isEmpty()) {
-        status_->setText(QStringLiteral("请输入推荐需求。"));
+        recommendationStatus_->setText(QStringLiteral("请输入推荐需求。"));
         return;
     }
     clearRecommendation();
@@ -461,7 +521,7 @@ void WarehousePage::recommend()
     const auto generation = recommendationEpoch_;
     recommending_ = true;
     updateControls();
-    status_->setText(QStringLiteral("服务器正在生成推荐…"));
+    recommendationStatus_->setText(QStringLiteral("服务器正在生成推荐…"));
     const auto handle = service_.recommendResources({query, target, 5},
         inSession([this, generation](Result<WarehouseRecommendationResult> result) {
             if (generation != recommendationEpoch_)
@@ -469,7 +529,11 @@ void WarehousePage::recommend()
             recommending_ = false;
             handle_.clear();
             if (!result.status.ok() || !result.value) {
-                displayStatus(result.status);
+                if (result.status.code == ErrorCode::NotConnected || result.status.code == ErrorCode::NotAuthenticated)
+                    displayStatus(result.status);
+                else
+                    recommendationStatus_->setText(result.status.message.isEmpty()
+                        ? QStringLiteral("推荐请求失败，请重试。") : result.status.message);
                 updateControls();
                 return;
             }
@@ -481,7 +545,7 @@ void WarehousePage::recommend()
             if (message.isEmpty())
                 message = suggestions_.isEmpty() ? QStringLiteral("没有符合条件的资源。")
                                                  : QStringLiteral("找到 %1 条推荐。").arg(suggestions_.size());
-            status_->setText(value.fallback ? QStringLiteral("备用推荐 · %1").arg(message) : message);
+            recommendationStatus_->setText(value.fallback ? QStringLiteral("备用推荐 · %1").arg(message) : message);
             updateControls();
         }));
     if (recommending_ && generation == recommendationEpoch_)
@@ -496,6 +560,7 @@ void WarehousePage::clearRecommendation()
     suggestions_.clear();
     recommendationList_->clear();
     reason_->clear();
+    recommendationStatus_->clear();
     if (!handle.isEmpty())
         service_.cancelRecommendation(handle);
     updateControls();
@@ -503,8 +568,6 @@ void WarehousePage::clearRecommendation()
 
 void WarehousePage::suspend()
 {
-    if (recommending_)
-        status_->setText(QStringLiteral("已停止等待推荐。"));
     clearRecommendation();
 }
 

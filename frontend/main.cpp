@@ -1,5 +1,6 @@
 #include "medialibrary.h"
-#include "warehouse_client.h"
+#include "online_care_client.h"
+#include "footprint_page.h"
 #include "warehouse_page.h"
 #include "mediarecommendation.h"
 #include "library_style.h"
@@ -279,6 +280,7 @@ public:
         tabs_->addTab(QStringLiteral("检索"));
         tabs_->addTab(today_ ? QStringLiteral("今日推荐") : QStringLiteral("推荐"));
         tabs_->addTab(QStringLiteral("资源仓库"));
+        tabs_->addTab(QStringLiteral("个人足迹"));
         layout->addWidget(tabs_);
 
         auto* libraryControls = new QWidget;
@@ -379,7 +381,6 @@ public:
         controls_->addWidget(libraryControls);
         controls_->addWidget(searchControls);
         controls_->addWidget(recommendationControls);
-        controls_->addWidget(new QWidget); // Warehouse connection controls will be supplied by the client integration.
         controls_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
         layout->addWidget(controls_);
         recommendationReason_->setTextFormat(Qt::PlainText);
@@ -469,11 +470,23 @@ public:
         todayPage_->hide();
         layout->addWidget(todayPage_, 1);
 
-        auto* client = new WarehouseClient(this);
+        auto* client = new OnlineCareClient(this);
         warehousePage_ = new WarehousePage(*client, [this] { return library_.records(); });
-        client->setParent(warehousePage_);
+        client->onDisconnected(warehousePage_, [this] { warehousePage_->connectionLost(); });
         warehousePage_->hide();
         layout->addWidget(warehousePage_, 1);
+        auto* footprint = createFootprintPage(*client, [this] { return warehousePage_->isSignedIn(); });
+        footprintPage_ = footprint;
+        footprint->setObjectName(QStringLiteral("onlineFootprintPage"));
+        layout->addWidget(footprint, 1);
+        footprint->hide();
+        warehousePage_->setSessionChangedCallback([page = QPointer<CarePage>(footprint)] {
+            if (page) {
+                page->deactivate();
+                if (page->isVisible())
+                    page->activate();
+            }
+        });
         trace_->setObjectName(QStringLiteral("tracePanel"));
         trace_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
         auto* traceLayout = new QVBoxLayout(trace_);
@@ -499,19 +512,28 @@ public:
         trace_->hide();
         layout->addWidget(trace_);
 
-        connect(tabs_, &QTabBar::currentChanged, this, [this, splitter](int index) {
+        connect(tabs_, &QTabBar::currentChanged, this, [this, splitter, footprint](int index) {
             const bool showToday = index == 2 && today_ && identity_;
             const bool showWarehouse = index == 3;
-            controls_->setVisible(!showWarehouse);
-            splitter->setVisible(!showToday && !showWarehouse);
-            count_->setVisible(!showToday && !showWarehouse);
-            order_->setVisible(!showToday && !showWarehouse);
+            const bool showFootprint = index == 4;
+            const bool showLibrary = !showWarehouse && !showFootprint;
+            controls_->setVisible(showLibrary);
+            splitter->setVisible(showLibrary && !showToday);
+            count_->setVisible(showLibrary && !showToday);
+            order_->setVisible(showLibrary && !showToday);
             todayTitle_->setVisible(showToday);
             todayPage_->setVisible(showToday);
             if (warehousePage_->isVisible() && !showWarehouse)
                 warehousePage_->suspend();
             warehousePage_->setVisible(showWarehouse);
-            if (!showWarehouse)
+            if (showFootprint) {
+                footprint->show();
+                footprint->activate();
+            } else if (!footprint->isHidden()) {
+                footprint->deactivate();
+                footprint->hide();
+            }
+            if (showLibrary)
                 controls_->setCurrentIndex(index);
             trace_->setVisible(index == 1);
             recommendationReason_->setVisible(index == 2 && !recommendationReason_->text().isEmpty());
@@ -568,6 +590,13 @@ public:
         connect(add_, &QPushButton::clicked, this, [this] { addRecord(); });
         connect(remove_, &QPushButton::clicked, this, [this] { removeRecord(); });
         refreshTypes();
+    }
+
+    ~LibraryWindow() override
+    {
+        // Both pages must be gone before the shared client is destroyed.
+        delete footprintPage_;
+        delete warehousePage_;
     }
 
 private:
@@ -1047,6 +1076,7 @@ private:
     QLabel* todayStatus_ = new QLabel;
     QGridLayout* todayGrid_ = nullptr;
     WarehousePage* warehousePage_ = nullptr;
+    CarePage* footprintPage_ = nullptr;
     QLabel* recommendationReason_ = new QLabel;
     MediaLibrary& library_;            // Loaded business service, owned by main.
     QList<MediaRecord> records_;       // Visible records in table row order.

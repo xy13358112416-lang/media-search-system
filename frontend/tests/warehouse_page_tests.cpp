@@ -1,5 +1,7 @@
 #include "../warehouse_page.h"
-#include "warehouse_client.h"
+#include "online_care_client.h"
+#include "../footprint_page.h"
+#include <memory>
 #include "warehouse_server.h"
 
 #include <QCheckBox>
@@ -113,6 +115,109 @@ void signIn(WarehousePage& page, quint16 port, const QString& user, const QStrin
 class OnlineWarehouseTests : public QObject {
     Q_OBJECT
 private slots:
+    void onlineViewsComeOnlyFromClicksAndFollowTheServerAccount()
+    {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        WarehouseServer server(llm_recommendation::Config{});
+        QString error;
+        QVERIFY2(server.openDatabase(temporary.filePath("clicks.sqlite"), error), qPrintable(error));
+        QVERIFY(server.addUser("alice", "alice-demo", error));
+        QVERIFY(server.addUser("bob", "bob-demo", error));
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+
+        OnlineCareClient client;
+        WarehousePage page(client, [] { return QList<MediaRecord>{}; });
+        client.onDisconnected(&page, [&] { page.connectionLost(); });
+        page.show();
+        std::unique_ptr<CarePage> footprint(createFootprintPage(client, [&] { return page.isSignedIn(); }));
+        auto* footprintStatus = footprint->findChild<QLabel*>("careStatus");
+        QVERIFY(footprintStatus);
+        page.setSessionChangedCallback([&] {
+            footprint->deactivate();
+            footprint->activate();
+        });
+        signIn(page, server.serverPort(), "alice", "alice-demo");
+        QTRY_VERIFY(page.isSignedIn());
+
+        std::optional<Result<WarehouseSummary>> warehouse;
+        client.createWarehouse("Alice", Visibility::Private, [&](auto result) { warehouse = result; });
+        QTRY_VERIFY(warehouse && warehouse->status.ok() && warehouse->value);
+        MediaRecord media;
+        media.id = "demo:media";
+        media.fileName = "Quiet Film";
+        media.category = QStringLiteral("电影");
+        std::optional<Result<WarehouseItem>> bought;
+        client.addItem(warehouse->value->warehouseId, media, [&](auto result) { bought = result; });
+        QTRY_VERIFY(bought && bought->status.ok() && bought->value);
+
+        auto* refresh = matching<QPushButton>(page, QStringLiteral("刷新列表"));
+        auto* items = named<QListWidget>(page, "onlineWarehouseItems");
+        QVERIFY(refresh && items);
+        refresh->click();
+        QTRY_COMPARE(items->count(), 1);
+        items->setCurrentRow(0);
+        refresh->click();
+        QTRY_COMPARE(items->count(), 1);
+        items->setCurrentRow(0);
+
+        using namespace care_contract;
+        const auto date = care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
+        const FootprintRequest request{{care_ui::midnight(date), care_ui::midnight(date.addDays(1))}, std::nullopt};
+        std::optional<warehouse_contract::Result<FootprintReport>> report;
+        const auto requestReport = [&] {
+            report.reset();
+            client.getFootprint(request, [&](auto result) { report = std::move(result); });
+        };
+        requestReport();
+        QTRY_VERIFY(report && report->status.ok() && report->value);
+        QCOMPARE(report->value->current.views, qint64(0));
+
+        QTest::mouseClick(items->viewport(), Qt::LeftButton, Qt::NoModifier,
+                          items->visualItemRect(items->item(0)).center());
+        // The first read may arrive before the resource resolution has queued the write.
+        requestReport();
+        QTRY_VERIFY(report && report->status.ok() && report->value);
+        requestReport();
+        QTRY_VERIFY(report && report->status.ok() && report->value);
+        QCOMPARE(report->value->current.views, qint64(1));
+        footprint->activate();
+        QTRY_VERIFY(footprintStatus->text().contains(QStringLiteral("北京时间")));
+        const auto* counts = footprint->findChild<QLabel*>("footprintCounts");
+        QVERIFY(counts && counts->text().contains(QStringLiteral("浏览 1 次")));
+
+        auto* query = named<QLineEdit>(page, "warehouseRecommendationQuery");
+        auto* recommendation = named<QListWidget>(page, "onlineWarehouseRecommendations");
+        query->setText("Quiet Film");
+        matching<QPushButton>(page, QStringLiteral("获取推荐"))->click();
+        QTRY_COMPARE(recommendation->count(), 1);
+        auto* note = named<QLabel>(page, "warehouseRecommendationStatus");
+        QVERIFY(note->text().contains(QStringLiteral("备用推荐")));
+
+        auto* logout = matching<QPushButton>(page, QStringLiteral("退出仓库"));
+        auto* login = matching<QPushButton>(page, QStringLiteral("连接并登录"));
+        logout->click();
+        QTRY_VERIFY(login->isEnabled());
+        QCOMPARE(recommendation->count(), 0);
+        QVERIFY(note->text().isEmpty());
+        QVERIFY(counts->text().isEmpty());
+        signIn(page, server.serverPort(), "bob", "bob-demo");
+        QTRY_VERIFY(page.isSignedIn());
+        requestReport();
+        QTRY_VERIFY(report && report->status.ok() && report->value);
+        QCOMPARE(report->value->current.views, qint64(0));
+        QCOMPARE(items->count(), 0);
+        QTRY_VERIFY(counts->text().contains(QStringLiteral("浏览 0 次")));
+
+        const auto sockets = server.findChildren<QTcpSocket*>();
+        QVERIFY(!sockets.isEmpty());
+        for (auto* socket : sockets)
+            socket->disconnectFromHost();
+        QTRY_VERIFY(!page.isSignedIn() && login->isEnabled());
+        QVERIFY(counts->text().isEmpty());
+        QVERIFY(footprintStatus->text().contains(QStringLiteral("登录服务器账号")));
+    }
+
     void refreshKeepsSelectionChangedWhileLoading()
     {
         DeferredPageClient client;
@@ -248,12 +353,12 @@ private slots:
         auto fresh = std::move(aliceClient.callback);
         fresh({{}, WarehouseRecommendationResult{{}, false, QStringLiteral("没有匹配")}});
         QCOMPARE(suggestions->count(), 0);
-        QCOMPARE(named<QLabel>(alice, "warehouseStatus")->text(), QStringLiteral("没有匹配"));
+        QCOMPARE(named<QLabel>(alice, "warehouseRecommendationStatus")->text(), QStringLiteral("没有匹配"));
         recommend->click();
         fresh = std::move(aliceClient.callback);
         fresh({{}, WarehouseRecommendationResult{{suggestion}, true, QStringLiteral("模型暂不可用")}});
         QCOMPARE(suggestions->count(), 1);
-        QVERIFY(named<QLabel>(alice, "warehouseStatus")->text().contains(QStringLiteral("备用推荐")));
+        QVERIFY(named<QLabel>(alice, "warehouseRecommendationStatus")->text().contains(QStringLiteral("备用推荐")));
         QCOMPARE(aliceItems->count(), 1);
         suggestions->setCurrentRow(0);
 
