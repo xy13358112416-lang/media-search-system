@@ -438,6 +438,92 @@ private slots:
         QCOMPARE(image.pixelColor(qRound(gap.x() * dpr), qRound(gap.y() * dpr)), QColor("#f1f5fb"));
     }
 
+    void accountEntryInitializesAdminAndSeparatesRoles()
+    {
+        Fixture f(QString::fromUtf8(SAMPLE_CSV));
+        AccountHistoryServiceImpl accounts(f.library);
+        QVERIFY(accounts.initializeDatabase(f.directory.filePath("role-selection.sqlite")).ok());
+        const auto visibleButton = [](QDialog* dialog, const QString& text) -> QPushButton* {
+            for (auto* candidate : dialog->findChildren<QPushButton*>())
+                if (candidate->isVisible() && candidate->text() == text)
+                    return candidate;
+            return nullptr;
+        };
+        QTimer::singleShot(0, this, [&] {
+            auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            QVERIFY(dialog);
+            const auto close = qScopeGuard([&] { if (dialog->isVisible()) dialog->reject(); });
+            QCOMPARE(dialog->windowTitle(), QStringLiteral("选择登录方式"));
+            QVERIFY(!visibleButton(dialog, QStringLiteral("创建管理员")));
+            button(dialog, QStringLiteral("用户登录"))->click();
+            QCOMPARE(dialog->windowTitle(), QStringLiteral("用户登录"));
+            auto* registration = visibleButton(dialog, QStringLiteral("注册"));
+            QVERIFY(registration && !registration->isEnabled());
+            auto* back = visibleButton(dialog, QStringLiteral("返回"));
+            QVERIFY(back);
+            back->click();
+            button(dialog, QStringLiteral("管理员登录"))->click();
+            auto* create = visibleButton(dialog, QStringLiteral("创建管理员"));
+            auto* adminLogin = visibleButton(dialog, QStringLiteral("登录管理员"));
+            QVERIFY(create && create->isEnabled());
+            QVERIFY(adminLogin && !adminLogin->isEnabled());
+            create->click();
+            auto* username = dialog->findChild<QLineEdit*>("loginUsername");
+            auto* password = dialog->findChild<QLineEdit*>("loginPassword");
+            auto* confirm = dialog->findChild<QLineEdit*>("loginConfirmPassword");
+            QVERIFY(username && password && confirm);
+            username->setText("admin");
+            password->setText("secret");
+            confirm->setText("secret");
+            create = visibleButton(dialog, QStringLiteral("创建管理员"));
+            QVERIFY(create);
+            create->click();
+            QCOMPARE(dialog->windowTitle(), QStringLiteral("管理员登录"));
+            QVERIFY(!confirm->isVisible());
+            QVERIFY(!accounts.currentUser());
+            password->setText("secret");
+            button(dialog, QStringLiteral("登录"))->click();
+        });
+        QVERIFY(account_ui::signIn(accounts));
+        QVERIFY(accounts.currentUser());
+        QCOMPARE(accounts.currentUser()->role, account_contract::UserRole::Admin);
+        accounts.logout();
+
+        QTimer::singleShot(0, this, [&] {
+            auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            QVERIFY(dialog);
+            const auto close = qScopeGuard([&] { if (dialog->isVisible()) dialog->reject(); });
+            button(dialog, QStringLiteral("管理员登录"))->click();
+            auto* create = visibleButton(dialog, QStringLiteral("创建管理员"));
+            QVERIFY(create && !create->isEnabled());
+            auto* back = visibleButton(dialog, QStringLiteral("返回"));
+            QVERIFY(back);
+            back->click();
+            button(dialog, QStringLiteral("用户登录"))->click();
+            auto* username = dialog->findChild<QLineEdit*>("loginUsername");
+            auto* password = dialog->findChild<QLineEdit*>("loginPassword");
+            auto* confirm = dialog->findChild<QLineEdit*>("loginConfirmPassword");
+            username->setText("admin");
+            password->setText("secret");
+            button(dialog, QStringLiteral("登录"))->click();
+            QVERIFY(dialog->isVisible());
+            QVERIFY(!accounts.currentUser());
+
+            button(dialog, QStringLiteral("注册"))->click();
+            username->setText("reader");
+            password->setText("reader-secret");
+            confirm->setText("reader-secret");
+            button(dialog, QStringLiteral("注册普通用户"))->click();
+            QCOMPARE(dialog->windowTitle(), QStringLiteral("用户登录"));
+            password->setText("reader-secret");
+            button(dialog, QStringLiteral("登录"))->click();
+        });
+        QVERIFY(account_ui::signIn(accounts));
+        QVERIFY(accounts.currentUser());
+        QCOMPARE(accounts.currentUser()->role, account_contract::UserRole::User);
+        accounts.logout();
+    }
+
     void accountFrontendStartsRealSession() {
         Fixture f(QString::fromUtf8(SAMPLE_CSV));
         const auto database = f.directory.filePath("startup.sqlite");
@@ -451,11 +537,11 @@ private slots:
         QTimer::singleShot(0, [&] {
             auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
             if (!dialog) return;
-            const auto fields = dialog->findChildren<QLineEdit*>();
-            if (fields.size() < 2) { dialog->reject(); return; }
-            loginDialogSeen = true;
-            fields.at(0)->setText("admin");
-            fields.at(1)->setText("secret");
+            loginDialogSeen = dialog->windowTitle() == QStringLiteral("选择登录方式");
+            button(dialog, QStringLiteral("管理员登录"))->click();
+            button(dialog, QStringLiteral("登录管理员"))->click();
+            dialog->findChild<QLineEdit*>("loginUsername")->setText("admin");
+            dialog->findChild<QLineEdit*>("loginPassword")->setText("secret");
             QTimer::singleShot(0, [&] {
                 auto* session = qobject_cast<QDialog*>(QApplication::activeModalWidget());
                 if (!session) return;
