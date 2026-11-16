@@ -167,8 +167,37 @@ void OnlineCareClient::getResource(const WarehouseItemRef& source, Callback<Reso
     });
 }
 void OnlineCareClient::searchPeople(const PersonSearchRequest&, Callback<Page<PersonSummary>> done) { unavailableResult(std::move(done)); }
-void OnlineCareClient::listWorkFeedback(const PageRequest&, Callback<Page<WorkFeedback>> done) { unavailableResult(std::move(done)); }
-void OnlineCareClient::setWorkFeedback(const WorkFeedbackRequest&, StatusCallback done) { done(unavailable()); }
+void OnlineCareClient::listWorkFeedback(const PageRequest& input, Callback<Page<WorkFeedback>> done) {
+    const auto status = validate(input);
+    if (!status.ok()) { done({status, {}}); return; }
+    request("list_work_feedback", {{"offset", QString::number(input.offset)}, {"limit", input.limit}},
+        [this, input, done=std::move(done)](Status result, QJsonObject payload) {
+        if (!result.ok()) { done({result, {}}); return; }
+        const auto value = payload.value("page"); const auto object = value.toObject(); Page<WorkFeedback> page;
+        bool ok = value.isObject() && object.value("items").isArray() && object.value("items").toArray().size() <= input.limit;
+        const auto next = object.value("next_offset");
+        if (!next.isUndefined() && !next.isNull()) {
+            qint64 parsed = 0;
+            if (!nonnegative(next, parsed) || parsed != input.offset + input.limit) ok = false;
+            else page.nextOffset = parsed;
+        }
+        for (const auto& entry : object.value("items").toArray()) {
+            const auto row = entry.toObject(); WorkFeedback item;
+            if (!entry.isObject() || row.value("feedback") != "not_interested" || !parseWork(row.value("work"), item.work)) { ok = false; break; }
+            item.feedback = WorkFeedbackKind::NotInterested; page.items.append(item);
+        }
+        if (!ok) { abortProtocol(); done({malformed(), {}}); return; }
+        done({{}, page});
+    });
+}
+void OnlineCareClient::setWorkFeedback(const WorkFeedbackRequest& input, StatusCallback done) {
+    const auto status = validate(input);
+    if (!status.ok()) { done(status); return; }
+    const auto& ref = input.resource;
+    const QJsonObject resource{{"work_id", ref.workId}, {"source", sourceJson(ref.source)}};
+    const QString feedback = input.feedback == WorkFeedbackKind::Neutral ? "neutral" : "not_interested";
+    request("set_work_feedback", {{"resource", resource}, {"feedback", feedback}}, [done=std::move(done)](Status result, QJsonObject) { done(result); });
+}
 void OnlineCareClient::listFollows(const PageRequest&, Callback<Page<PersonSummary>> done) { unavailableResult(std::move(done)); }
 void OnlineCareClient::setFollow(const QString&, bool, StatusCallback done) { done(unavailable()); }
 void OnlineCareClient::getPersonWorks(const QString&, const PageRequest&, Callback<Page<ResourceSummary>> done) { unavailableResult(std::move(done)); }
