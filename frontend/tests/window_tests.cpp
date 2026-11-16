@@ -46,6 +46,27 @@ private slots:
         }
     }
 
+    void realCatalogCanFilterCategoryAndUnknownFormat()
+    {
+        Fixture f(QString::fromUtf8(REAL_CSV));
+        auto* category = f.window->findChild<QComboBox*>(QStringLiteral("libraryCategory"));
+        auto* format = f.window->findChild<QComboBox*>(QStringLiteral("libraryFormat"));
+        QVERIFY(category && format);
+        QCOMPARE(f.table->rowCount(), 500);
+        QCOMPARE(format->count(), 2);
+        QCOMPARE(format->itemText(1), QStringLiteral("格式未知"));
+        format->setCurrentIndex(1);
+        QCOMPARE(f.table->rowCount(), 500);
+        QCOMPARE(f.table->item(0, 1)->text(), QStringLiteral("未知"));
+        for (const auto& name : {QStringLiteral("音乐"), QStringLiteral("电影"), QStringLiteral("电视剧")}) {
+            const int index = category->findData(name);
+            QVERIFY(index >= 0);
+            category->setCurrentIndex(index);
+            QCOMPARE(f.table->rowCount(), name == QStringLiteral("电影") ? 200 : 150);
+            QCOMPARE(f.detail(QStringLiteral("类别")), name);
+        }
+    }
+
     void searchesFiltersAndEmptyResultsStayCorrect() {
         Fixture f(QString::fromUtf8(SAMPLE_CSV));
         f.tabs->setCurrentIndex(1);
@@ -75,10 +96,7 @@ private slots:
         finishLayout(f.table);
         QCOMPARE(f.table->rowCount(), 30);
         f.tabs->setCurrentIndex(0);
-        QComboBox* filter = nullptr;
-        for (auto* candidate : f.window->findChildren<QComboBox*>())
-            if (candidate->findText(QStringLiteral("全部类型")) >= 0)
-                filter = candidate;
+        auto* filter = f.window->findChild<QComboBox*>(QStringLiteral("libraryFormat"));
         QVERIFY(filter);
         filter->setCurrentIndex(filter->findData(QStringLiteral("WAV")));
         finishLayout(f.table);

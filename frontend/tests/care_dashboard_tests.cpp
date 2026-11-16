@@ -4,6 +4,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QScopeGuard>
 #include <QTabWidget>
@@ -100,9 +101,30 @@ private slots:
             auto* report = footprint->findChild<QLabel*>("careStatus");
             QVERIFY(report && report->text().contains(QStringLiteral("含模拟数据")));
             QVERIFY(footprint->findChildren<QTableWidget*>().size() == 3);
+            auto* clearHistory = button(footprint, QStringLiteral("清理历史"));
+            QVERIFY(clearHistory);
+            QLabel* counts = nullptr;
+            for (auto* label : footprint->findChildren<QLabel*>())
+                if (label->accessibleName() == QStringLiteral("足迹统计"))
+                    counts = label;
+            QVERIFY(counts && counts->text().contains(QStringLiteral("浏览 3 次")));
+            const auto answerHistory = [this](QMessageBox::StandardButton choice) {
+                QTimer::singleShot(0, this, [choice] {
+                    auto* confirmation = qobject_cast<QMessageBox*>(QApplication::activeModalWidget());
+                    QVERIFY(confirmation);
+                    confirmation->button(choice)->click();
+                });
+            };
+            answerHistory(QMessageBox::No);
+            clearHistory->click();
+            QVERIFY(counts->text().contains(QStringLiteral("浏览 3 次")));
+            answerHistory(QMessageBox::Yes);
+            clearHistory->click();
+            QVERIFY(counts->text().contains(QStringLiteral("浏览 0 次")));
 
             tabs->setCurrentIndex(3);
             auto* recommendation = tabs->currentWidget();
+            QVERIFY(!button(recommendation, QStringLiteral("清理历史")));
             auto* results = recommendation->findChild<QListWidget*>("careTemporalList");
             QVERIFY(results);
             auto* cancel = button(recommendation, QStringLiteral("取消"));

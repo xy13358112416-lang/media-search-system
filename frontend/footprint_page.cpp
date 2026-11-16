@@ -4,6 +4,7 @@
 #include <QDateEdit>
 #include <QHeaderView>
 #include <QHBoxLayout>
+#include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
 #include <algorithm>
@@ -71,6 +72,7 @@ public:
         bar->addWidget(fetch);
         layout->addLayout(bar);
         counts_->setObjectName(QStringLiteral("sectionTitle"));
+        counts_->setAccessibleName(QStringLiteral("足迹统计"));
         layout->addWidget(counts_);
         note_->setTextFormat(Qt::PlainText);
         note_->setWordWrap(true);
@@ -83,12 +85,19 @@ public:
         setup(days_, {QStringLiteral("北京时间"), QStringLiteral("浏览次数"), QStringLiteral("搜索次数")});
         setup(categories_, {QStringLiteral("类别"), QStringLiteral("浏览次数"), QStringLiteral("相对分布")});
         setup(people_, {QStringLiteral("人物"), QStringLiteral("角色"), QStringLiteral("浏览次数")});
+        auto* actions = new QHBoxLayout;
+        actions->addStretch();
+        actions->addWidget(clearHistory_);
+        layout->addLayout(actions);
+        clearHistory_->setObjectName(QStringLiteral("danger"));
+        connect(clearHistory_, &QPushButton::clicked, this, [this] { clearHistory(); });
         connect(mode_, &QComboBox::activated, this, [this] { activate(); });
         connect(fetch, &QPushButton::clicked, this, [this] { activate(); });
     }
 
     void activate() override
     {
+        active_ = true;
         clear();
         invalidate(0);
         const auto today = care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
@@ -156,12 +165,36 @@ public:
 
     void deactivate() override
     {
+        active_ = false;
         CarePage::deactivate();
         clear();
         status->clear();
     }
 
 private:
+    void clearHistory()
+    {
+        if (QMessageBox::question(this, QStringLiteral("清理浏览和搜索历史"),
+                QStringLiteral("清理后无法恢复。已关注的人物和「不感兴趣」记录会保留。确定清理？"),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+            return;
+
+        clearHistory_->setEnabled(false);
+        invalidate(0);
+        status->setText(QStringLiteral("正在清理历史…"));
+        service_.clearHistory([page = QPointer<FootprintPage>(this)](Status result) {
+            if (!page)
+                return;
+            page->clearHistory_->setEnabled(true);
+            if (!page->active_)
+                return;
+            if (result.ok())
+                page->activate();
+            else
+                page->reportError(result);
+        });
+    }
+
     void setup(QTableWidget* table, const QStringList& headings)
     {
         table->setColumnCount(headings.size());
@@ -181,6 +214,8 @@ private:
     }
 
     CareService& service_;
+    bool active_ = false;
+    QPushButton* clearHistory_ = new QPushButton(QStringLiteral("清理历史"));
     QComboBox* mode_ = new QComboBox;
     QDateEdit* from_ = new QDateEdit;
     QDateEdit* to_ = new QDateEdit;

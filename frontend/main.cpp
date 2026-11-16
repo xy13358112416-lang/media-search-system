@@ -49,6 +49,19 @@
 
 namespace {
 
+const QString unknownFormat = QStringLiteral("<unknown>");
+
+QStringList contentCategories(const QList<MediaRecord>& records)
+{
+    QStringList categories;
+    for (const auto& record : records) {
+        if (!record.category.isEmpty() && !categories.contains(record.category))
+            categories.append(record.category);
+    }
+    categories.sort();
+    return categories;
+}
+
 QString displayText(const QString& value)
 {
     return value.isEmpty() ? QStringLiteral("—") : value;
@@ -300,8 +313,14 @@ public:
         auto* libraryControls = new QWidget;
         auto* toolbar = new QHBoxLayout(libraryControls);
         toolbar->setContentsMargins(0, 0, 0, 0);
-        auto* filterLabel = new QLabel(QStringLiteral("文件类型"));
+        auto* libraryCategoryLabel = new QLabel(QStringLiteral("内容类别"));
+        libraryCategoryLabel->setBuddy(libraryCategory_);
+        libraryCategory_->setObjectName(QStringLiteral("libraryCategory"));
+        toolbar->addWidget(libraryCategoryLabel);
+        toolbar->addWidget(libraryCategory_);
+        auto* filterLabel = new QLabel(QStringLiteral("文件格式"));
         filterLabel->setBuddy(filter_);
+        filter_->setObjectName(QStringLiteral("libraryFormat"));
         toolbar->addWidget(filterLabel);
         toolbar->addWidget(filter_);
         toolbar->addWidget(add_);
@@ -583,6 +602,7 @@ public:
         });
 
         connect(filter_, &QComboBox::currentIndexChanged, this, [this] { refresh(); });
+        connect(libraryCategory_, &QComboBox::currentIndexChanged, this, [this] { refresh(); });
         connect(table_, &QTableWidget::cellClicked, this, [this](int row) {
             if (!accounts_ || !identity_ || row < 0 || row >= records_.size())
                 return;
@@ -696,9 +716,7 @@ private:
                 }
             }
 
-            // If another file type was selected, switch to the new record's type.
-            const QString activeType = filter_->currentData().toString();
-            refreshTypes(activeType.isEmpty() ? QString() : record.fileType, id);
+            refreshTypes(&record, id);
             dialog.accept();
         });
         name.setFocus();
@@ -735,7 +753,7 @@ private:
                 return;
             }
         }
-        refreshTypes(filter_->currentData().toString());
+        refreshTypes();
     }
 
     // Reload after a committed write, including writes that reported an index error.
@@ -763,7 +781,7 @@ private:
     void recoverAfterError(QWidget* parent, const QString& title, const QString& error)
     {
         const auto reload = library_.load();
-        refreshTypes(filter_->currentData().toString());
+        refreshTypes();
         QMessageBox message(QMessageBox::Warning, title,
                             reload.success ? error : error + QStringLiteral("\n重新加载失败：") + reload.error,
                             QMessageBox::Ok, parent);
@@ -771,29 +789,54 @@ private:
         message.exec();
     }
 
-    // Restore the filter if the type still exists, or show all records.
-    void refreshTypes(const QString& type = {}, const QString& selectedId = {})
+    // Preserve filters after refreshing the catalog. When adding, keep the new record visible.
+    void refreshTypes(const MediaRecord* added = nullptr, const QString& selectedId = {})
     {
         const QSignalBlocker blockFilter(filter_);
+        const QSignalBlocker blockCategory(libraryCategory_);
+        auto format = filter_->currentData().toString();
+        auto category = libraryCategory_->currentData().toString();
+        if (added && !format.isEmpty())
+            format = added->fileType.isEmpty() ? unknownFormat : added->fileType;
+        if (added && !category.isEmpty())
+            category = added->category;
+
         filter_->clear();
-        filter_->addItem(QStringLiteral("全部类型"), QString());
-        for (const auto& availableType : library_.fileTypes())
-            filter_->addItem(availableType, availableType);
-        const int index = filter_->findData(type);
-        filter_->setCurrentIndex(index < 0 ? 0 : index);
+        filter_->addItem(QStringLiteral("全部格式"), QString());
+        for (const auto& availableType : library_.fileTypes()) {
+            if (availableType.isEmpty())
+                filter_->addItem(QStringLiteral("格式未知"), unknownFormat);
+            else
+                filter_->addItem(availableType, availableType);
+        }
+        filter_->setCurrentIndex(std::max(0, filter_->findData(format)));
+
+        const auto records = library_.records();
+        libraryCategory_->clear();
+        libraryCategory_->addItem(QStringLiteral("全部类别"), QString());
+        for (const auto& availableCategory : contentCategories(records))
+            libraryCategory_->addItem(availableCategory, availableCategory);
+        libraryCategory_->setCurrentIndex(std::max(0, libraryCategory_->findData(category)));
         refresh(selectedId);
 
         QStringList names;
-        for (const auto& record : library_.records())
+        for (const auto& record : records)
             names.append(record.fileName);
         names.removeDuplicates();
         names.sort(Qt::CaseInsensitive);
         keywordSuggestions_.setStringList(names);
     }
-    // Apply the selected file type and display the date order returned by the library.
+    // Apply category and format together, retaining the library's date order.
     void refresh(const QString& selectedId = {})
     {
-        populateTable(library_.records(filter_->currentData().toString()), selectedId);
+        const auto format = filter_->currentData().toString();
+        const auto category = libraryCategory_->currentData().toString();
+        auto records = library_.records(format == unknownFormat ? QString() : format);
+        records.removeIf([&](const MediaRecord& record) {
+            return (format == unknownFormat && !record.fileType.isEmpty()) ||
+                   (!category.isEmpty() && record.category != category);
+        });
+        populateTable(records, selectedId);
         count_->setText(records_.isEmpty() ? QStringLiteral("暂无媒体记录")
                                           : QStringLiteral("共 %1 条").arg(records_.size()));
     }
@@ -870,8 +913,10 @@ private:
         if (accounts_)
             add(QStringLiteral("自动"), PreferenceMode::Auto);
         add(QStringLiteral("不限"), PreferenceMode::Any);
-        for (const auto& choice : choices)
-            add(choice, PreferenceMode::Explicit, choice);
+        for (const auto& choice : choices) {
+            if (!choice.isEmpty())
+                add(choice, PreferenceMode::Explicit, choice);
+        }
         const int index = previousMode.isValid() && previous.toString().isEmpty()
             ? combo->findData(previousMode, Qt::UserRole + 1) : combo->findData(previous);
         combo->setCurrentIndex(index < 0 ? 0 : index);
@@ -1026,7 +1071,8 @@ private:
             const auto& record = records_.at(row);
             if (record.id == selectedId)
                 selectedRow = row;
-            const QStringList values{record.fileName, record.fileType,
+            const QStringList values{record.fileName,
+                                     record.fileType.isEmpty() ? QStringLiteral("未知") : record.fileType,
                 recommended ? record.category : record.director,
                 recommended ? QLocale().toString(record.viewCount) : displayDate(record.releaseDate)};
             for (int column = 0; column < values.size(); ++column)
@@ -1054,7 +1100,8 @@ private:
 
         const auto& record = records_.at(row);
         const QLocale locale;
-        const QStringList values{record.id, record.fileName, record.fileType,
+        const QStringList values{record.id, record.fileName,
+                                 record.fileType.isEmpty() ? QStringLiteral("未知") : record.fileType,
                                  record.fileType.isEmpty() ? QStringLiteral("未知") : QStringLiteral("%1 字节").arg(locale.toString(record.fileSize)),
                                  record.director, record.actors.join(QStringLiteral("、")),
                                  locale.toString(record.viewCount), displayDate(record.releaseDate),
@@ -1095,7 +1142,8 @@ private:
     QFrame* trace_ = new QFrame; // Search trace panel.
     QLabel* traceStatus_ = new QLabel; // Explanation when there are no query conditions.
     std::array<QLabel*, 3> traceCards_{}; // One card for each possible index step.
-    QComboBox* filter_ = new QComboBox; // File type filter with an empty value for all types.
+    QComboBox* filter_ = new QComboBox;
+    QComboBox* libraryCategory_ = new QComboBox;
     QPushButton* add_ = new QPushButton(QStringLiteral("新增")); // Open the record form.
     QPushButton* remove_ = new QPushButton(QStringLiteral("删除")); // Delete the selected row.
     QLabel* count_ = new QLabel;       // Visible record count or empty state.
