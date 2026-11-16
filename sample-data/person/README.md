@@ -1,5 +1,7 @@
 # Synthetic person adapter examples
 
+`import-demo.synthetic.json` is a separate **fictional operator-import example**, documented in `server/PERSON_IMPORT.md`. Its placeholder resource triple must be replaced with an exact registered source in a dedicated demo database, and importing requires `--allow-synthetic`. The adapter fixtures described below are not operator-import files.
+
 These files are hand-authored, fictional test inputs. They contain **no real biography, confirmed real-world credit, news crawl, or production loader**. The JSON metadata explicitly sets `synthetic: true` and `productionLoaderEnabled: false`. Do not import this directory into a production person store or infer real associations from the invented display names.
 
 `confirmed_people.synthetic.json` demonstrates stable opaque person/work IDs, two separate people named Alex Vale, English whitespace normalization, one person with three roles, duplicate roles, an unknown association, duplicate local media row IDs, multiple actual sources, and a directory entry outside the caller's readable scope. `mediaRowId` and `rawCsvActors` are explanatory fixture fields only; the adapter never reads or matches them.
