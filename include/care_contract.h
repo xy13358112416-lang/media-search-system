@@ -8,6 +8,7 @@ namespace care_contract {
 enum class PersonRole { Actor, Director, Musician };
 enum class BrowseScene { Neutral, Relax, Focus, Explore }; // User-selected context, not inferred emotion.
 enum class TrendingKind { Works, SearchTerms };
+enum class TrendingSummaryMode { Rules, Model };
 enum class UpdateKind { News, Release };
 enum class RecommendationEngine { Temporal, DeepSeek };
 enum class WorkFeedbackKind { Neutral, NotInterested };
@@ -35,7 +36,12 @@ struct PersonUpdate {
     qint64 fetchedAtUtc = 0;
     bool stale = false;
 };
-struct TrendingRequest { TrendingKind kind = TrendingKind::Works; TimeRange range; int limit = 10; };
+struct TrendingRequest {
+    TrendingKind kind = TrendingKind::Works;
+    TimeRange range;
+    int limit = 10;
+    TrendingSummaryMode summaryMode = TrendingSummaryMode::Rules;
+};
 struct TrendingItem {
     std::optional<ResourceSummary> work; // Works: present and term empty. SearchTerms: absent and term set.
     QString term;

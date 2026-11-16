@@ -97,13 +97,17 @@ PeriodFootprint的views/searches是去重事件后的原始次数；uniqueWorks�
 | set_follow / setFollow | person_id,followed布尔值 | 空对象 |
 | get_person_works / getPersonWorks | person_id,offset,limit | page（ResourceSummary） |
 | get_person_updates / getPersonUpdates | person_id,range,offset,limit | page（PersonUpdate） |
-| get_trending / getTrending | kind,range,limit整数 | result（TrendingResult） |
+| get_trending / getTrending | kind,range,limit整数,summary_mode可省略 | result（TrendingResult） |
 | get_footprint / getFootprint | range,comparison可省略 | report（FootprintReport） |
 | recommend_temporal / recommendTemporal | category,file_type,scene,limit整数 | result（TemporalRecommendationResult） |
 
 分页请求中的 `offset` 是十进制字符串、`limit` 是整数，两者直接位于请求 `payload`，不再额外嵌套 `page`。例如 `search_people` 的 `payload` 为 `{"query":"名字","offset":"0","limit":20}`。分页响应仍以 `page` 对象返回。此约定与已实现的 `list_work_feedback` 请求保持一致；新增人物 RPC 及资讯客户端应按此格式实现并参与联调。
 
-沿用4字节长度前缀与JSON `{type,req_id,token,payload}`。响应type为请求type＋`_resp`，错误使用现有error_resp/Status。cancel_recommendation复用于recommend_resources和recommend_temporal，target_req_id作用域为同一连接；本地先以Cancelled完成原回调，取消确认不再次调用原回调。未知操作在当前未实现服务端被拒绝，不返回伪造业务成功。
+沿用4字节长度前缀与JSON `{type,req_id,token,payload}`。响应type为请求type＋`_resp`，错误使用现有error_resp/Status。cancel_recommendation复用于recommend_resources、recommend_temporal及模型模式get_trending，target_req_id作用域为同一连接；本地先以Cancelled完成原回调，取消确认不再次调用原回调。未知操作在当前未实现服务端被拒绝，不返回伪造业务成功。
+
+`TrendingRequest.summaryMode` 为 `TrendingSummaryMode::Rules` / `Model`，默认 Rules，追加在既有字段末尾。网络 `summary_mode` 只能为字符串 `rules` 或 `model`；省略表示 rules，null 或其他值无效。普通切页/筛选/刷新只请求规则摘要，用户主动点击“生成 AI 摘要”才请求 model。模型模式复用较长的推荐请求超时，超时和退出会话时内部发送取消；`getTrending` 的公开回调接口保持不变，不新增取消句柄。
+
+模型在服务器异步运行，只接收符合公开门槛的聚合榜单。发送前重新核对会话并重新聚合；若条目、计数或公开资格影响了结果，丢弃旧模型文本并返回当前规则榜单，不自动再调用模型。模型任务使用独立记录，取消不会误取消仓库推荐。无 Key、超时或模型失败时正常返回规则摘要，`summary_from_model=false`。
 
 ## 7. JSON字段映射（供后续编解码实现）
 

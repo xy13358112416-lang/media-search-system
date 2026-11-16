@@ -161,7 +161,7 @@ std::optional<QList<WarehouseItem>> listItems(const QSqlDatabase& db, qint64 war
 } // namespace
 
 WarehouseServer::WarehouseServer(llm_recommendation::Config config)
-    : recommender_(std::move(config)), dbName_(QUuid::createUuid().toString())
+    : recommender_(config), trendSummarizer_(std::move(config)), dbName_(QUuid::createUuid().toString())
 {
     connect(this, &QTcpServer::newConnection, this, [this] {
         while (auto* socket = nextPendingConnection()) {
@@ -183,6 +183,9 @@ WarehouseServer::WarehouseServer(llm_recommendation::Config config)
 WarehouseServer::~WarehouseServer()
 {
     close();
+    // Finish accepted connections while both async clients and the database still live.
+    // disconnected cancels their pending jobs before callbacks can outlive this server.
+    for (auto* socket : findChildren<QTcpSocket*>()) socket->abort();
     personContextLoader_ = {};
     personStore_.reset();
     db_ = {};
@@ -398,11 +401,15 @@ void WarehouseServer::readRequests(QTcpSocket* socket, const std::shared_ptr<Ses
             return;
         }
         const QString id = request.value("req_id").toString();
-        if (session->pending.contains(id)) {
+        if (session->pending.contains(id) || session->summaries.contains(id)) {
             socket->abort();
             return;
         }
         const auto type = request.value("type").toString();
+        if (type == "get_trending" && request.value("payload").toObject().value("summary_mode") == QJsonValue("model")) {
+            startTrendingSummary(socket, session, request);
+            continue;
+        }
         if (type == "recommend_resources" || type == "cancel_recommendation") {
             startRecommendation(socket, session, request);
             continue;
@@ -648,88 +655,10 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
     }
     if (type == "get_trending") {
         care_contract::TrendingRequest input;
-        const auto kind = payload.value("kind").toString();
-        if (kind == "works") input.kind = care_contract::TrendingKind::Works;
-        else if (kind == "search_terms") input.kind = care_contract::TrendingKind::SearchTerms;
-        else return invalid();
-        if (!readRange(payload.value("range"), input.range) || !payload.value("limit").isDouble()) return invalid();
-        const double requestedLimit = payload.value("limit").toDouble();
-        if (requestedLimit < 1 || requestedLimit > care_contract::MaxPageSize || requestedLimit != static_cast<int>(requestedLimit)) return invalid();
-        input.limit = static_cast<int>(requestedLimit);
-        if (!care_contract::validate(input).ok()) return invalid();
-
-        care_algorithms::PublicSnapshot snapshot;
-        snapshot.nowUtc = QDateTime::currentSecsSinceEpoch();
-        QSqlQuery sources(db_);
-        sources.prepare("SELECT s.work_id,s.warehouse_id,s.item_id,i.media FROM work_sources s "
-                        "JOIN warehouse_items i ON i.id=s.item_id AND i.warehouse_id=s.warehouse_id "
-                        "JOIN warehouses w ON w.id=s.warehouse_id WHERE w.is_public=1 AND EXISTS ("
-                        "SELECT 1 FROM behavior_events e JOIN behavior_settings p ON p.user_id=e.user_id "
-                        "WHERE e.public_eligible=1 AND p.contribute_public_trends=1 AND e.action='view' "
-                        "AND e.work_id=s.work_id AND e.warehouse_id=s.warehouse_id AND e.item_id=s.item_id "
-                        "AND e.occurred_at_utc>=? AND e.occurred_at_utc<? AND e.occurred_at_utc<=?) ORDER BY s.warehouse_id,s.item_id");
-        sources.addBindValue(input.range.beginUtc); sources.addBindValue(input.range.endUtc); sources.addBindValue(snapshot.nowUtc);
-        if (input.kind == care_contract::TrendingKind::Works && !sources.exec()) return dbError();
-        qint64 bytes = 0;
-        while (input.kind == care_contract::TrendingKind::Works && sources.next()) {
-            if (snapshot.publicWorks.size() >= 10000) return dbError();
-            const auto blob = sources.value(3).toByteArray(); bytes += blob.size();
-            if (bytes > 16 * 1024 * 1024) return dbError();
-            MediaRecord media; QString error;
-            if (!media_json::fromJson(QJsonDocument::fromJson(blob).object(), media, error)) return dbError();
-            snapshot.publicWorks.append({{sources.value(0).toString(), {sources.value(1).toLongLong(), sources.value(2).toLongLong()}}, media, {}});
-        }
-        if (sources.lastError().isValid()) return dbError();
-        QSqlQuery events(db_);
-        QString eventSql = QStringLiteral("SELECT e.user_id,e.event_id,e.action,e.query,e.occurred_at_utc,e.synthetic,e.work_id,e.warehouse_id,e.item_id "
-                       "FROM behavior_events e JOIN behavior_settings s ON s.user_id=e.user_id "
-                       "WHERE e.public_eligible=1 AND s.contribute_public_trends=1 AND e.action=? "
-                       "AND e.occurred_at_utc>=? AND e.occurred_at_utc<? AND e.occurred_at_utc<=?");
-        if (input.kind == care_contract::TrendingKind::Works)
-            eventSql += QStringLiteral(" AND EXISTS (SELECT 1 FROM work_sources ws "
-                "JOIN warehouse_items i ON i.id=ws.item_id AND i.warehouse_id=ws.warehouse_id "
-                "JOIN warehouses w ON w.id=ws.warehouse_id WHERE w.is_public=1 "
-                "AND ws.work_id=e.work_id AND ws.warehouse_id=e.warehouse_id AND ws.item_id=e.item_id)");
-        events.prepare(eventSql);
-        events.addBindValue(input.kind == care_contract::TrendingKind::Works ? "view" : "search");
-        events.addBindValue(input.range.beginUtc); events.addBindValue(input.range.endUtc); events.addBindValue(snapshot.nowUtc);
-        if (!events.exec()) return dbError();
-        while (events.next()) {
-            if (snapshot.events.size() >= 100000) return dbError();
-            care_algorithms::ObservedBehavior event;
-            event.userKey = QString::number(events.value(0).toLongLong());
-            event.record.event.eventId = events.value(1).toString();
-            if (input.kind == care_contract::TrendingKind::Works) {
-                event.record.event.action = care_contract::BehaviorAction::View;
-                event.record.event.resource = care_contract::ResourceRef{events.value(6).toString(),
-                    {events.value(7).toLongLong(), events.value(8).toLongLong()}};
-            } else {
-                event.record.event.action = care_contract::BehaviorAction::Search;
-                event.record.event.query = events.value(3).toString();
-            }
-            event.record.occurredAtUtc = events.value(4).toLongLong();
-            event.record.synthetic = events.value(5).toBool(); event.publicEligible = true;
-            snapshot.events.append(event);
-        }
-        if (events.lastError().isValid()) return dbError();
-        const auto result = care_algorithms::buildTrending(input, snapshot);
-        if (!result.status.ok() || !result.value) return fail("ServerError", result.status.message);
-        QJsonArray items;
-        for (const auto& item : result.value->items) {
-            QJsonObject row{{"term", item.term}, {"distinct_users", QString::number(item.distinctUsers)},
-                            {"effective_events", QString::number(item.effectiveEvents)}};
-            if (item.work) {
-                const auto& work = *item.work;
-                row.insert("work", QJsonObject{{"resource", QJsonObject{{"work_id", work.resource.workId},
-                    {"source", QJsonObject{{"warehouse_id", QString::number(work.resource.source.warehouseId)},
-                                           {"item_id", QString::number(work.resource.source.itemId)}}}}},
-                    {"media", media_json::toJson(work.media)}, {"people", QJsonArray{}}});
-            }
-            items.append(row);
-        }
-        return success({{"result", QJsonObject{{"kind", kind}, {"range", rangeJson(input.range)}, {"items", items},
-            {"generated_at_utc", QString::number(result.value->generatedAtUtc)}, {"summary", result.value->summary},
-            {"summary_from_model", result.value->summaryFromModel}, {"contains_synthetic_data", result.value->containsSyntheticData}}}});
+        if (!parseTrendingRequest(payload, input).ok()) return invalid();
+        const auto result = currentTrending(input);
+        if (!result.status.ok() || !result.value) return dbError();
+        return success({{"result", trendingJson(*result.value)}});
     }
     if (type == "get_footprint") {
         care_contract::FootprintRequest input;

@@ -77,7 +77,9 @@ Status validate(const PersonUpdatesRequest& value) {
 }
 Status validate(const TrendingRequest& value) {
     if ((value.kind != TrendingKind::Works && value.kind != TrendingKind::SearchTerms) ||
-        value.limit <= 0 || value.limit > MaxPageSize) return invalid("热榜类型或数量无效。");
+        value.limit <= 0 || value.limit > MaxPageSize ||
+        (value.summaryMode != TrendingSummaryMode::Rules && value.summaryMode != TrendingSummaryMode::Model))
+        return invalid("热榜类型、数量或摘要模式无效。");
     return validate(value.range);
 }
 Status validate(const FootprintRequest& value) {
