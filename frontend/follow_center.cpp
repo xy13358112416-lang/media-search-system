@@ -38,6 +38,8 @@ public:
         layout->addLayout(split, 1);
         auto* actions = new QHBoxLayout;
         actions->addWidget(toggle_);
+        actions->addWidget(worksMore_);
+        actions->addWidget(updatesMore_);
         actions->addStretch();
         actions->addWidget(source_);
         layout->addLayout(actions);
@@ -55,6 +57,8 @@ public:
         connect(query_, &QLineEdit::returnPressed, this, startSearch);
         connect(followed, &QPushButton::clicked, this, [this] { activate(); });
         connect(more_, &QPushButton::clicked, this, [this] { if (next_) loadPeople(*next_); });
+        connect(worksMore_, &QPushButton::clicked, this, [this] { if (nextWorks_) loadWorks(*nextWorks_); });
+        connect(updatesMore_, &QPushButton::clicked, this, [this] { if (nextUpdates_) loadUpdates(*nextUpdates_); });
         connect(people_, &QListWidget::currentRowChanged, this, [this] { loadPerson(); });
         connect(toggle_, &QPushButton::clicked, this, [this] { toggleFollow(); });
         connect(news_, &QListWidget::itemSelectionChanged, this, [this] { updateActions(); });
@@ -69,6 +73,8 @@ public:
                 status->setText(QStringLiteral("无法打开来源。"));
         });
         more_->setEnabled(false);
+        worksMore_->setEnabled(false);
+        updatesMore_->setEnabled(false);
         updateActions();
     }
 
@@ -130,29 +136,51 @@ private:
         works_->clear();
         news_->clear();
         calendar_->clear();
+        nextWorks_.reset();
+        nextUpdates_.reset();
+        worksMore_->setEnabled(false);
+        updatesMore_->setEnabled(false);
+        selectedPersonId_.clear();
         updateActions();
         const auto row = people_->currentRow();
         if (row < 0 || row >= entries_.size())
             return;
-        const auto id = entries_.at(row).personId;
+        selectedPersonId_ = entries_.at(row).personId;
         const auto now = care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
-        service_.getPersonWorks(id, {0, 50}, latest(1, [this](Result<Page<ResourceSummary>> result) {
+        updatesRange_ = {care_ui::midnight(now.addMonths(-3)), care_ui::midnight(now.addMonths(6))};
+        loadWorks(0);
+        loadUpdates(0);
+    }
+
+    void loadWorks(qint64 offset)
+    {
+        worksMore_->setEnabled(false);
+        service_.getPersonWorks(selectedPersonId_, {offset, 50}, latest(1, [this](Result<Page<ResourceSummary>> result) {
             if (!result.status.ok() || !result.value) {
+                worksMore_->setEnabled(nextWorks_.has_value());
                 reportError(result);
                 return;
             }
+            nextWorks_ = result.value->nextOffset;
             for (const auto& item : result.value->items)
                 works_->addItem(item.media.fileName);
-            if (works_->count() == 0)
+            worksMore_->setEnabled(nextWorks_.has_value());
+            if (works_->count() == 0 && !nextWorks_)
                 works_->addItem(QStringLiteral("暂无关联作品"));
         }));
-        service_.getPersonUpdates({id, {care_ui::midnight(now.addMonths(-3)),
-                                       care_ui::midnight(now.addMonths(6))}, {0, 50}},
+    }
+
+    void loadUpdates(qint64 offset)
+    {
+        updatesMore_->setEnabled(false);
+        service_.getPersonUpdates({selectedPersonId_, updatesRange_, {offset, 50}},
             latest(2, [this](Result<Page<PersonUpdate>> result) {
                 if (!result.status.ok() || !result.value) {
+                    updatesMore_->setEnabled(nextUpdates_.has_value());
                     reportError(result);
                     return;
                 }
+                nextUpdates_ = result.value->nextOffset;
                 for (const auto& update : result.value->items) {
                     if (update.kind == UpdateKind::Release && !update.eventAtUtc)
                         continue;
@@ -164,9 +192,10 @@ private:
                              care_ui::timestamp(update.fetchedAtUtc)), list);
                     item->setData(Qt::UserRole, update.sourceUrl);
                 }
-                if (!news_->count())
+                updatesMore_->setEnabled(nextUpdates_.has_value());
+                if (!news_->count() && !nextUpdates_)
                     news_->addItem(QStringLiteral("暂无有来源的资讯"));
-                if (!calendar_->count())
+                if (!calendar_->count() && !nextUpdates_)
                     calendar_->addItem(QStringLiteral("暂无已确认日期的发布"));
             }));
     }
@@ -224,10 +253,16 @@ private:
     QListWidget* news_ = new QListWidget;
     QListWidget* calendar_ = new QListWidget;
     QPushButton* more_ = new QPushButton(QStringLiteral("加载更多"));
+    QPushButton* worksMore_ = new QPushButton(QStringLiteral("加载更多作品"));
+    QPushButton* updatesMore_ = new QPushButton(QStringLiteral("加载更多更新"));
     QPushButton* toggle_ = new QPushButton;
     QPushButton* source_ = new QPushButton(QStringLiteral("打开原始来源"));
     QList<PersonSummary> entries_;
     std::optional<qint64> next_;
+    std::optional<qint64> nextWorks_;
+    std::optional<qint64> nextUpdates_;
+    QString selectedPersonId_;
+    TimeRange updatesRange_;
     QString submitted_;
     bool followingOnly_ = true;
     bool writing_ = false;

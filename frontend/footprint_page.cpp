@@ -122,7 +122,10 @@ public:
             notes << (current.coverageStartUtc ? QStringLiteral("记录起于 %1").arg(care_ui::timestamp(*current.coverageStartUtc))
                                                : QStringLiteral("所选时段暂无浏览或搜索记录"));
             if (data.comparison)
-                notes << QStringLiteral("前一自然区间 · %1").arg(statistics(*data.comparison));
+                notes << QStringLiteral("前一自然区间 %1 至 %2 · %3")
+                    .arg(care_ui::localTime(data.comparison->range.beginUtc).date().toString(Qt::ISODate),
+                         care_ui::localTime(data.comparison->range.endUtc - 1).date().toString(Qt::ISODate),
+                         statistics(*data.comparison));
             if (!data.message.isEmpty())
                 notes << data.message;
             note_->setText(notes.join(QStringLiteral("\n")));

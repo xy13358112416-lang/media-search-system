@@ -56,6 +56,16 @@ public:
         cancel_->setEnabled(false);
     }
 
+    ~TemporalPage() override
+    {
+        // Cancellation may synchronously complete a callback while QPointer is
+        // still valid during this destructor. Invalidate before calling out.
+        CarePage::deactivate();
+        auto handle = std::exchange(handle_, {});
+        if (!handle.isEmpty())
+            service_.cancelRecommendation(handle);
+    }
+
     void activate() override { reloadView(); }
 
     void deactivate() override
