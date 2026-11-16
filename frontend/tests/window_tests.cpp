@@ -1,14 +1,21 @@
 #include "account_history_service.h"
 #include "personalrecommendation_service.h"
 #include "window_test_support.h"
+
+#include <QCheckBox>
+#include <QPropertyAnimation>
+#include <QSettings>
 #include <QtTest>
 
 using namespace UiTest;
 
 class WindowTests : public QObject {
     Q_OBJECT
+    QTemporaryDir settingsDir_;
 private slots:
     void initTestCase() {
+        QVERIFY(settingsDir_.isValid());
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDir_.path());
         qApp->setStyle(QStringLiteral("Fusion"));
         qApp->setStyleSheet(libraryStyle());
     }
@@ -289,6 +296,97 @@ private slots:
         f.window.reset();
     }
 
+    void warmScenesAndMotionPreference() {
+        using warm_mode::Scene;
+        using media_mood::Mood;
+        const auto noRecommendations = [] {};
+        QList<Scene> scenes;
+        Mood mood = Mood::Any;
+        const auto search = [&](const QString&, Mood value, const QString&, bool) { mood = value; };
+        const auto sceneChanged = [&](Scene scene) { scenes.append(scene); };
+        {
+            AssistantDialog dialog(nullptr, search, sceneChanged, noRecommendations, QStringLiteral("推荐"));
+            dialog.show();
+            auto* motion = dialog.findChild<QCheckBox*>(QStringLiteral("warmAnimationEnabled"));
+            auto* animation = dialog.findChild<QPropertyAnimation*>(QStringLiteral("warmSceneAnimation"));
+            auto* panel = dialog.findChild<QFrame*>(QStringLiteral("warmSceneCard"));
+            QVERIFY(motion && animation && panel);
+            QCOMPARE(scenes.last(), Scene::Neutral);
+            QVERIFY(motion->isChecked());
+            const auto neutral = panel->styleSheet();
+            button(&dialog, QStringLiteral("放松"))->click();
+            QCOMPARE(scenes.last(), Scene::Relax);
+            QVERIFY(panel->styleSheet() != neutral);
+            QCOMPARE(animation->state(), QAbstractAnimation::Running);
+            motion->setChecked(false);
+            QCOMPARE(animation->state(), QAbstractAnimation::Stopped);
+            button(&dialog, QStringLiteral("查本地媒体"))->click();
+            QCOMPARE(mood, Mood::Relaxing);
+            dialog.show();
+            for (const auto& label : {QStringLiteral("专注"), QStringLiteral("探索"), QStringLiteral("默认")}) {
+                button(&dialog, label)->click();
+                QCOMPARE(animation->state(), QAbstractAnimation::Stopped);
+            }
+            QCOMPARE(scenes.mid(2), (QList<Scene>{Scene::Focus, Scene::Explore, Scene::Neutral}));
+            QCOMPARE(panel->styleSheet(), neutral);
+            button(&dialog, QStringLiteral("查本地媒体"))->click();
+            QCOMPARE(mood, Mood::Any);
+        }
+        AssistantDialog dialog(nullptr, search, sceneChanged, noRecommendations, QStringLiteral("推荐"));
+        auto* motion = dialog.findChild<QCheckBox*>(QStringLiteral("warmAnimationEnabled"));
+        QVERIFY(motion && !motion->isChecked());
+        QCOMPARE(scenes.last(), Scene::Neutral);
+    }
+
+    void assistantSearchesLocalMediaByMood() {
+        Fixture f(QString::fromUtf8(REAL_CSV));
+        AccountHistoryServiceImpl accounts(f.library);
+        QVERIFY(accounts.initializeDatabase(f.directory.filePath("assistant-accounts.sqlite")).ok());
+        QVERIFY(accounts.createInitialAdmin("admin", "secret").ok());
+        QVERIFY(accounts.registerUser("reader", "secret").ok());
+        QVERIFY(accounts.login("reader", "secret").status.ok());
+
+        LibraryWindow window(f.library, &accounts);
+        window.show();
+        auto* opener = window.findChild<QPushButton*>(QStringLiteral("openAssistant"));
+        QVERIFY(opener);
+        QVERIFY(!window.findChild<QDialog*>());
+        opener->click();
+        auto* dialog = window.findChild<QDialog*>();
+        QVERIFY(dialog && dialog->isVisible());
+        QVERIFY(!dialog->findChild<QLineEdit*>(QStringLiteral("assistantApiKey")));
+        auto* tabs = window.findChild<QTabBar*>();
+        auto* table = window.findChild<QTableWidget*>();
+        auto* mood = dialog->findChild<QComboBox*>(QStringLiteral("assistantMood"));
+        auto* category = dialog->findChild<QComboBox*>(QStringLiteral("assistantCategory"));
+        auto* keyword = dialog->findChild<QLineEdit*>(QStringLiteral("assistantMediaKeyword"));
+        QVERIFY(tabs && table && mood && category && keyword);
+        const auto choose = [](QComboBox* box, const QVariant& selection) {
+            box->setCurrentIndex(box->findData(selection));
+        };
+        choose(mood, static_cast<int>(media_mood::Mood::Energizing));
+        choose(category, QStringLiteral("音乐"));
+        keyword->setText(QStringLiteral("  Champions  "));
+        button(dialog, QStringLiteral("查本地媒体"))->click();
+        QCOMPARE(tabs->currentIndex(), 1);
+        QVERIFY(!dialog->isVisible());
+        QCOMPARE(table->rowCount(), 1);
+        QCOMPARE(table->item(0, 0)->text(), QStringLiteral("We Are the Champions"));
+
+        opener->click();
+        choose(category, QStringLiteral("电影"));
+        button(dialog, QStringLiteral("查本地媒体"))->click();
+        QCOMPARE(table->rowCount(), 0);
+        QVERIFY(accounts.loadMediaHistory(accounts.currentUser()->userId).value->isEmpty());
+
+        button(&window, QStringLiteral("清空条件"))->click();
+        QCOMPARE(table->rowCount(), f.library.records().size());
+        opener->click();
+        button(dialog, QStringLiteral("打开推荐"))->click();
+        QCOMPARE(tabs->currentIndex(), 2);
+        QVERIFY(!dialog->isVisible());
+    }
+
     void accountFrontendStartsRealSession() {
         Fixture f(QString::fromUtf8(SAMPLE_CSV));
         const auto database = f.directory.filePath("startup.sqlite");
@@ -320,6 +418,45 @@ private slots:
         QVERIFY(loginDialogSeen);
         QVERIFY(sessionSeen);
         QVERIFY(!accounts.currentUser().has_value());
+    }
+
+    void integrationKeepsTodayAssistantAndOnlineWarehouse() {
+        Fixture f(QString::fromUtf8(SAMPLE_CSV));
+        AccountHistoryServiceImpl accounts(f.library);
+        QVERIFY(accounts.initializeDatabase(f.directory.filePath("integrated-account.sqlite")).ok());
+        QVERIFY(accounts.createInitialAdmin("admin", "secret").ok());
+        QVERIFY(accounts.login("admin", "secret").status.ok());
+        recommendation_contract::PersonalRecommendationServiceImpl recommendations(
+            accounts, [&] { return f.library.records(); });
+        recommendation_contract::TodayRecommendationServiceImpl today(
+            recommendations, [&] { return f.library.records(); });
+        LibraryWindow window(f.library, &accounts, &recommendations, &today);
+        window.show();
+        auto* tabs = window.findChild<QTabBar*>();
+        QVERIFY(tabs);
+        QCOMPARE(tabs->count(), 4);
+        QCOMPARE(tabs->tabText(2), QStringLiteral("今日推荐"));
+        QCOMPARE(tabs->tabText(3), QStringLiteral("资源仓库"));
+        auto* host = window.findChild<QLineEdit*>(QStringLiteral("warehouseHost"));
+        QVERIFY(host); // Real WarehousePage, rather than the old placeholder.
+        tabs->setCurrentIndex(2);
+        QVERIFY(!window.findChildren<QFrame*>(QStringLiteral("recommendCard")).isEmpty());
+        QVERIFY(!host->isVisible());
+        tabs->setCurrentIndex(3);
+        QVERIFY(host->isVisible());
+        for (auto* card : window.findChildren<QFrame*>(QStringLiteral("recommendCard")))
+            QVERIFY(!card->isVisible());
+        auto* assistant = window.findChild<QPushButton*>(QStringLiteral("openAssistant"));
+        QVERIFY(assistant);
+        assistant->click();
+        auto* dialog = window.findChild<QDialog*>();
+        QVERIFY(dialog);
+        button(dialog, QStringLiteral("打开今日推荐"))->click();
+        QCOMPARE(tabs->currentIndex(), 2);
+        QVERIFY(!host->isVisible());
+        tabs->setCurrentIndex(0);
+        auto* table = window.findChild<QTableWidget*>();
+        QVERIFY(table && table->isVisible());
     }
 
     void externalChangeStillRecovers() {

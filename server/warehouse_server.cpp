@@ -45,7 +45,13 @@ WarehouseSummary readSummary(const QSqlQuery& query)
             query.value(3).toBool() ? Visibility::Public : Visibility::Private};
 }
 
-std::optional<QList<WarehouseItem>> listItems(const QSqlDatabase& db, qint64 warehouseId)
+struct SnapshotBudget {
+    int items = 0;
+    qint64 bytes = 0;
+};
+
+std::optional<QList<WarehouseItem>> listItems(const QSqlDatabase& db, qint64 warehouseId,
+                                              SnapshotBudget* budget = nullptr)
 {
     QSqlQuery query(db);
     query.prepare("SELECT id,media FROM warehouse_items WHERE warehouse_id=? ORDER BY id");
@@ -54,9 +60,16 @@ std::optional<QList<WarehouseItem>> listItems(const QSqlDatabase& db, qint64 war
         return std::nullopt;
     QList<WarehouseItem> items;
     while (query.next()) {
+        const auto snapshot = query.value(1).toByteArray();
+        if (budget) {
+            ++budget->items;
+            budget->bytes += snapshot.size();
+            if (budget->items > 1000 || budget->bytes > warehouse_protocol::MaxFrameSize)
+                return std::nullopt;
+        }
         MediaRecord media;
         QString error;
-        if (!media_json::fromJson(QJsonDocument::fromJson(query.value(1).toByteArray()).object(), media, error))
+        if (!media_json::fromJson(QJsonDocument::fromJson(snapshot).object(), media, error))
             return std::nullopt;
         items.append({query.value(0).toLongLong(), media});
     }
@@ -65,14 +78,20 @@ std::optional<QList<WarehouseItem>> listItems(const QSqlDatabase& db, qint64 war
 
 } // namespace
 
-WarehouseServer::WarehouseServer() : dbName_(QUuid::createUuid().toString())
+WarehouseServer::WarehouseServer(llm_recommendation::Config config)
+    : recommender_(std::move(config)), dbName_(QUuid::createUuid().toString())
 {
     connect(this, &QTcpServer::newConnection, this, [this] {
         while (auto* socket = nextPendingConnection()) {
             auto session = std::make_shared<Session>();
             socket->setReadBufferSize(64 * 1024);
             connect(socket, &QTcpSocket::readyRead, this, [this, socket, session] {
-                readRequests(socket, *session);
+                readRequests(socket, session);
+            });
+            connect(socket, &QTcpSocket::disconnected, this, [this, session, socket] {
+                cancelPending(*session, socket, false);
+                session->token.clear();
+                session->userId = 0;
             });
             connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
         }
@@ -156,9 +175,11 @@ std::optional<QList<WarehouseDetail>> WarehouseServer::readableCandidates(qint64
     if (!query.exec())
         return std::nullopt;
     QList<WarehouseDetail> rows;
+    SnapshotBudget budget;
     while (query.next()) {
+        if (rows.size() >= 1000) return std::nullopt;
         const auto warehouse = readSummary(query);
-        auto items = listItems(db_, warehouse.warehouseId);
+        auto items = listItems(db_, warehouse.warehouseId, &budget);
         if (!items)
             return std::nullopt;
         rows.append({warehouse, std::move(*items)});
@@ -166,28 +187,48 @@ std::optional<QList<WarehouseDetail>> WarehouseServer::readableCandidates(qint64
     return rows;
 }
 
-void WarehouseServer::readRequests(QTcpSocket* socket, Session& session)
+bool WarehouseServer::sendResponse(QTcpSocket* socket, const QJsonObject& response)
+{
+    QString error;
+    auto frame = warehouse_protocol::encodeFrame(response, error);
+    if (frame.isEmpty())
+        frame = warehouse_protocol::encodeFrame({{"type", "error_resp"}, {"req_id", response.value("req_id")},
+                {"code", "ServerError"}, {"message", QStringLiteral("响应超过帧大小限制。")}}, error);
+    if (socket->state() != QAbstractSocket::ConnectedState) return false;
+    if (frame.isEmpty() || socket->bytesToWrite() > warehouse_protocol::MaxFrameSize || socket->write(frame) != frame.size()) {
+        socket->abort();
+        return false;
+    }
+    return true;
+}
+
+void WarehouseServer::readRequests(QTcpSocket* socket, const std::shared_ptr<Session>& session)
 {
     QList<QJsonObject> requests;
     QString error;
-    const bool valid = session.decoder.feed(socket->readAll(), requests, error);
+    const bool valid = session->decoder.feed(socket->readAll(), requests, error);
     for (const auto& request : requests) {
+        if (socket->state() != QAbstractSocket::ConnectedState) return;
         if (!request.value("req_id").isString() || request.value("req_id").toString().trimmed().isEmpty() ||
             request.value("req_id").toString().size() > 128) {
             socket->disconnectFromHost();
             return;
         }
-        auto response = dispatch(session, request);
-        auto frame = warehouse_protocol::encodeFrame(response, error);
-        if (frame.isEmpty()) {
-            response = {{"type", "error_resp"}, {"req_id", request.value("req_id")},
-                        {"code", "ServerError"}, {"message", QStringLiteral("响应超过帧大小限制。")}};
-            frame = warehouse_protocol::encodeFrame(response, error);
-        }
-        if (socket->bytesToWrite() > warehouse_protocol::MaxFrameSize || socket->write(frame) != frame.size()) {
+        const QString id = request.value("req_id").toString();
+        if (session->pending.contains(id)) {
             socket->abort();
             return;
         }
+        const auto type = request.value("type").toString();
+        if (type == "recommend_resources" || type == "cancel_recommendation") {
+            startRecommendation(socket, session, request);
+            continue;
+        }
+        if (type == "logout" && session->userId && request.value("token").toString() == session->token &&
+            request.value("payload").isObject())
+            cancelPending(*session, socket, true);
+        if (socket->state() != QAbstractSocket::ConnectedState) return;
+        if (!sendResponse(socket, dispatch(*session, request))) return;
     }
     if (!valid)
         socket->disconnectFromHost();

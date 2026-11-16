@@ -58,6 +58,37 @@ public:
 class LlmTests : public QObject {
     Q_OBJECT
 private slots:
+    void exactTitleSurvives500RecordLimit() {
+        Request input; input.context = "Pygmalion"; input.limit = 30;
+        for (int i = 0; i < 499; ++i) {
+            MediaRecord hot; hot.fileName = QStringLiteral("Track %1").arg(i);
+            hot.category = QStringLiteral("音乐"); hot.viewCount = 100;
+            input.candidates.append({QStringLiteral("a:%1").arg(i), hot});
+        }
+        MediaRecord target; target.fileName = "Pygmalion"; target.category = QStringLiteral("电影");
+        input.candidates.append({"z:target", target});
+        Client client(Config{}); std::optional<Result> result;
+        client.recommend(input, [&](Result value) { result = value; });
+        QTRY_VERIFY(result.has_value());
+        QCOMPARE(result->items.size(), 30);
+        QCOMPARE(result->items.first().key, QStringLiteral("z:target"));
+    }
+    void broadRequestsRetainDifferentCategories() {
+        Request input; input.context = QStringLiteral("探索收藏"); input.limit = 30;
+        QHash<QString, QString> categories;
+        for (int i = 0; i < 500; ++i) {
+            MediaRecord media; media.fileName = QStringLiteral("Resource %1").arg(i);
+            media.category = i < 240 ? QStringLiteral("音乐") : i < 480 ? QStringLiteral("电视剧") : QStringLiteral("电影");
+            const auto key = QStringLiteral("%1").arg(i, 4, 10, QLatin1Char('0'));
+            input.candidates.append({key, media}); categories.insert(key, media.category);
+        }
+        Client client(Config{}); std::optional<Result> result;
+        client.recommend(input, [&](Result value) { result = value; });
+        QTRY_VERIFY(result.has_value());
+        QSet<QString> selected;
+        for (const auto& item : result->items) selected.insert(categories.value(item.key));
+        QCOMPARE(selected.size(), 3);
+    }
     void warehouseKeysDoNotConfuseLocalMediaIds() {
         warehouse_contract::WarehouseDetail first, second;
         first.warehouse = {10, QStringLiteral("音乐收藏"), 1, warehouse_contract::Visibility::Private};
@@ -138,6 +169,36 @@ private slots:
         QVERIFY(!sent.first().toObject().contains("fileSize"));
         QVERIFY(!input.contains("fake-test-key"));
         QTest::qWait(20); QCOMPARE(completions, 1);
+    }
+    void payloadKeepsRecalledTitleAndMatchingActorWithinCaps() {
+        Server server; QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.body = completion("{\"recommendations\":[{\"id\":\"z:target\",\"reason\":\"Provided title and actor match\"}]}");
+        Request input; input.context = "Pygmalion with Target Actor";
+        for (int i = 0; i < 499; ++i) {
+            MediaRecord hot; hot.fileName = QStringLiteral("Track %1").arg(i); hot.category = "Music"; hot.viewCount = 100;
+            input.candidates.append({QStringLiteral("a:%1").arg(i), hot});
+        }
+        MediaRecord target; target.fileName = "Pygmalion"; target.category = "Movie";
+        target.actors = {"First", "Second", "Third", "Fourth", "Fifth", "Target Actor"};
+        input.candidates.append({"z:target", target});
+        Client client(server.config()); std::optional<Result> result;
+        client.recommend(input, [&](Result value) { result = value; });
+        QTRY_VERIFY(result.has_value()); QVERIFY(!result->fallback);
+        QCOMPARE(result->items.first().key, QStringLiteral("z:target"));
+        const auto boundary = server.received.indexOf("\r\n\r\n");
+        const auto envelope = QJsonDocument::fromJson(server.received.mid(boundary + 4)).object();
+        const auto userInput = envelope["messages"].toArray().last().toObject()["content"].toString();
+        const auto sent = QJsonDocument::fromJson(userInput.toUtf8()).object()["candidates"].toArray();
+        QCOMPARE(sent.size(), 30);
+        bool found = false;
+        for (const auto& value : sent) {
+            const auto entry = value.toObject();
+            if (entry["id"] != "z:target") continue;
+            found = true;
+            const auto actors = entry["actors"].toArray();
+            QCOMPARE(actors.size(), 5); QCOMPARE(actors.first().toString(), QStringLiteral("Target Actor"));
+        }
+        QVERIFY(found); QCOMPARE(server.calls, 1);
     }
     void failures_data() {
         QTest::addColumn<int>("status"); QTest::addColumn<QByteArray>("body");

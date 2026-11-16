@@ -1,10 +1,15 @@
 #include "medialibrary.h"
+#include "warehouse_client.h"
+#include "warehouse_page.h"
 #include "mediarecommendation.h"
 #include "library_style.h"
 #include "account_dialog.h"
+#include "avatar_button.h"
+#include "assistant_dialog.h"
 #include "account_frontend.h"
 #include "account_history_service.h"
 #include "personalrecommendation_service.h"
+#include "todayrecommendation_service.h"
 #include "personalrecommendation_contract.h"
 
 #include <QApplication>
@@ -184,8 +189,10 @@ class LibraryWindow final : public QWidget {
 public:
     explicit LibraryWindow(MediaLibrary& library,
                            account_contract::AccountHistoryService* accounts = nullptr,
-                           recommendation_contract::PersonalRecommendationService* recommendations = nullptr)
-        : library_(library), accounts_(accounts), recommendations_(recommendations),
+                           recommendation_contract::PersonalRecommendationService* recommendations = nullptr,
+                           recommendation_contract::TodayRecommendationService* today = nullptr,
+                           const QString& accountDatabasePath = {})
+        : library_(library), accounts_(accounts), recommendations_(recommendations), today_(today),
           identity_(accounts ? accounts->currentUser() : std::nullopt)
     {
         setWindowTitle(QStringLiteral("多媒体文件管理及检索系统"));
@@ -204,6 +211,48 @@ public:
         bannerLayout->addWidget(heading);
         bannerLayout->addStretch();
         if (identity_) {
+            auto* assistant = new QPushButton(assistantIcon(), QStringLiteral("媒体助手"));
+            assistant->setIconSize(QSize(22, 22));
+            assistant->setObjectName(QStringLiteral("openAssistant"));
+            bannerLayout->addWidget(assistant);
+            connect(assistant, &QPushButton::clicked, this, [this, banner] {
+                if (!assistant_) {
+                    assistant_ = new AssistantDialog(this, [this](const QString& keyword,
+                                                       media_mood::Mood mood, const QString& category, bool useScene) {
+                        sceneSearch_ = useScene;
+                        director_->clear();
+                        actor_->clear();
+                        searchType_->clear();
+                        keywordInput_->setText(keyword);
+                        moodFilter_->setCurrentIndex(moodFilter_->findData(static_cast<int>(mood)));
+                        contentFilter_->setCurrentIndex(contentFilter_->findData(category));
+                        query_ = {};
+                        keyword_ = keyword;
+                        if (tabs_->currentIndex() == 1)
+                            showSearchResults();
+                        else
+                            tabs_->setCurrentIndex(1);
+                        keywordInput_->setFocus();
+                    }, [this, banner](warm_mode::Scene scene) {
+                        const auto theme = warm_mode::theme(scene);
+                        banner->setStyleSheet(scene == warm_mode::Scene::Neutral ? QString()
+                            : QStringLiteral("QFrame#banner { background: %1; }").arg(theme.banner));
+                        if (sceneSearch_) {
+                            moodFilter_->setCurrentIndex(moodFilter_->findData(static_cast<int>(theme.mood)));
+                            if (tabs_->currentIndex() == 1)
+                                showSearchResults();
+                        }
+                    }, [this] {
+                        tabs_->setCurrentIndex(2);
+                    }, today_ ? QStringLiteral("打开今日推荐") : QStringLiteral("打开推荐"));
+                }
+                assistant_->show();
+                assistant_->raise();
+                assistant_->activateWindow();
+            });
+            if (!accountDatabasePath.isEmpty())
+                bannerLayout->addWidget(account_ui::createAvatarButton(
+                    accountDatabasePath, identity_->userId, identity_->username));
             auto* identityLabel = new QLabel(QStringLiteral("%1 · %2").arg(identity_->username,
                 canManage() ? QStringLiteral("管理员") : QStringLiteral("普通用户")));
             identityLabel->setTextFormat(Qt::PlainText);
@@ -228,7 +277,8 @@ public:
         tabs_->setDrawBase(false);
         tabs_->addTab(QStringLiteral("媒体库"));
         tabs_->addTab(QStringLiteral("检索"));
-        tabs_->addTab(QStringLiteral("推荐"));
+        tabs_->addTab(today_ ? QStringLiteral("今日推荐") : QStringLiteral("推荐"));
+        tabs_->addTab(QStringLiteral("资源仓库"));
         layout->addWidget(tabs_);
 
         auto* libraryControls = new QWidget;
@@ -265,6 +315,25 @@ public:
 
         auto* searchBar = new QHBoxLayout;
         searchLayout->addLayout(searchBar);
+        auto* moodLabel = new QLabel(QStringLiteral("内容氛围"));
+        moodLabel->setBuddy(moodFilter_);
+        moodFilter_->setObjectName(QStringLiteral("searchMoodFilter"));
+        using media_mood::Mood;
+        for (auto mood : {Mood::Any, Mood::Relaxing, Mood::Resonant, Mood::Energizing, Mood::Nostalgic})
+            moodFilter_->addItem(media_mood::label(mood), static_cast<int>(mood));
+        auto* contentLabel = new QLabel(QStringLiteral("内容类别"));
+        contentLabel->setBuddy(contentFilter_);
+        contentFilter_->setObjectName(QStringLiteral("searchContentFilter"));
+        contentFilter_->addItem(QStringLiteral("全部内容"), QString());
+        for (const auto& category : {QStringLiteral("音乐"), QStringLiteral("电影"), QStringLiteral("电视剧")})
+            contentFilter_->addItem(category, category);
+        auto* moodBar = new QHBoxLayout;
+        moodBar->addWidget(moodLabel);
+        moodBar->addWidget(moodFilter_);
+        moodBar->addWidget(contentLabel);
+        moodBar->addWidget(contentFilter_);
+        moodBar->addStretch();
+        searchLayout->addLayout(moodBar);
         director_->setPlaceholderText(QStringLiteral("完整姓名"));
         actor_->setPlaceholderText(QStringLiteral("完整姓名"));
         searchType_->setPlaceholderText(QStringLiteral("例如 MP4"));
@@ -305,11 +374,12 @@ public:
         recommendationBar->addWidget(recommend);
         recommendationBar->addStretch();
         connect(recommend, &QPushButton::clicked, this,
-                [this] { showRecommendations(library_.records()); });
+                [this] { refreshRecommendationPage(); });
 
         controls_->addWidget(libraryControls);
         controls_->addWidget(searchControls);
         controls_->addWidget(recommendationControls);
+        controls_->addWidget(new QWidget); // Warehouse connection controls will be supplied by the client integration.
         controls_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
         layout->addWidget(controls_);
         recommendationReason_->setTextFormat(Qt::PlainText);
@@ -379,6 +449,31 @@ public:
         splitter->setStretchFactor(0, 3);
         splitter->setStretchFactor(1, 1);
         layout->addWidget(splitter, 1);
+
+        todayTitle_->setObjectName(QStringLiteral("sectionTitle"));
+        recommendationBar->insertWidget(0, todayTitle_);
+        todayTitle_->hide();
+        auto* todayBody = new QWidget;
+        auto* todayLayout = new QVBoxLayout(todayBody);
+        todayLayout->setContentsMargins(0, 0, 0, 0);
+        todayGrid_ = new QGridLayout;
+        todayGrid_->setSpacing(12);
+        todayGrid_->setColumnStretch(0, 1);
+        todayGrid_->setColumnStretch(1, 1);
+        todayLayout->addLayout(todayGrid_);
+        todayLayout->addWidget(todayStatus_);
+        todayLayout->addStretch();
+        todayPage_->setWidget(todayBody);
+        todayPage_->setWidgetResizable(true);
+        todayPage_->setFrameShape(QFrame::NoFrame);
+        todayPage_->hide();
+        layout->addWidget(todayPage_, 1);
+
+        auto* client = new WarehouseClient(this);
+        warehousePage_ = new WarehousePage(*client, [this] { return library_.records(); });
+        client->setParent(warehousePage_);
+        warehousePage_->hide();
+        layout->addWidget(warehousePage_, 1);
         trace_->setObjectName(QStringLiteral("tracePanel"));
         trace_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
         auto* traceLayout = new QVBoxLayout(trace_);
@@ -404,8 +499,20 @@ public:
         trace_->hide();
         layout->addWidget(trace_);
 
-        connect(tabs_, &QTabBar::currentChanged, this, [this](int index) {
-            controls_->setCurrentIndex(index);
+        connect(tabs_, &QTabBar::currentChanged, this, [this, splitter](int index) {
+            const bool showToday = index == 2 && today_ && identity_;
+            const bool showWarehouse = index == 3;
+            controls_->setVisible(!showWarehouse);
+            splitter->setVisible(!showToday && !showWarehouse);
+            count_->setVisible(!showToday && !showWarehouse);
+            order_->setVisible(!showToday && !showWarehouse);
+            todayTitle_->setVisible(showToday);
+            todayPage_->setVisible(showToday);
+            if (warehousePage_->isVisible() && !showWarehouse)
+                warehousePage_->suspend();
+            warehousePage_->setVisible(showWarehouse);
+            if (!showWarehouse)
+                controls_->setCurrentIndex(index);
             trace_->setVisible(index == 1);
             recommendationReason_->setVisible(index == 2 && !recommendationReason_->text().isEmpty());
             order_->setText(index == 2 ? QStringLiteral("按推荐顺序")
@@ -413,10 +520,10 @@ public:
             if (index == 2) {
                 const auto records = library_.records();
                 refreshPreferences(records);
-                showRecommendations(records);
+                refreshRecommendationPage();
             } else if (index == 1) {
                 showSearchResults();
-            } else {
+            } else if (index == 0) {
                 refresh();
             }
         });
@@ -426,6 +533,11 @@ public:
             showSearchResults();
         };
         connect(searchButton, &QPushButton::clicked, this, submitSearch);
+        connect(moodFilter_, &QComboBox::activated, this, [this, submitSearch] {
+            sceneSearch_ = false;
+            submitSearch();
+        });
+        connect(contentFilter_, &QComboBox::activated, this, submitSearch);
         for (auto* input : {keywordInput_, director_, actor_, searchType_})
             connect(input, &QLineEdit::returnPressed, this, submitSearch);
         connect(suggestions, qOverload<const QString&>(&QCompleter::activated), this,
@@ -438,6 +550,9 @@ public:
             director_->clear();
             actor_->clear();
             searchType_->clear();
+            sceneSearch_ = false;
+            moodFilter_->setCurrentIndex(0);
+            contentFilter_->setCurrentIndex(0);
             submitSearch();
             keywordInput_->setFocus();
         });
@@ -446,9 +561,7 @@ public:
         connect(table_, &QTableWidget::cellClicked, this, [this](int row) {
             if (!accounts_ || !identity_ || row < 0 || row >= records_.size())
                 return;
-            const auto status = accounts_->recordMediaView(identity_->userId, records_.at(row).id);
-            if (!status.ok())
-                QMessageBox::warning(this, QStringLiteral("保存浏览记录失败"), status.message);
+            recordMediaView(records_.at(row).id);
         });
         connect(table_, &QTableWidget::currentCellChanged, this,
                 [this](int row) { showDetail(row); });
@@ -666,20 +779,29 @@ private:
         SearchTrace trace;
         const auto ids = library_.search(query_, trace);
         const QSet<QString> matched(ids.cbegin(), ids.cend());
+        const auto mood = static_cast<media_mood::Mood>(moodFilter_->currentData().toInt());
+        const QString category = contentFilter_->currentData().toString();
         QList<MediaRecord> results;
         for (const auto& record : library_.records()) {
-            if (matched.contains(record.id) &&
+            if (matched.contains(record.id) && media_mood::matches(record, mood) &&
+                (category.isEmpty() || record.category == category) &&
                 (keyword_.isEmpty() || record.fileName.contains(keyword_, Qt::CaseInsensitive)))
                 results.append(record);
         }
         populateTable(results);
         count_->setText(QStringLiteral("命中 %1 条").arg(results.size()));
 
-        const bool hasKeyword = !keyword_.isEmpty();
-        traceStatus_->setText(hasKeyword
-            ? QStringLiteral("文件名包含「%1」 · 筛选后剩余 %2 条").arg(keyword_).arg(results.size())
-            : QStringLiteral("未填写条件，显示全部记录。"));
-        traceStatus_->setVisible(hasKeyword || trace.steps.isEmpty());
+        QStringList filters;
+        if (!keyword_.isEmpty())
+            filters << QStringLiteral("文件名包含「%1」").arg(keyword_);
+        if (mood != media_mood::Mood::Any)
+            filters << media_mood::label(mood);
+        if (!category.isEmpty())
+            filters << category;
+        traceStatus_->setText(filters.isEmpty()
+            ? QStringLiteral("未填写条件，显示全部记录。")
+            : QStringLiteral("%1 · 筛选后剩余 %2 条").arg(filters.join(QStringLiteral(" · "))).arg(results.size()));
+        traceStatus_->setVisible(!filters.isEmpty() || trace.steps.isEmpty());
         for (std::size_t i = 0; i < traceCards_.size(); ++i) {
             auto* card = traceCards_[i];
             if (i >= static_cast<std::size_t>(trace.steps.size())) {
@@ -731,18 +853,102 @@ private:
     }
 
     // Preserve the rank returned by the recommendation function in the shared table.
+    void refreshRecommendationPage()
+    {
+        if (today_ && identity_)
+            showTodayRecommendations();
+        else
+            showRecommendations(library_.records());
+    }
+
+    void showTodayRecommendations()
+    {
+        while (auto* item = todayGrid_->takeAt(0)) {
+            if (auto* widget = item->widget()) {
+                widget->hide();
+                widget->deleteLater();
+            }
+            delete item;
+        }
+
+        const auto result = today_->recommendToday({identity_->userId,
+            preferenceChoice(categoryPreference_), preferenceChoice(typePreference_)});
+        todayTitle_->setText(result.dateKey.isEmpty()
+            ? QStringLiteral("今日推荐") : QStringLiteral("今日推荐 · %1").arg(result.dateKey));
+        recommendationReason_->setText(result.success ? result.reason : result.error);
+        recommendationReason_->setVisible(!recommendationReason_->text().isEmpty());
+        int position = 0;
+        if (result.success) {
+            for (const auto& id : result.mediaIds) {
+                MediaRecord record;
+                if (!library_.find(id, record))
+                    continue;
+
+                auto* card = new QFrame;
+                card->setObjectName(QStringLiteral("recommendCard"));
+                card->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+                auto* content = new QVBoxLayout(card);
+                content->setContentsMargins(16, 14, 16, 14);
+                auto* title = new QLabel(record.fileName);
+                title->setObjectName(QStringLiteral("sectionTitle"));
+                title->setTextFormat(Qt::PlainText);
+                title->setWordWrap(true);
+                content->addWidget(title);
+                auto* metadata = new QLabel(QStringLiteral("%1 · %2 · %3 次浏览").arg(
+                    displayText(record.category), record.fileType, QLocale().toString(record.viewCount)));
+                metadata->setObjectName(QStringLiteral("muted"));
+                metadata->setTextFormat(Qt::PlainText);
+                metadata->setWordWrap(true);
+                content->addWidget(metadata);
+                content->addStretch();
+                auto* details = new QPushButton(QStringLiteral("查看详情"));
+                content->addWidget(details, 0, Qt::AlignLeft);
+                connect(details, &QPushButton::clicked, card, [this, id] {
+                    MediaRecord current;
+                    if (!library_.find(id, current)) {
+                        QMessageBox::information(this, QStringLiteral("记录详情"), QStringLiteral("该记录已移除。"));
+                        return;
+                    }
+                    recordMediaView(id);
+                    QMessageBox dialog(QMessageBox::Information, QStringLiteral("记录详情"), current.fileName,
+                                       QMessageBox::Ok, this);
+                    dialog.setTextFormat(Qt::PlainText);
+                    dialog.setInformativeText(QStringLiteral("导演：%1\n演员：%2\n发行日期：%3\n所获奖项：%4")
+                        .arg(displayText(current.director), displayText(current.actors.join(QStringLiteral("、"))),
+                             displayDate(current.releaseDate), displayText(current.awards.join(QStringLiteral("、")))));
+                    dialog.exec();
+                });
+                todayGrid_->addWidget(card, position / 2, position % 2);
+                ++position;
+            }
+        }
+        todayStatus_->setText(result.success && position == 0 ? QStringLiteral("暂无可推荐的媒体。") : QString());
+        todayStatus_->setVisible(!todayStatus_->text().isEmpty());
+    }
+
+    static recommendation_contract::PreferenceSelection preferenceChoice(const QComboBox* combo)
+    {
+        return {static_cast<recommendation_contract::PreferenceMode>(combo->currentData(Qt::UserRole + 1).toInt()),
+                combo->currentData().toString()};
+    }
+
+    void recordMediaView(const QString& id)
+    {
+        if (!accounts_ || !identity_)
+            return;
+        const auto status = accounts_->recordMediaView(identity_->userId, id);
+        if (!status.ok())
+            QMessageBox::warning(this, QStringLiteral("保存浏览记录失败"), status.message);
+    }
+
     void showRecommendations(const QList<MediaRecord>& records)
     {
         QStringList ids;
         QString reason;
         if (accounts_) {
             using namespace recommendation_contract;
-            const auto choice = [](const QComboBox* combo) -> PreferenceSelection {
-                return {static_cast<PreferenceMode>(combo->currentData(Qt::UserRole + 1).toInt()),
-                        combo->currentData().toString()};
-            };
             const auto result = identity_ && recommendations_
-                ? recommendations_->recommend({identity_->userId, choice(categoryPreference_), choice(typePreference_)})
+                ? recommendations_->recommend({identity_->userId, preferenceChoice(categoryPreference_), preferenceChoice(typePreference_)})
                 : RecommendationResult{false, QStringLiteral("个性化推荐服务暂不可用。"), {}, {}};
             ids = result.success ? result.mediaIds : QStringList();
             reason = result.success ? result.reason : result.error;
@@ -834,17 +1040,27 @@ private:
 
     account_contract::AccountHistoryService* accounts_;
     recommendation_contract::PersonalRecommendationService* recommendations_;
+    recommendation_contract::TodayRecommendationService* today_;
     const std::optional<account_contract::UserIdentity> identity_;
+    QScrollArea* todayPage_ = new QScrollArea;
+    QLabel* todayTitle_ = new QLabel;
+    QLabel* todayStatus_ = new QLabel;
+    QGridLayout* todayGrid_ = nullptr;
+    WarehousePage* warehousePage_ = nullptr;
     QLabel* recommendationReason_ = new QLabel;
     MediaLibrary& library_;            // Loaded business service, owned by main.
     QList<MediaRecord> records_;       // Visible records in table row order.
     QList<QLabel*> detailValues_;      // Detail value labels in form order.
     SearchQuery query_; // Last submitted combination of search fields.
+    AssistantDialog* assistant_ = nullptr;
+    bool sceneSearch_ = false;
     QTabBar* tabs_ = new QTabBar; // Switch between browsing and searching.
     QStackedWidget* controls_ = new QStackedWidget; // Controls for the selected tab.
     QLineEdit* director_ = new QLineEdit; // Director full-name query.
     QLineEdit* actor_ = new QLineEdit; // Actor full-name query.
     QString keyword_; // Last submitted file-name keyword.
+    QComboBox* moodFilter_ = new QComboBox;
+    QComboBox* contentFilter_ = new QComboBox;
     QStringListModel keywordSuggestions_; // Current library file names for completion.
     QLineEdit* keywordInput_ = new QLineEdit; // Partial file-name query.
     QLineEdit* searchType_ = new QLineEdit; // File extension query.
@@ -867,7 +1083,8 @@ private:
 int runAccountFrontend(QApplication& app, MediaLibrary& library,
                        account_contract::AccountHistoryService& accounts,
                        recommendation_contract::PersonalRecommendationService& recommendations,
-                       const QString& databasePath)
+                       const QString& databasePath,
+                       recommendation_contract::TodayRecommendationService* today)
 {
     const auto initialized = accounts.initializeDatabase(databasePath);
     if (!initialized.ok()) {
@@ -884,7 +1101,7 @@ int runAccountFrontend(QApplication& app, MediaLibrary& library,
         session.resize(1120, 710);
         auto* layout = new QVBoxLayout(&session);
         layout->setContentsMargins(0, 0, 0, 0);
-        auto* window = new LibraryWindow(library, &accounts, &recommendations);
+        auto* window = new LibraryWindow(library, &accounts, &recommendations, today, databasePath);
         layout->addWidget(window);
         session.exec();
         const bool loggedOut = !accounts.currentUser();
@@ -940,5 +1157,7 @@ int main(int argc, char* argv[])
                               QStringLiteral("无法创建应用数据目录。"));
         return 1;
     }
-    return runAccountFrontend(app, library, accounts, recommendations, databasePath);
+    recommendation_contract::TodayRecommendationServiceImpl today(
+        recommendations, [&library] { return library.records(); });
+    return runAccountFrontend(app, library, accounts, recommendations, databasePath, &today);
 }
