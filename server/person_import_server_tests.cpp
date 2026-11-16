@@ -205,7 +205,7 @@ private slots:
                 FeedNetwork network;
                 network.content = R"(<rss version="2.0"><channel>
                     <title>Example</title><item><title>Fictional story</title>
-                    <link>https://example.invalid/story</link></item>
+                    <link>https://publisher.example.org/story</link></item>
                     </channel></rss>)";
                 person_feed_refresh::refresh(store, network, sources.value->items.first(),
                     [&](Status outcome) { status = std::move(outcome); done = true; });
@@ -222,7 +222,7 @@ private slots:
             QCOMPARE(news.value->items.first().title,QStringLiteral("Fictional story"));
             QVERIFY(!news.value->items.first().publishedAtUtc);
             QVERIFY(!news.value->items.first().stale);
-            QCOMPARE(news.value->items.first().sourceUrl, QUrl("https://example.invalid/story"));
+            QCOMPARE(news.value->items.first().sourceUrl, QUrl("https://publisher.example.org/story"));
             {
                 auto db = QSqlDatabase::addDatabase("QSQLITE", "person-import-failed-refresh");
                 db.setDatabaseName(path); QVERIFY(db.open());
@@ -232,7 +232,7 @@ private slots:
                 FeedNetwork network;
                 network.content = "<feed xmlns=\"http://www.w3.org/2005/Atom\">"
                                   "<title>Example</title><entry><title>Fictional story</title>"
-                                  "<link rel=\"alternate\" href=\"/story\"/></entry></feed>";
+                                  "<link rel=\"alternate\" href=\"https://publisher.example.org/story\"/></entry></feed>";
                 const auto refresh = [&] {
                     person_feed_refresh::refresh(store, network, sources.value->items.first(),
                         [&](Status outcome) { status = std::move(outcome); done = true; });
@@ -254,7 +254,7 @@ private slots:
             QCOMPARE(news.value->items.first().title, QStringLiteral("Fictional story"));
             QVERIFY(news.value->items.first().stale);
 
-            const QString approvedArticle = QStringLiteral("https://publisher.example.org/world-premiere");
+            const QString approvedArticle = QStringLiteral("https://publisher.example.org/story");
             {
                 auto db = QSqlDatabase::addDatabase("QSQLITE", "person-import-deepseek-news");
                 db.setDatabaseName(path); QVERIFY(db.open());
@@ -293,12 +293,20 @@ private slots:
                 QCOMPARE(network.payloads.at(1).value("url").toString(), approvedArticle);
                 QCOMPARE(network.payloads.at(2).value("url").toString(),
                          QStringLiteral("https://publisher.example.org/unrelated"));
+                // Force two successful providers into the same UTC second.
+                QSqlQuery alignTimes(db);
+                alignTimes.prepare("UPDATE person_updates SET fetched_at_utc=? WHERE source_url=?");
+                alignTimes.addBindValue(now);
+                alignTimes.addBindValue(approvedArticle);
+                QVERIFY(alignTimes.exec());
+                QCOMPARE(alignTimes.numRowsAffected(), qint64(2));
                 alice.getPersonUpdates(updates, [&](auto r){news=r;done=true;});
-                QTRY_VERIFY(done); QVERIFY(news.status.ok() && news.value); done = false;
+                QTRY_VERIFY(done); QVERIFY2(news.status.ok() && news.value, qPrintable(news.status.message)); done = false;
                 const auto deepseekArticle = [&]() -> const PersonUpdate* {
                     if (!news.value) return nullptr;
                     for (const auto& article : news.value->items)
-                        if (article.sourceUrl == QUrl(approvedArticle)) return &article;
+                        if (article.sourceUrl == QUrl(approvedArticle) && article.title == "Publisher story")
+                            return &article;
                     return nullptr;
                 };
                 QCOMPARE(news.value->items.size(), 2);

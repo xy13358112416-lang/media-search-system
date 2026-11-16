@@ -221,7 +221,7 @@ private:
         if (date.isValid() && date.timeSpec() != Qt::LocalTime &&
             date.toSecsSinceEpoch() >= 0 && date.toSecsSinceEpoch() <= now)
             publication = date.toSecsSinceEpoch();
-        const auto id = QStringLiteral("feed:") + QString::fromLatin1(
+        const auto id = QStringLiteral("deepseek:") + QString::fromLatin1(
             QCryptographicHash::hash(article.source.toEncoded(), QCryptographicHash::Sha256).toHex());
         PersonUpdate update{id, personId_, title, UpdateKind::News, article.source,
                             publication, std::nullopt, now, false};
