@@ -169,7 +169,8 @@ QString WarehouseClient::request(const QString& type, const QJsonObject& payload
     QString error;
     const QByteArray frame = warehouse_protocol::encodeFrame(req, error);
     if (frame.isEmpty()) { callback(fail(ErrorCode::InvalidArgument, error), {}); return {}; }
-    const bool mutation = type == "create_warehouse" || type == "add_item" || type == "remove_item";
+    const bool mutation = type == "create_warehouse" || type == "add_item" || type == "remove_item" ||
+                          type == "record_behavior" || type == "set_participation_settings" || type == "clear_history";
     pending_.insert(id, {type + QStringLiteral("_resp"), std::move(callback), mutation});
     if (socket_.write(frame) < 0) {
         auto p = pending_.take(id); p.callback(fail(ErrorCode::NotConnected, socket_.errorString()), {}); return {};

@@ -21,10 +21,10 @@ include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_trending.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_temporal.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../sample-data/simulation/simulation.cmake)
 
-add_library(warehouse_client STATIC warehouse_client.cpp)
+add_library(warehouse_client STATIC warehouse_client.cpp online_care_client.cpp)
 target_include_directories(warehouse_client PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_compile_features(warehouse_client PUBLIC cxx_std_17)
-target_link_libraries(warehouse_client PUBLIC warehouse_protocol)
+target_link_libraries(warehouse_client PUBLIC warehouse_protocol care_contract)
 target_compile_options(warehouse_client PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 if(BUILD_TESTING)
