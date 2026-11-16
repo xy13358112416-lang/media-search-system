@@ -25,7 +25,7 @@ server.setPersonContextLoader([&store](qint64 authenticatedUserId,
 
 `store` 必须比服务器及其加载器活得更久。加载器同步运行在服务器/数据库所属线程，不发网络请求，不启动嵌套事件循环。数据库失败返回错误；未知人物成功返回空映射。目录返回的 `PersonContext` 是当前用户作用域，不能直接由客户端 JSON 构造。
 
-可信目录/作品关联可由服务端操作工具 `media_person_import` 导入，格式与事务约定见 `server/PERSON_IMPORT.md`。必须核对服务器登记的完整作品来源三元组；导入不推断 CSV 同名身份。虚构样例只用于显式允许的独立演示库。人物 RPC/provider 和页面装配仍是后续 Qt 对接任务，不能把导入测试通过等同于这些链路已完成。
+可信目录/作品关联可由服务端操作工具 `media_person_import` 导入，格式与事务约定见 `server/PERSON_IMPORT.md`。必须核对服务器登记的完整作品来源三元组；导入不推断 CSV 同名身份。虚构样例只用于显式允许的独立演示库。人物 RPC、关注中心和资讯缓存已在整合候选版接通，真实来源和 DeepSeek 仍需在部署环境验收。
 
 加载器未设置时保持原有 `people=[]` 和无人物关注加分，不声称人物中心已经联网。既有历史人物快照即使未装配目录或作品已删除，也仍可用于本人足迹。`followedPeople` 只影响当前候选，默认 `+0.05`；关闭个性化忽略关注加分，不感兴趣仍硬排除。主动关注不是隐式历史，清历史不得删除关注表。
 
@@ -33,8 +33,9 @@ server.setPersonContextLoader([&store](qint64 authenticatedUserId,
 
 ## Qt 的 N02 / N04 / N05 接法
 
-- 补人物 5 个客户端方法和 4 个服务端只读操作；复用 `care_person` 搜索、作品与资讯缓存算法。`set_follow` 的写事务仍由主逻辑仓储负责，客户端加入 mutation 判定保留 OutcomeUnknown。
-- Qt 写服务端人物读服务/分页/JSON 响应和资讯 provider；主逻辑提供授权仓储。资讯 provider 异步刷新，标准化后调用 `mergeUpdates`，不直接创建表，不允许客户端指定任意抓取 URL。
+- 人物 5 个客户端方法和 4 个服务端只读操作已经接通，复用 `care_person` 搜索、作品与资讯缓存算法。`set_follow` 的写事务仍由主逻辑仓储负责，客户端加入 mutation 判定保留 OutcomeUnknown。
+- 服务端人物读服务、分页和 JSON 响应使用授权仓储。资讯 provider 异步刷新，标准化后调用 `mergeUpdates`，不直接创建表，不允许客户端指定任意抓取 URL。
+- DeepSeek 联网资讯由服务器运维工具显式触发。以稳定人物 ID 查询可信显示名，操作者提供核验的发布者域名和公开作品等消歧线索。调用 DeepSeek 独立 Search 与 Fetch 接口，解析原始文章标题，校验允许域和身份线索后写入现有缓存。DeepSeek 和 RSS/Atom 分开刷新，旧数据按来源保存。具体部署见 server/PERSON_SOURCE_CONFIG.md。
 - 资讯夹具中的 `example.invalid` 是保留示例域名，不能拿它当真实来源或演示新闻。真实来源未选定/核验前，News 不算交付。
 
 ## Qt 的 N09 服务适配接法

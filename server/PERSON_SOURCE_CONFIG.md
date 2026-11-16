@@ -67,6 +67,18 @@
 
 某个来源失败时，已有缓存保留并标记为过期，命令以失败退出。其余已登记来源仍会尝试刷新。刷新后，用户可在关注中心重新选择该人物以读取缓存。发布现场应记录实际核验的 feed 地址及人工确认依据。
 
+## DeepSeek 联网资讯
+
+~~~powershell
+& .\media_person_source_config.exe --db D:\demo\server.sqlite --deepseek-person person:example --news-site publisher.example.org --news-clue "已核验的公开作品名"
+~~~
+
+先在服务器进程环境设置 MEDIA_SERVER_DEEPSEEK_API_KEY。命令读取该人物已导入的可信显示名。运维人员负责核验发布者域名及消歧线索；搜索只发送公开名称、域名和线索。未提供 Key 时立即失败。一次调用最多发出一次 Search 和三次 Fetch，各次请求最多 10 秒。点击 Qt 关注页面仅查询缓存。
+
+只保存来自指定 HTTPS 站点、由 Fetch 读取且内容包含姓名和线索的原文记录。缓存保存原始链接、来源标题和获取时间；搜索返回的有效过去日期可以作发布日期，未知或未来日期留空。联网资讯不生成发布日历条目。该流程使用 [DeepSeek 独立 Search & Fetch](https://api-docs.deepseek.com/guides/search/)，调用计费，由服务器操作员显式执行。
+
+每个人物和发布者域名对应独立的 DeepSeek 缓存源。正常空结果只清空该来源，上游失败保留旧条目并标记过期。RSS/Atom 缓存由原命令独立维护。上线验收需要核验真实人物、发布者和原文匹配；模拟响应仅验证接口和数据库行为。
+
 ## 程序接口
 
 头文件为 `server/person_source_config.h`：
