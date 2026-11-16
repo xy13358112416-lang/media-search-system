@@ -143,6 +143,7 @@ void WarehouseClient::disconnectFromServer() {
     auto connecting = std::move(connecting_); connecting_ = {};
     auto pending = std::move(pending_); pending_.clear();
     token_.clear(); decoder_.reset();
+    loginPending_ = false;
     logoutPending_ = false;
     socket_.abort();
     if (connecting) connecting(status);
@@ -221,7 +222,12 @@ void WarehouseClient::login(const QString& username, const QString& password, Ca
     cancelSessionRequests();
     const QString oldToken = std::exchange(token_, QString());
     if (!oldToken.isEmpty()) {
-        request("logout", {}, [this, username, password, done=std::move(done)](Status status, QJsonObject) mutable {
+        const quint64 attempt = connectAttempt_;
+        request("logout", {}, [this, attempt, username, password, done=std::move(done)](Status status, QJsonObject) mutable {
+            if (connectAttempt_ != attempt) {
+                done({status.ok() ? fail(ErrorCode::Cancelled, QStringLiteral("登录请求已被新的连接操作替代")) : status, {}});
+                return;
+            }
             if (!status.ok()) {
                 loginPending_ = false;
                 disconnectFromServer();
@@ -238,7 +244,11 @@ void WarehouseClient::sendLogin(const QString& username, const QString& password
     request("login", {{"username",username},{"password",password}},
         [this, done=std::move(done)](Status status, QJsonObject payload) {
             loginPending_ = false;
-            if (!status.ok()) { done({status,{}}); return; }
+            if (!status.ok()) {
+                // A timed-out login may already have created a server session whose token we never received.
+                if (status.code == ErrorCode::Timeout) disconnectFromServer();
+                done({status,{}}); return;
+            }
             const auto u = payload.value("user").toObject();
             UserInfo result;
             if (!payload.value("token").isString() || payload.value("token").toString().isEmpty() ||
@@ -263,11 +273,18 @@ void WarehouseClient::logout(StatusCallback done) {
         return;
     }
     logoutPending_ = true;
+    const quint64 attempt = connectAttempt_;
     cancelSessionRequests();
+    if (connectAttempt_ != attempt) {
+        // Cancellation callbacks may have replaced the connection; leave that new session alone.
+        done(fail(ErrorCode::Cancelled, QStringLiteral("退出请求已被新的连接操作替代"))); return;
+    }
     const QString oldToken = std::exchange(token_, QString());
-    request("logout", {}, [this, done=std::move(done)](Status status, QJsonObject) {
-        logoutPending_ = false;
-        if (!status.ok()) disconnectFromServer();
+    request("logout", {}, [this, attempt, done=std::move(done)](Status status, QJsonObject) {
+        if (connectAttempt_ == attempt) {
+            logoutPending_ = false;
+            if (!status.ok()) disconnectFromServer();
+        }
         done(status);
     }, oldToken);
 }

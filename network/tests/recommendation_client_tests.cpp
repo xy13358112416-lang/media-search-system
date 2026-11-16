@@ -16,6 +16,8 @@ public:
     QList<QPair<QPointer<QTcpSocket>, QJsonObject>> recommendations;
     QList<QPair<QPointer<QTcpSocket>, QJsonObject>> otherRequests;
     QList<QJsonObject> cancellations;
+    QList<QPair<QPointer<QTcpSocket>, QJsonObject>> logins;
+    bool holdLoginResponses = false;
     bool rejectLogout = false;
     int appliedMutations = 0;
     FakeServer() {
@@ -29,6 +31,8 @@ public:
                         const QString type = m.value("type").toString();
                         const QString id = m.value("req_id").toString();
                         if (type == "login") {
+                            logins.append({socket, m});
+                            if (holdLoginResponses) continue;
                             const QString name = m.value("payload").toObject().value("username").toString();
                             send(socket, {{"type","login_resp"},{"req_id",id},{"payload",QJsonObject{
                                 {"token",name + "-token"},{"user",QJsonObject{{"user_id",name == "alice" ? "1" : "2"},{"username",name}}}}}});
@@ -80,6 +84,10 @@ private slots:
     void explicitCancelAndEmptyResult();
     void reconnectFromCancelledConnectCallback();
     void immediateFailureReturnsEmptyHandle();
+    void loginTimeoutClosesIndeterminateSession();
+    void reconnectFromLogoutCancellationCallback();
+    void reconnectWhileLogoutResponseIsPending_data();
+    void reconnectWhileLogoutResponseIsPending();
 };
 
 void RecommendationClientTests::twoClientsReceiveTheirOwnResponses() {
@@ -419,6 +427,108 @@ void RecommendationClientTests::immediateFailureReturnsEmptyHandle() {
     QCOMPARE(code, ErrorCode::NotConnected);
     QVERIFY(handle.isEmpty());
     QVERIFY(!client.cancelRecommendation(handle));
+}
+
+void RecommendationClientTests::loginTimeoutClosesIndeterminateSession() {
+    FakeServer fake; QVERIFY(fake.server.listen(QHostAddress::LocalHost, 0));
+    fake.holdLoginResponses = true;
+    WarehouseClient client;
+    bool connected = false;
+    client.connectToServer("127.0.0.1", fake.server.serverPort(), [&](Status s) { connected = s.ok(); });
+    QTRY_VERIFY(connected);
+    int loginCalls = 0; Status loginStatus;
+    client.login("alice", "pw", [&](auto r) { ++loginCalls; loginStatus = r.status; });
+    QTRY_COMPARE(fake.logins.size(), 1);
+    const auto oldLogin = fake.logins.first();
+    QTRY_COMPARE_WITH_TIMEOUT(loginCalls, 1, 12000);
+    QCOMPARE(loginStatus.code, ErrorCode::Timeout);
+    // The server may already have authenticated this connection, although its token is unknown locally.
+    QTRY_COMPARE(oldLogin.first->state(), QAbstractSocket::UnconnectedState);
+    fake.holdLoginResponses = false;
+    connected = false;
+    client.connectToServer("127.0.0.1", fake.server.serverPort(), [&](Status s) { connected = s.ok(); });
+    QTRY_VERIFY(connected);
+    bool loggedIn = false;
+    client.login("alice", "pw", [&](auto r) { loggedIn = r.status.ok(); });
+    QTRY_VERIFY(loggedIn);
+    QCOMPARE(fake.logins.size(), 2);
+    QCOMPARE(loginCalls, 1);
+}
+
+void RecommendationClientTests::reconnectFromLogoutCancellationCallback() {
+    FakeServer first, second;
+    QVERIFY(first.server.listen(QHostAddress::LocalHost, 0));
+    QVERIFY(second.server.listen(QHostAddress::LocalHost, 0));
+    WarehouseClient client;
+    bool connected = false;
+    client.connectToServer("127.0.0.1", first.server.serverPort(), [&](Status s) { connected = s.ok(); });
+    QTRY_VERIFY(connected);
+    bool loggedIn = false;
+    client.login("alice", "pw", [&](auto r) { loggedIn = r.status.ok(); });
+    QTRY_VERIFY(loggedIn);
+    int recommendationCalls = 0, connectCalls = 0, logoutCalls = 0;
+    Status recommendationStatus, connectStatus, logoutStatus;
+    client.recommendResources({"Music", {}, 5}, [&](auto r) {
+        ++recommendationCalls; recommendationStatus = r.status;
+        client.connectToServer("127.0.0.1", second.server.serverPort(), [&](Status s) {
+            ++connectCalls; connectStatus = s;
+        });
+    });
+    QTRY_COMPARE(first.recommendations.size(), 1);
+    client.logout([&](Status s) { ++logoutCalls; logoutStatus = s; });
+    QTRY_COMPARE(connectCalls, 1);
+    QVERIFY2(connectStatus.ok(), qPrintable(connectStatus.message));
+    QCOMPARE(logoutCalls, 1);
+    QCOMPARE(logoutStatus.code, ErrorCode::Cancelled);
+    QCOMPARE(recommendationCalls, 1);
+    QCOMPARE(recommendationStatus.code, ErrorCode::Cancelled);
+    loggedIn = false;
+    client.login("bob", "pw", [&](auto r) { loggedIn = r.status.ok(); });
+    QTRY_VERIFY(loggedIn);
+    QCOMPARE(second.logins.size(), 1);
+    QCOMPARE(connectCalls, 1);
+    QCOMPARE(logoutCalls, 1);
+    QCOMPARE(recommendationCalls, 1);
+}
+
+void RecommendationClientTests::reconnectWhileLogoutResponseIsPending_data() {
+    QTest::addColumn<bool>("switchAccount");
+    QTest::newRow("explicit-logout") << false;
+    QTest::newRow("account-switch-logout") << true;
+}
+
+void RecommendationClientTests::reconnectWhileLogoutResponseIsPending() {
+    QFETCH(bool, switchAccount);
+    FakeServer first, second;
+    QVERIFY(first.server.listen(QHostAddress::LocalHost, 0));
+    QVERIFY(second.server.listen(QHostAddress::LocalHost, 0));
+    WarehouseClient client;
+    bool connected = false;
+    client.connectToServer("127.0.0.1", first.server.serverPort(), [&](Status s) { connected = s.ok(); });
+    QTRY_VERIFY(connected);
+    bool loggedIn = false;
+    client.login("alice", "pw", [&](auto r) { loggedIn = r.status.ok(); });
+    QTRY_VERIFY(loggedIn);
+    int logoutCalls = 0, connectCalls = 0;
+    Status logoutStatus, connectStatus;
+    if (switchAccount)
+        client.login("bob", "pw", [&](auto r) { ++logoutCalls; logoutStatus = r.status; });
+    else
+        client.logout([&](Status s) { ++logoutCalls; logoutStatus = s; });
+    // Replace the connection before the old logout response can be delivered.
+    client.connectToServer("127.0.0.1", second.server.serverPort(), [&](Status s) {
+        ++connectCalls; connectStatus = s;
+    });
+    QTRY_COMPARE(connectCalls, 1);
+    QVERIFY2(connectStatus.ok(), qPrintable(connectStatus.message));
+    QCOMPARE(logoutCalls, 1);
+    QCOMPARE(logoutStatus.code, ErrorCode::NotConnected);
+    loggedIn = false;
+    client.login("bob", "pw", [&](auto r) { loggedIn = r.status.ok(); });
+    QTRY_VERIFY(loggedIn);
+    QCOMPARE(second.logins.size(), 1);
+    QCOMPARE(logoutCalls, 1);
+    QCOMPARE(connectCalls, 1);
 }
 
 QTEST_GUILESS_MAIN(RecommendationClientTests)
