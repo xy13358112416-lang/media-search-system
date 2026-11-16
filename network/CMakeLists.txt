@@ -18,6 +18,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_algorithm_core.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_person.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_footprint.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_trending.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../retrieval/care_temporal.cmake)
 
 # PR 4 将其替换为包含 warehouse_client.cpp 的实际实现。
 add_library(warehouse_client INTERFACE)

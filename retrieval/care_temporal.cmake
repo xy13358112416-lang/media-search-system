@@ -1,0 +1,15 @@
+# Included by network/CMakeLists.txt after care_algorithm_core is available.
+add_library(care_temporal STATIC
+    "${CMAKE_CURRENT_LIST_DIR}/care_temporal.cpp")
+target_include_directories(care_temporal PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../include")
+target_compile_features(care_temporal PUBLIC cxx_std_17)
+target_link_libraries(care_temporal PUBLIC care_algorithm_core Qt6::Core)
+target_compile_options(care_temporal PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+if(BUILD_TESTING)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+    add_executable(care_temporal_tests "${CMAKE_CURRENT_LIST_DIR}/care_temporal_tests.cpp")
+    set_target_properties(care_temporal_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(care_temporal_tests PRIVATE care_temporal Qt6::Test)
+    target_compile_options(care_temporal_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    add_test(NAME care_temporal COMMAND care_temporal_tests)
+endif()
