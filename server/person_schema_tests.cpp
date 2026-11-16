@@ -71,6 +71,10 @@ private slots:
             QCOMPARE(q.value(2).toInt(),0);
             QVERIFY(q.exec("SELECT COUNT(*) FROM server_schema_migrations WHERE version=3"));
             QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),1);
+            q.finish();
+            QVERIFY(db.transaction());
+            QVERIFY2(person_schema::migrate(db,error),qPrintable(error));
+            QVERIFY(db.commit());
             db.close();
         }
         QSqlDatabase::removeDatabase(connection);
