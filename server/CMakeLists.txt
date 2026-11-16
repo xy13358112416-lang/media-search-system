@@ -2,8 +2,8 @@ find_package(Qt6 REQUIRED COMPONENTS Core Network Sql)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SODIUM REQUIRED IMPORTED_TARGET libsodium)
 
-add_library(warehouse_server STATIC warehouse_server.cpp recommendation_router.cpp)
-target_link_libraries(warehouse_server PUBLIC warehouse_protocol care_contract care_footprint care_trending care_temporal llm_recommendation Qt6::Sql PRIVATE PkgConfig::SODIUM)
+add_library(warehouse_server STATIC warehouse_server.cpp recommendation_router.cpp person_snapshot_json.cpp)
+target_link_libraries(warehouse_server PUBLIC warehouse_protocol care_contract care_footprint care_trending care_temporal care_person_snapshot llm_recommendation Qt6::Sql PRIVATE PkgConfig::SODIUM)
 target_compile_options(warehouse_server PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 add_executable(media_server main.cpp)
@@ -16,6 +16,11 @@ target_compile_options(media_demo_import PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-
 
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
+    add_executable(person_snapshot_server_tests person_snapshot_server_tests.cpp)
+    set_target_properties(person_snapshot_server_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(person_snapshot_server_tests PRIVATE warehouse_server warehouse_client Qt6::Test)
+    target_compile_options(person_snapshot_server_tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    add_test(NAME person_snapshot_server_tests COMMAND person_snapshot_server_tests)
     find_package(Python3 QUIET COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         add_test(NAME demo_import_tests COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/sample-data/simulation/test_import_demo.py" "$<TARGET_FILE:media_demo_import>" "$<TARGET_FILE:media_server>")
