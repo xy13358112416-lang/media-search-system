@@ -1,6 +1,10 @@
 #include "warehouse_server.h"
 #include "media_json.h"
 #include <QJsonArray>
+#include <QFile>
+#include <QSqlDatabase>
+#include <QSqlError>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTcpSocket>
 #include <QtTest>
@@ -47,6 +51,271 @@ QJsonObject payload(const QJsonObject& response)
 class ServerTests : public QObject {
     Q_OBJECT
 private slots:
+    void historyReadFailsOnMidStreamDatabaseError()
+    {
+        QTemporaryDir directory;
+        const auto path = directory.filePath("corrupt-test.sqlite");
+        QString error;
+        {
+            WarehouseServer server;
+            QVERIFY(server.openDatabase(path, error));
+            QVERIFY(server.addUser("alice", "alice-demo", error));
+        }
+        qint64 leaf = 0, pageSize = 0;
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", "history-corrupt-setup");
+            db.setDatabaseName(path); QVERIFY(db.open()); QVERIFY(db.transaction());
+            QSqlQuery q(db);
+            QVERIFY(q.prepare("INSERT INTO behavior_events(user_id,event_id,action,query,occurred_at_utc) VALUES(1,?,'search',?,?)"));
+            for (int i = 0; i < 1000; ++i) {
+                q.bindValue(0, QStringLiteral("event-%1").arg(i, 4, 10, QLatin1Char('0')));
+                q.bindValue(1, QString(180, QLatin1Char('x')));
+                q.bindValue(2, 1700000000 + i);
+                QVERIFY(q.exec());
+            }
+            QVERIFY(db.commit());
+            QVERIFY(q.exec("PRAGMA page_size")); QVERIFY(q.next()); pageSize = q.value(0).toLongLong();
+            if (!q.exec("SELECT pageno FROM dbstat WHERE name='behavior_events' AND pagetype='leaf' ORDER BY path DESC LIMIT 1"))
+                QSKIP("SQLite dbstat is unavailable; cannot safely locate a test-only leaf page");
+            QVERIFY(q.next()); leaf = q.value(0).toLongLong();
+        }
+        QSqlDatabase::removeDatabase("history-corrupt-setup");
+        QVERIFY(leaf > 1 && pageSize > 0);
+        QFile file(path); QVERIFY(file.open(QIODevice::ReadWrite));
+        QVERIFY(file.seek((leaf - 1) * pageSize));
+        QCOMPARE(file.write(QByteArray(1, '\0')), qint64(1));
+        file.close();
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", "history-corrupt-check");
+            db.setDatabaseName(path); QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec("SELECT event_id FROM behavior_events WHERE user_id=1 AND occurred_at_utc>=0 AND occurred_at_utc<253402300800 ORDER BY occurred_at_utc,event_id"));
+            int rows = 0; while (q.next()) ++rows;
+            QVERIFY(rows > 0); QVERIFY(rows < 1000); QVERIFY(q.lastError().isValid());
+        }
+        QSqlDatabase::removeDatabase("history-corrupt-check");
+        WarehouseServer server;
+        QVERIFY2(server.openDatabase(path, error), qPrintable(error));
+        QVERIFY(!server.queryBehavior(1, {0, care_contract::MaxUtcExclusive}).has_value());
+    }
+    void existingDatabaseMigratesWithoutLosingData()
+    {
+        QTemporaryDir directory;
+        const auto path = directory.filePath("old.sqlite");
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", "old-fixture");
+            db.setDatabaseName(path); QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec("CREATE TABLE network_users(id INTEGER PRIMARY KEY,username TEXT NOT NULL,username_key TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL)"));
+            QVERIFY(q.exec("CREATE TABLE warehouses(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,owner_id INTEGER NOT NULL REFERENCES network_users(id),is_public INTEGER NOT NULL)"));
+            QVERIFY(q.exec("CREATE TABLE warehouse_items(id INTEGER PRIMARY KEY AUTOINCREMENT,warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),media BLOB NOT NULL)"));
+            QVERIFY(q.exec("INSERT INTO network_users VALUES(1,'old','old','hash')"));
+            QVERIFY(q.exec("INSERT INTO warehouses VALUES(1,'preserved',1,0)"));
+        }
+        QSqlDatabase::removeDatabase("old-fixture");
+        QString error;
+        {
+            WarehouseServer server;
+            QVERIFY2(server.openDatabase(path, error), qPrintable(error));
+            auto history = server.queryBehavior(1, {0, care_contract::MaxUtcExclusive});
+            QVERIFY(history.has_value()); QVERIFY(history->isEmpty());
+            auto warehouses = server.readableCandidates(1);
+            QVERIFY(warehouses.has_value()); QCOMPARE(warehouses->size(), 1);
+            QCOMPARE(warehouses->first().warehouse.name, QStringLiteral("preserved"));
+        }
+        WarehouseServer restarted;
+        QVERIFY2(restarted.openDatabase(path, error), qPrintable(error));
+        auto warehouses = restarted.readableCandidates(1);
+        QVERIFY(warehouses.has_value()); QCOMPARE(warehouses->size(), 1);
+    }
+    void behaviorViewIdentityAndPermission()
+    {
+        QTemporaryDir directory;
+        const QString path = directory.filePath("view.sqlite");
+        QString error, warehouseId, itemId, workId;
+        const MediaRecord media{"original", "Music.mp3", "MP3", 1, "Director", {"Actor"}, 1,
+                                QDate(2025, 1, 1), {}, "music"};
+        {
+            WarehouseServer server;
+            QVERIFY(server.openDatabase(path, error));
+            QVERIFY(server.addUser("alice", "alice-demo", error));
+            QVERIFY(server.addUser("bob", "bob-demo", error));
+            QVERIFY(server.listen(QHostAddress::LocalHost));
+            Connection alice(server.serverPort()), bob(server.serverPort());
+            QTRY_COMPARE(alice.socket.state(), QAbstractSocket::ConnectedState);
+            QTRY_COMPARE(bob.socket.state(), QAbstractSocket::ConnectedState);
+            alice.socket.write(alice.request("login", {{"username", "alice"}, {"password", "alice-demo"}}));
+            bob.socket.write(bob.request("login", {{"username", "bob"}, {"password", "bob-demo"}}));
+            QTRY_COMPARE(alice.received.size(), 1);
+            QTRY_COMPARE(bob.received.size(), 1);
+            alice.token = payload(alice.received.takeFirst()).value("token").toString();
+            bob.token = payload(bob.received.takeFirst()).value("token").toString();
+            alice.socket.write(alice.request("create_warehouse", {{"name", "private"}, {"visibility", "private"}}));
+            QTRY_COMPARE(alice.received.size(), 1);
+            warehouseId = payload(alice.received.takeFirst()).value("warehouse").toObject().value("warehouse_id").toString();
+            alice.socket.write(alice.request("add_item", {{"warehouse_id", warehouseId}, {"media", media_json::toJson(media)}}));
+            QTRY_COMPARE(alice.received.size(), 1);
+            itemId = payload(alice.received.takeFirst()).value("item").toObject().value("item_id").toString();
+            const QJsonObject source{{"warehouse_id", warehouseId}, {"item_id", itemId}};
+            bob.socket.write(bob.request("get_resource", {{"source", source}}));
+            QTRY_COMPARE(bob.received.size(), 1);
+            QCOMPARE(bob.received.takeFirst().value("code").toString(), "PermissionDenied");
+            alice.socket.write(alice.request("get_resource", {{"source", source}}));
+            QTRY_COMPARE(alice.received.size(), 1);
+            workId = payload(alice.received.takeFirst()).value("work").toObject().value("resource").toObject().value("work_id").toString();
+            QVERIFY(!workId.isEmpty());
+            QJsonObject event{{"event_id", "view-1"}, {"action", "view"}, {"resource", QJsonObject{{"work_id", workId}, {"source", source}}},
+                              {"user_id", "2"}, {"occurred_at_utc", "42"}, {"synthetic", true}};
+            bob.socket.write(bob.request("record_behavior", {{"event", event}}));
+            QTRY_COMPARE(bob.received.size(), 1);
+            QCOMPARE(bob.received.takeFirst().value("code").toString(), "PermissionDenied");
+            alice.socket.write(alice.request("record_behavior", {{"event", event}}) + alice.request("record_behavior", {{"event", event}}));
+            QTRY_COMPARE(alice.received.size(), 2);
+            QCOMPARE(alice.received.takeFirst().value("type").toString(), "record_behavior_resp");
+            QCOMPARE(alice.received.takeFirst().value("type").toString(), "record_behavior_resp");
+            auto resource = event.value("resource").toObject(); resource["work_id"] = "fake:id"; event["resource"] = resource;
+            alice.socket.write(alice.request("record_behavior", {{"event", event}}));
+            QTRY_COMPARE(alice.received.size(), 1);
+            QCOMPARE(alice.received.takeFirst().value("code").toString(), "InvalidArgument");
+            auto history = server.queryBehavior(1, {0, care_contract::MaxUtcExclusive});
+            QVERIFY(history.has_value()); QCOMPARE(history->size(), 1);
+            QCOMPARE(history->first().record.event.resource->workId, workId);
+            QVERIFY(!history->first().record.synthetic);
+            QVERIFY(history->first().record.occurredAtUtc > 42);
+            QVERIFY(history->first().mediaSnapshot.has_value());
+            QCOMPARE(history->first().mediaSnapshot->category, media.category);
+            auto other = server.queryBehavior(2, {0, care_contract::MaxUtcExclusive});
+            QVERIFY(other.has_value()); QVERIFY(other->isEmpty());
+            const auto timestamp = history->first().record.occurredAtUtc;
+            auto before = server.queryBehavior(1, {0, timestamp});
+            QVERIFY(before.has_value()); QVERIFY(before->isEmpty());
+            auto included = server.queryBehavior(1, {timestamp, timestamp + 1});
+            QVERIFY(included.has_value()); QCOMPARE(included->size(), 1);
+            alice.socket.write(alice.request("remove_item", {{"warehouse_id", warehouseId}, {"item_id", itemId}}));
+            QTRY_COMPARE(alice.received.size(), 1);
+            QCOMPARE(alice.received.takeFirst().value("type").toString(), "remove_item_resp");
+            resource["work_id"] = workId; event["resource"] = resource;
+            alice.socket.write(alice.request("record_behavior", {{"event", event}}));
+            QTRY_COMPARE(alice.received.size(), 1);
+            QCOMPARE(alice.received.takeFirst().value("type").toString(), "record_behavior_resp");
+            history = server.queryBehavior(1, {0, care_contract::MaxUtcExclusive});
+            QVERIFY(history.has_value()); QCOMPARE(history->size(), 1);
+            QCOMPARE(history->first().mediaSnapshot->category, media.category);
+        }
+        WarehouseServer restarted;
+        QVERIFY(restarted.openDatabase(path, error));
+        auto history = restarted.queryBehavior(1, {0, care_contract::MaxUtcExclusive});
+        QVERIFY(history.has_value()); QCOMPARE(history->size(), 1);
+        QCOMPARE(history->first().record.event.resource->workId, workId);
+    }
+    void behaviorSearchIsAuthenticatedAndIdempotent()
+    {
+        QTemporaryDir directory;
+        const auto path = directory.filePath("behavior.sqlite");
+        QString error;
+        WarehouseServer server;
+        QVERIFY(server.openDatabase(path, error));
+        QVERIFY(server.addUser("alice", "alice-demo", error));
+        QVERIFY(server.addUser("bob", "bob-demo", error));
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        Connection alice(server.serverPort()), bob(server.serverPort());
+        QTRY_COMPARE(alice.socket.state(), QAbstractSocket::ConnectedState);
+        QTRY_COMPARE(bob.socket.state(), QAbstractSocket::ConnectedState);
+        const QJsonObject event{{"event_id", "evt-1"}, {"action", "search"}, {"query", "music"}};
+        alice.socket.write(alice.request("record_behavior", {{"event", event}}));
+        QTRY_COMPARE(alice.received.size(), 1);
+        QCOMPARE(alice.received.takeFirst().value("code").toString(), "NotAuthenticated");
+        alice.socket.write(alice.request("login", {{"username", "alice"}, {"password", "alice-demo"}}));
+        QTRY_COMPARE(alice.received.size(), 1);
+        alice.token = payload(alice.received.takeFirst()).value("token").toString();
+        bob.socket.write(bob.request("login", {{"username", "bob"}, {"password", "bob-demo"}}));
+        QTRY_COMPARE(bob.received.size(), 1);
+        bob.token = payload(bob.received.takeFirst()).value("token").toString();
+        bob.socket.write(bob.request("record_behavior", {{"event", event}}));
+        QTRY_COMPARE(bob.received.size(), 1);
+        QCOMPARE(bob.received.takeFirst().value("type").toString(), "record_behavior_resp");
+        alice.socket.write(alice.request("record_behavior", {{"event", event}}) +
+                           alice.request("record_behavior", {{"event", event}}));
+        QTRY_COMPARE(alice.received.size(), 2);
+        QCOMPARE(alice.received.takeFirst().value("type").toString(), "record_behavior_resp");
+        QCOMPARE(alice.received.takeFirst().value("type").toString(), "record_behavior_resp");
+        auto altered = event;
+        altered["query"] = "different";
+        alice.socket.write(alice.request("record_behavior", {{"event", altered}}));
+        QTRY_COMPARE(alice.received.size(), 1);
+        QCOMPARE(alice.received.takeFirst().value("code").toString(), "InvalidArgument");
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", "behavior-test");
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec("SELECT COUNT(*) FROM behavior_events WHERE user_id=1"));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toInt(), 1);
+        }
+        QSqlDatabase::removeDatabase("behavior-test");
+        alice.socket.write(alice.request("get_participation_settings"));
+        QTRY_COMPARE(alice.received.size(), 1);
+        auto settings = payload(alice.received.takeFirst()).value("settings").toObject();
+        QCOMPARE(settings.value("history_enabled").toBool(), true);
+        QCOMPARE(settings.value("contribute_public_trends").toBool(), false);
+        settings["contribute_public_trends"] = true;
+        alice.socket.write(alice.request("set_participation_settings", {{"settings", settings}}));
+        QTRY_COMPARE(alice.received.size(), 1);
+        QCOMPARE(alice.received.takeFirst().value("type").toString(), "set_participation_settings_resp");
+        auto contributed = event; contributed["event_id"] = "evt-2";
+        alice.socket.write(alice.request("record_behavior", {{"event", contributed}}));
+        QTRY_COMPARE(alice.received.size(), 1);
+        QCOMPARE(alice.received.takeFirst().value("type").toString(), "record_behavior_resp");
+        auto beforeRevoke = server.queryBehavior(1, {0, care_contract::MaxUtcExclusive});
+        QVERIFY(beforeRevoke.has_value()); QCOMPARE(beforeRevoke->size(), 2);
+        QCOMPARE(beforeRevoke->at(0).publicEligible, false);
+        QCOMPARE(beforeRevoke->at(1).publicEligible, true);
+        settings["contribute_public_trends"] = false;
+        alice.socket.write(alice.request("set_participation_settings", {{"settings", settings}}));
+        QTRY_COMPARE(alice.received.size(), 1);
+        QCOMPARE(alice.received.takeFirst().value("type").toString(), "set_participation_settings_resp");
+        auto afterRevoke = server.queryBehavior(1, {0, care_contract::MaxUtcExclusive});
+        QVERIFY(afterRevoke.has_value()); QCOMPARE(afterRevoke->size(), 2);
+        QCOMPARE(afterRevoke->at(1).publicEligible, false);
+        settings["history_enabled"] = false;
+        alice.socket.write(alice.request("set_participation_settings", {{"settings", settings}}));
+        QTRY_COMPARE(alice.received.size(), 1);
+        QCOMPARE(alice.received.takeFirst().value("type").toString(), "set_participation_settings_resp");
+        alice.socket.write(alice.request("record_behavior", {{"event", altered}}));
+        QTRY_COMPARE(alice.received.size(), 1);
+        QCOMPARE(alice.received.takeFirst().value("code").toString(), "InvalidArgument");
+        auto paused = event;
+        paused["event_id"] = "evt-paused";
+        alice.socket.write(alice.request("record_behavior", {{"event", paused}}));
+        QTRY_COMPARE(alice.received.size(), 1);
+        QCOMPARE(alice.received.takeFirst().value("type").toString(), "record_behavior_resp");
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", "behavior-paused-test");
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec("SELECT COUNT(*) FROM behavior_events WHERE user_id=1"));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toInt(), 2);
+        }
+        QSqlDatabase::removeDatabase("behavior-paused-test");
+        alice.socket.write(alice.request("clear_history"));
+        QTRY_COMPARE(alice.received.size(), 1);
+        QCOMPARE(alice.received.takeFirst().value("type").toString(), "clear_history_resp");
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", "behavior-clear-test");
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec("SELECT COUNT(*) FROM behavior_events WHERE user_id=1"));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toInt(), 0);
+        }
+        QSqlDatabase::removeDatabase("behavior-clear-test");
+        auto bobHistory = server.queryBehavior(2, {0, care_contract::MaxUtcExclusive});
+        QVERIFY(bobHistory.has_value()); QCOMPARE(bobHistory->size(), 1);
+    }
     void permissionsAndPersistence()
     {
         QTemporaryDir directory;

@@ -1,9 +1,12 @@
 #include "warehouse_server.h"
 #include "media_json.h"
+#include "behavior_contract.h"
 
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QRegularExpression>
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QTcpSocket>
 #include <QUuid>
@@ -110,6 +113,21 @@ bool WarehouseServer::openDatabase(const QString& path, QString& error)
                     "(id INTEGER PRIMARY KEY AUTOINCREMENT, "
                     "warehouse_id INTEGER NOT NULL REFERENCES warehouses(id), media BLOB NOT NULL)") ||
         !query.exec("CREATE INDEX IF NOT EXISTS warehouse_items_warehouse ON warehouse_items(warehouse_id,id)") ||
+        !query.exec("CREATE TABLE IF NOT EXISTS work_sources "
+                    "(warehouse_id INTEGER NOT NULL, item_id INTEGER NOT NULL, work_id TEXT NOT NULL UNIQUE, "
+                    "PRIMARY KEY(warehouse_id,item_id))") ||
+        !query.exec("CREATE TABLE IF NOT EXISTS behavior_events "
+                    "(user_id INTEGER NOT NULL REFERENCES network_users(id), event_id TEXT NOT NULL, "
+                    "action TEXT NOT NULL, query TEXT NOT NULL, occurred_at_utc INTEGER NOT NULL, "
+                    "synthetic INTEGER NOT NULL DEFAULT 0, public_eligible INTEGER NOT NULL DEFAULT 0, "
+                    "work_id TEXT, warehouse_id INTEGER, item_id INTEGER, media_snapshot BLOB, "
+                    "PRIMARY KEY(user_id,event_id))") ||
+        !query.exec("CREATE INDEX IF NOT EXISTS behavior_events_user_time ON behavior_events(user_id,occurred_at_utc)") ||
+        !query.exec("CREATE TABLE IF NOT EXISTS behavior_settings "
+                    "(user_id INTEGER PRIMARY KEY REFERENCES network_users(id), history_enabled INTEGER NOT NULL, "
+                    "personalization_enabled INTEGER NOT NULL, contribute_public_trends INTEGER NOT NULL)") ||
+        !query.exec("CREATE TABLE IF NOT EXISTS server_schema_migrations(version INTEGER PRIMARY KEY)") ||
+        !query.exec("INSERT OR IGNORE INTO server_schema_migrations(version) VALUES(1)") ||
         !db_.commit()) {
         db_.rollback();
         error = QStringLiteral("无法创建仓库表。");
@@ -164,6 +182,52 @@ std::optional<QList<WarehouseDetail>> WarehouseServer::readableCandidates(qint64
         rows.append({warehouse, std::move(*items)});
     }
     return rows;
+}
+
+std::optional<QList<StoredBehavior>> WarehouseServer::queryBehavior(qint64 userId, care_contract::TimeRange range)
+{
+    if (userId <= 0 || !care_contract::validate(range).ok()) return std::nullopt;
+    QSqlQuery exists(db_);
+    exists.prepare("SELECT 1 FROM network_users WHERE id=?");
+    exists.addBindValue(userId);
+    if (!exists.exec() || !exists.next()) return std::nullopt;
+    QSqlQuery query(db_);
+    query.prepare("SELECT event_id,action,query,occurred_at_utc,synthetic,work_id,warehouse_id,item_id,media_snapshot,public_eligible "
+                  "FROM behavior_events WHERE user_id=? AND occurred_at_utc>=? AND occurred_at_utc<? "
+                  "ORDER BY occurred_at_utc,event_id");
+    query.addBindValue(userId); query.addBindValue(range.beginUtc); query.addBindValue(range.endUtc);
+    if (!query.exec()) return std::nullopt;
+    QList<StoredBehavior> result;
+    qint64 snapshotBytes = 0;
+    while (query.next()) {
+        if (result.size() >= 10000) return std::nullopt;
+        StoredBehavior stored;
+        care_contract::BehaviorRecord record;
+        record.event.eventId = query.value(0).toString();
+        const auto action = query.value(1).toString();
+        if (action == "view") {
+            record.event.action = care_contract::BehaviorAction::View;
+            record.event.resource = care_contract::ResourceRef{query.value(5).toString(),
+                {query.value(6).toLongLong(), query.value(7).toLongLong()}};
+            const auto bytes = query.value(8).toByteArray();
+            snapshotBytes += bytes.size();
+            if (snapshotBytes > 16 * 1024 * 1024) return std::nullopt;
+            MediaRecord media; QString error;
+            if (!media_json::fromJson(QJsonDocument::fromJson(bytes).object(), media, error)) return std::nullopt;
+            stored.mediaSnapshot = media;
+        } else if (action == "search") {
+            record.event.action = care_contract::BehaviorAction::Search;
+            record.event.query = query.value(2).toString();
+        } else return std::nullopt;
+        record.occurredAtUtc = query.value(3).toLongLong();
+        record.synthetic = query.value(4).toBool();
+        if (!care_contract::validate(record.event).ok()) return std::nullopt;
+        stored.record = record;
+        stored.publicEligible = query.value(9).toBool();
+        result.append(stored);
+    }
+    if (query.lastError().isValid()) return std::nullopt;
+    return result;
 }
 
 void WarehouseServer::readRequests(QTcpSocket* socket, Session& session)
@@ -240,6 +304,154 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
     if (type == "logout") {
         session.userId = 0;
         session.token.clear();
+        return success();
+    }
+    if (type == "get_resource") {
+        if (!payload.value("source").isObject()) return invalid();
+        const auto source = payload.value("source").toObject();
+        const qint64 warehouseId = readId(source.value("warehouse_id"));
+        const qint64 itemId = readId(source.value("item_id"));
+        if (!warehouseId || !itemId) return invalid();
+        query.prepare("SELECT w.owner_id,w.is_public,i.media FROM warehouses w "
+                      "JOIN warehouse_items i ON i.warehouse_id=w.id WHERE w.id=? AND i.id=?");
+        query.addBindValue(warehouseId); query.addBindValue(itemId);
+        if (!query.exec()) return dbError();
+        if (!query.next()) return fail("NotFound", QStringLiteral("资源不存在。"));
+        if (query.value(0).toLongLong() != session.userId && !query.value(1).toBool())
+            return fail("PermissionDenied", QStringLiteral("没有此资源的访问权限。"));
+        const auto media = QJsonDocument::fromJson(query.value(2).toByteArray()).object();
+        MediaRecord decoded; QString error;
+        if (!media_json::fromJson(media, decoded, error)) return dbError();
+        query.finish();
+        query.prepare("INSERT OR IGNORE INTO work_sources(warehouse_id,item_id,work_id) VALUES(?,?,?)");
+        query.addBindValue(warehouseId); query.addBindValue(itemId);
+        query.addBindValue(QStringLiteral("srv:") + QUuid::createUuid().toString(QUuid::WithoutBraces));
+        if (!query.exec()) return dbError();
+        query.prepare("SELECT work_id FROM work_sources WHERE warehouse_id=? AND item_id=?");
+        query.addBindValue(warehouseId); query.addBindValue(itemId);
+        if (!query.exec() || !query.next()) return dbError();
+        const QJsonObject cleanSource{{"warehouse_id", QString::number(warehouseId)}, {"item_id", QString::number(itemId)}};
+        const QJsonObject ref{{"work_id", query.value(0).toString()}, {"source", cleanSource}};
+        return success({{"work", QJsonObject{{"resource", ref}, {"media", media}, {"people", QJsonArray{}}}}});
+    }
+    if (type == "get_participation_settings") {
+        query.prepare("SELECT history_enabled,personalization_enabled,contribute_public_trends FROM behavior_settings WHERE user_id=?");
+        query.addBindValue(session.userId);
+        if (!query.exec()) return dbError();
+        if (!query.next()) return success({{"settings", QJsonObject{{"history_enabled", true}, {"personalization_enabled", true}, {"contribute_public_trends", false}}}});
+        return success({{"settings", QJsonObject{{"history_enabled", query.value(0).toBool()},
+                         {"personalization_enabled", query.value(1).toBool()}, {"contribute_public_trends", query.value(2).toBool()}}}});
+    }
+    if (type == "set_participation_settings") {
+        if (!payload.value("settings").isObject()) return invalid();
+        const auto settings = payload.value("settings").toObject();
+        if (!settings.value("history_enabled").isBool() || !settings.value("personalization_enabled").isBool() ||
+            !settings.value("contribute_public_trends").isBool()) return invalid();
+        if (!db_.transaction()) return dbError();
+        query.prepare("INSERT INTO behavior_settings VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET "
+                      "history_enabled=excluded.history_enabled,personalization_enabled=excluded.personalization_enabled,"
+                      "contribute_public_trends=excluded.contribute_public_trends");
+        query.addBindValue(session.userId);
+        query.addBindValue(settings.value("history_enabled").toBool());
+        query.addBindValue(settings.value("personalization_enabled").toBool());
+        query.addBindValue(settings.value("contribute_public_trends").toBool());
+        if (!query.exec()) { db_.rollback(); return dbError(); }
+        if (!settings.value("contribute_public_trends").toBool()) {
+            query.prepare("UPDATE behavior_events SET public_eligible=0 WHERE user_id=?");
+            query.addBindValue(session.userId);
+            if (!query.exec()) { db_.rollback(); return dbError(); }
+        }
+        if (!db_.commit()) { db_.rollback(); return dbError(); }
+        return success();
+    }
+    if (type == "clear_history") {
+        query.prepare("DELETE FROM behavior_events WHERE user_id=?");
+        query.addBindValue(session.userId);
+        if (!query.exec()) return dbError();
+        return success();
+    }
+    if (type == "record_behavior") {
+        if (!payload.value("event").isObject()) return invalid();
+        const auto event = payload.value("event").toObject();
+        if (!event.value("event_id").isString() || !event.value("action").isString()) return invalid();
+        care_contract::BehaviorEvent value;
+        value.eventId = event.value("event_id").toString();
+        const auto action = event.value("action").toString();
+        QByteArray snapshot;
+        bool sourcePublic = true;
+        if (action == "search") {
+            if (!event.value("query").isString() || (!event.value("resource").isUndefined() && !event.value("resource").isNull())) return invalid();
+            value.action = care_contract::BehaviorAction::Search;
+            value.query = event.value("query").toString();
+        } else if (action == "view") {
+            if (!event.value("resource").isObject() || (!event.value("query").isUndefined() && !event.value("query").isString())) return invalid();
+            const auto resource = event.value("resource").toObject();
+            if (!resource.value("work_id").isString() || !resource.value("source").isObject()) return invalid();
+            const auto source = resource.value("source").toObject();
+            value.action = care_contract::BehaviorAction::View;
+            value.query = event.value("query").isUndefined() ? QStringLiteral("") : event.value("query").toString();
+            value.resource = care_contract::ResourceRef{resource.value("work_id").toString(),
+                {readId(source.value("warehouse_id")), readId(source.value("item_id"))}};
+        } else return invalid();
+        const auto status = care_contract::validate(value);
+        if (!status.ok()) return fail("InvalidArgument", status.message);
+        // Check the authenticated user's existing event before looking up a resource:
+        // retries must remain idempotent even if that resource was later deleted.
+        query.prepare("SELECT action,query,work_id,warehouse_id,item_id FROM behavior_events WHERE user_id=? AND event_id=?");
+        query.addBindValue(session.userId);
+        query.addBindValue(value.eventId);
+        if (!query.exec()) return dbError();
+        if (query.next()) {
+            if (query.value(0).toString() != action || query.value(1).toString() != value.query ||
+                (value.resource && (query.value(2).toString() != value.resource->workId ||
+                  query.value(3).toLongLong() != value.resource->source.warehouseId || query.value(4).toLongLong() != value.resource->source.itemId)))
+                return fail("InvalidArgument", QStringLiteral("行为编号已用于其他内容。"));
+            return success();
+        }
+        if (query.lastError().isValid()) return dbError();
+        query.finish();
+        if (value.resource) {
+            query.prepare("SELECT w.owner_id,w.is_public,i.media,s.work_id FROM warehouses w "
+                          "JOIN warehouse_items i ON i.warehouse_id=w.id "
+                          "LEFT JOIN work_sources s ON s.warehouse_id=w.id AND s.item_id=i.id WHERE w.id=? AND i.id=?");
+            query.addBindValue(value.resource->source.warehouseId); query.addBindValue(value.resource->source.itemId);
+            if (!query.exec()) return dbError();
+            if (!query.next()) return fail("NotFound", QStringLiteral("资源不存在。"));
+            if (query.value(0).toLongLong() != session.userId && !query.value(1).toBool())
+                return fail("PermissionDenied", QStringLiteral("没有此资源的访问权限。"));
+            if (query.value(3).toString() != value.resource->workId) return invalid();
+            sourcePublic = query.value(1).toBool(); snapshot = query.value(2).toByteArray();
+            query.finish();
+        }
+        query.prepare("SELECT history_enabled,contribute_public_trends FROM behavior_settings WHERE user_id=?");
+        query.addBindValue(session.userId);
+        if (!query.exec()) return dbError();
+        const bool hasSettings = query.next();
+        const bool historyEnabled = !hasSettings || query.value(0).toBool();
+        const bool publicEligible = hasSettings && query.value(1).toBool() && sourcePublic;
+        query.finish();
+        if (!historyEnabled) return success();
+        query.prepare("INSERT INTO behavior_events(user_id,event_id,action,query,occurred_at_utc,public_eligible,work_id,warehouse_id,item_id,media_snapshot) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,event_id) DO NOTHING");
+        query.addBindValue(session.userId);
+        query.addBindValue(value.eventId);
+        query.addBindValue(action);
+        query.addBindValue(value.query);
+        query.addBindValue(QDateTime::currentSecsSinceEpoch());
+        query.addBindValue(publicEligible);
+        query.addBindValue(value.resource ? QVariant(value.resource->workId) : QVariant());
+        query.addBindValue(value.resource ? QVariant(value.resource->source.warehouseId) : QVariant());
+        query.addBindValue(value.resource ? QVariant(value.resource->source.itemId) : QVariant());
+        query.addBindValue(value.resource ? QVariant(snapshot) : QVariant());
+        if (!query.exec()) return dbError();
+        if (query.numRowsAffected() == 0) {
+            query.prepare("SELECT action,query,work_id,warehouse_id,item_id FROM behavior_events WHERE user_id=? AND event_id=?");
+            query.addBindValue(session.userId); query.addBindValue(value.eventId);
+            if (!query.exec() || !query.next()) return dbError();
+            if (query.value(0).toString() != action || query.value(1).toString() != value.query ||
+                (value.resource && (query.value(2).toString() != value.resource->workId ||
+                 query.value(3).toLongLong() != value.resource->source.warehouseId || query.value(4).toLongLong() != value.resource->source.itemId)))
+                return fail("InvalidArgument", QStringLiteral("行为编号已用于其他内容。"));
+        }
         return success();
     }
     if (type == "list_my_warehouses" || type == "list_public_warehouses") {
