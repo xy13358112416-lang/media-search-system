@@ -6,10 +6,11 @@ class QApplication;
 class MediaLibrary;
 
 namespace account_contract { class AccountHistoryService; }
-namespace recommendation_contract { class PersonalRecommendationService; }
+namespace recommendation_contract { class PersonalRecommendationService; class TodayRecommendationService; }
 
 // The application supplies a loaded media library and the concrete business services.
 int runAccountFrontend(QApplication& app, MediaLibrary& library,
                        account_contract::AccountHistoryService& accounts,
                        recommendation_contract::PersonalRecommendationService& recommendations,
-                       const QString& databasePath);
+                       const QString& databasePath,
+                       recommendation_contract::TodayRecommendationService* today = nullptr);

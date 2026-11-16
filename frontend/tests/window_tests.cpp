@@ -1,6 +1,7 @@
 #include "account_history_service.h"
 #include "personalrecommendation_service.h"
 #include "window_test_support.h"
+
 #include <QtTest>
 
 using namespace UiTest;
@@ -287,6 +288,55 @@ private slots:
         QVERIFY(button(f.window.get(), QStringLiteral("删除"))->isHidden());
         QVERIFY(accounts.loadMediaHistory(reader.value->userId).value->isEmpty());
         f.window.reset();
+    }
+
+    void assistantSearchesLocalMediaByMood() {
+        Fixture f(QString::fromUtf8(REAL_CSV));
+        AccountHistoryServiceImpl accounts(f.library);
+        QVERIFY(accounts.initializeDatabase(f.directory.filePath("assistant-accounts.sqlite")).ok());
+        QVERIFY(accounts.createInitialAdmin("admin", "secret").ok());
+        QVERIFY(accounts.registerUser("reader", "secret").ok());
+        QVERIFY(accounts.login("reader", "secret").status.ok());
+
+        LibraryWindow window(f.library, &accounts);
+        window.show();
+        auto* opener = window.findChild<QPushButton*>(QStringLiteral("openAssistant"));
+        QVERIFY(opener);
+        QVERIFY(!window.findChild<QDialog*>());
+        opener->click();
+        auto* dialog = window.findChild<QDialog*>();
+        QVERIFY(dialog && dialog->isVisible());
+        QVERIFY(!dialog->findChild<QLineEdit*>(QStringLiteral("assistantApiKey")));
+        auto* tabs = window.findChild<QTabBar*>();
+        auto* table = window.findChild<QTableWidget*>();
+        auto* mood = dialog->findChild<QComboBox*>(QStringLiteral("assistantMood"));
+        auto* category = dialog->findChild<QComboBox*>(QStringLiteral("assistantCategory"));
+        auto* keyword = dialog->findChild<QLineEdit*>(QStringLiteral("assistantMediaKeyword"));
+        QVERIFY(tabs && table && mood && category && keyword);
+        const auto choose = [](QComboBox* box, const QVariant& selection) {
+            box->setCurrentIndex(box->findData(selection));
+        };
+        choose(mood, static_cast<int>(media_mood::Mood::Energizing));
+        choose(category, QStringLiteral("音乐"));
+        keyword->setText(QStringLiteral("  Champions  "));
+        button(dialog, QStringLiteral("查本地媒体"))->click();
+        QCOMPARE(tabs->currentIndex(), 1);
+        QVERIFY(!dialog->isVisible());
+        QCOMPARE(table->rowCount(), 1);
+        QCOMPARE(table->item(0, 0)->text(), QStringLiteral("We Are the Champions"));
+
+        opener->click();
+        choose(category, QStringLiteral("电影"));
+        button(dialog, QStringLiteral("查本地媒体"))->click();
+        QCOMPARE(table->rowCount(), 0);
+        QVERIFY(accounts.loadMediaHistory(accounts.currentUser()->userId).value->isEmpty());
+
+        button(&window, QStringLiteral("清空条件"))->click();
+        QCOMPARE(table->rowCount(), f.library.records().size());
+        opener->click();
+        button(dialog, QStringLiteral("打开推荐"))->click();
+        QCOMPARE(tabs->currentIndex(), 2);
+        QVERIFY(!dialog->isVisible());
     }
 
     void accountFrontendStartsRealSession() {

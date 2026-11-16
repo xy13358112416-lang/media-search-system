@@ -11,7 +11,7 @@ inline QString libraryStyle()
         QLabel#appTitle { color: #ffffff; font-size: 27px; font-weight: 700; }
         QLabel#dialogTitle { color: #173253; font-size: 23px; font-weight: 700; }
         QLabel#sectionTitle { color: #173253; font-size: 17px; font-weight: 700; }
-        QLabel#muted { color: #536680; }
+        QLabel#muted, QLabel#assistantStatus { color: #536680; }
         QLabel#fieldLabel { color: #536680; }
         QLabel#resultCount { color: #244c8d; background: #e3edff; border-radius: 9px;
                              padding: 5px 11px; font-weight: 700; }
@@ -23,6 +23,7 @@ inline QString libraryStyle()
         QProgressBar#linearBar::chunk { background: #667b98; }
         QProgressBar#fixedBar::chunk { background: #4177c0; }
         QProgressBar#shortBar::chunk { background: #007c70; }
+        QFrame#recommendCard { background: #ffffff; border: 1px solid #d7e1ef; border-radius: 12px; }
         QFrame#detailCard { background: #ffffff; border: 1px solid #d7e1ef; border-radius: 12px; }
         QWidget#detailBody { background: #ffffff; }
         QScrollArea#detailScroll { border: none; background: transparent; }
@@ -60,6 +61,9 @@ inline QString libraryStyle()
         QPushButton#primary { color: #ffffff; background: #244f91; border-color: #244f91; }
         QPushButton#primary:hover { background: #1a3e75; }
         QPushButton#primary:focus { border: 1px solid #98b7ff; }
+        QPushButton#avatarButton { background: #173253; border: 1px solid transparent;
+                                   border-radius: 22px; padding: 0; }
+        QPushButton#avatarButton:hover, QPushButton#avatarButton:focus { border-color: #98b7ff; }
         QPushButton#danger { color: #9d2c41; }
         QPushButton:disabled, QPushButton#danger:disabled { color: #7d8ba0; background: #f2f5f9; }
         QTableWidget { background: #ffffff; alternate-background-color: #f5f8fd;
