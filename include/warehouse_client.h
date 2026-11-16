@@ -27,7 +27,12 @@ public:
 private:
     friend class OnlineCareClient;
     using Response = std::function<void(warehouse_contract::Status, QJsonObject)>;
-    struct Pending { QString responseType; Response callback; bool mutation = false; };
+    struct Pending {
+        QString responseType;
+        Response callback;
+        bool mutation = false;
+        bool cancelOnServer = false;
+    };
     static warehouse_contract::Status pendingFailure(const Pending& pending, warehouse_contract::Status status);
     QString request(const QString& type, const QJsonObject& payload, Response callback, const QString& logoutToken = {});
     void receive();

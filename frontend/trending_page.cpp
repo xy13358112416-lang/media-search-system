@@ -20,9 +20,11 @@ public:
         kind_->addItems({QStringLiteral("热门作品"), QStringLiteral("热门搜索词")});
         kind_->setAccessibleName(QStringLiteral("榜单类型"));
         auto* refresh = new QPushButton(QStringLiteral("刷新热榜"));
+        modelSummary_->setObjectName(QStringLiteral("careTrendingModelSummary"));
         filters->addWidget(period_);
         filters->addWidget(kind_);
         filters->addStretch();
+        filters->addWidget(modelSummary_);
         filters->addWidget(refresh);
         layout->addLayout(filters);
         layout->addWidget(new QLabel(QStringLiteral("北京时间 · 同一项至少有 3 位用户公开贡献才展示 · 每人每项每日最多计一次。")));
@@ -39,20 +41,43 @@ public:
         table_->setAlternatingRowColors(true);
         layout->addWidget(table_, 1);
         connect(refresh, &QPushButton::clicked, this, [this] { activate(); });
-        connect(period_, &QComboBox::activated, this, [this] { activate(); });
-        connect(kind_, &QComboBox::activated, this, [this] { activate(); });
+        connect(period_, &QComboBox::currentIndexChanged, this, [this] { activate(); });
+        connect(kind_, &QComboBox::currentIndexChanged, this, [this] { activate(); });
+        connect(modelSummary_, &QPushButton::clicked, this, [this] {
+            if (active_ && modelSummary_->isEnabled())
+                load(TrendingSummaryMode::Model);
+        });
     }
 
     void activate() override
     {
+        active_ = true;
+        load(TrendingSummaryMode::Rules);
+    }
+
+    void deactivate() override
+    {
+        CarePage::deactivate();
+        active_ = false;
+        modelSummary_->setEnabled(true);
         clear();
-        status->setText(QStringLiteral("正在加载热榜…"));
+        status->clear();
+    }
+private:
+    void load(TrendingSummaryMode mode)
+    {
+        modelSummary_->setEnabled(mode != TrendingSummaryMode::Model);
+        if (mode == TrendingSummaryMode::Rules)
+            clear();
+        status->setText(mode == TrendingSummaryMode::Model ? QStringLiteral("正在生成 AI 摘要…")
+                                                         : QStringLiteral("正在加载热榜…"));
         const auto date = care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
         const auto start = period_->currentIndex() == 0 ? date : date.addDays(1 - date.dayOfWeek());
         const auto end = start.addDays(period_->currentIndex() == 0 ? 1 : 7);
         const auto kind = kind_->currentIndex() == 0 ? TrendingKind::Works : TrendingKind::SearchTerms;
-        service_.getTrending({kind, {care_ui::midnight(start), care_ui::midnight(end)}, 20},
+        service_.getTrending({kind, {care_ui::midnight(start), care_ui::midnight(end)}, 20, mode},
             latest(0, [this](Result<TrendingResult> result) {
+                modelSummary_->setEnabled(true);
                 if (!result.status.ok() || !result.value) {
                     reportError(result);
                     return;
@@ -79,13 +104,6 @@ public:
             }));
     }
 
-    void deactivate() override
-    {
-        CarePage::deactivate();
-        clear();
-        status->clear();
-    }
-private:
     void clear()
     {
         table_->setRowCount(0);
@@ -93,6 +111,8 @@ private:
     }
 
     CareService& service_;
+    bool active_ = false;
+    QPushButton* modelSummary_ = new QPushButton(QStringLiteral("生成 AI 摘要"));
     QComboBox* period_ = new QComboBox;
     QComboBox* kind_ = new QComboBox;
     QLabel* summary_ = new QLabel;

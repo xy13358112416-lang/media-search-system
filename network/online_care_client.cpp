@@ -243,7 +243,9 @@ void OnlineCareClient::getTrending(const TrendingRequest& requestValue, Callback
     const auto valid = validate(requestValue);
     if (!valid.ok()) { done({valid, {}}); return; }
     const QString kind = requestValue.kind == TrendingKind::Works ? "works" : "search_terms";
-    request("get_trending", {{"kind", kind}, {"range", rangeJson(requestValue.range)}, {"limit", requestValue.limit}},
+    const QString summaryMode = requestValue.summaryMode == TrendingSummaryMode::Model ? "model" : "rules";
+    request("get_trending", {{"kind", kind}, {"range", rangeJson(requestValue.range)}, {"limit", requestValue.limit},
+                            {"summary_mode", summaryMode}},
             [this, requestValue, kind, done=std::move(done)](Status status, QJsonObject payload) {
         if (!status.ok()) { done({status, {}}); return; }
         const auto value = payload.value("result"); const auto object = value.toObject();

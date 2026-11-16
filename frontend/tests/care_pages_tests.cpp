@@ -1,11 +1,14 @@
 #include "../follow_center.h"
 #include "../footprint_page.h"
 #include "../temporal_recommendation_page.h"
+#include "../trending_page.h"
 
+#include <QComboBox>
 #include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
 #include <QTabWidget>
+#include <QTableWidget>
 #include <QtTest>
 #include <memory>
 
@@ -48,8 +51,11 @@ class FakeCareService final : public CareService {
 public:
     struct WorksCall { QString person; PageRequest page; Callback<Page<ResourceSummary>> done; };
     struct UpdatesCall { PersonUpdatesRequest request; Callback<Page<PersonUpdate>> done; };
+    struct TrendingCall { TrendingRequest request; Callback<TrendingResult> done; };
     QList<WorksCall> worksCalls;
     QList<UpdatesCall> updatesCalls;
+    QList<TrendingCall> trendingCalls;
+    bool immediateTrendingFailure = false;
     Callback<TemporalRecommendationResult> recommendationDone;
     BrowseScene lastScene = BrowseScene::Neutral;
     Callback<FootprintReport> footprintDone;
@@ -78,7 +84,12 @@ public:
     { worksCalls.append({person, page, std::move(done)}); }
     void getPersonUpdates(const PersonUpdatesRequest& request, Callback<Page<PersonUpdate>> done) override
     { updatesCalls.append({request, std::move(done)}); }
-    void getTrending(const TrendingRequest&, Callback<TrendingResult> done) override { done(success(TrendingResult{})); }
+    void getTrending(const TrendingRequest& request, Callback<TrendingResult> done) override
+    {
+        trendingCalls.append({request, std::move(done)});
+        if (immediateTrendingFailure)
+            failTrending(trendingCalls.size() - 1);
+    }
     void getFootprint(const FootprintRequest& request, Callback<FootprintReport> done) override
     { footprintRequest = request; footprintDone = std::move(done); }
     warehouse_contract::RecommendationHandle recommendTemporal(
@@ -113,6 +124,22 @@ public:
         auto done = std::move(updatesCalls[index].done);
         done(success(std::move(page)));
     }
+    void finishTrending(int index, const QString& summary)
+    {
+        TrendingResult result;
+        result.summary = summary;
+        result.summaryFromModel = trendingCalls.at(index).request.summaryMode == TrendingSummaryMode::Model;
+        TrendingItem item;
+        item.term = summary;
+        result.items.append(item);
+        auto done = std::move(trendingCalls[index].done);
+        done(success(std::move(result)));
+    }
+    void failTrending(int index)
+    {
+        auto done = std::move(trendingCalls[index].done);
+        done({{warehouse_contract::ErrorCode::NotAuthenticated, QStringLiteral("请登录")}, std::nullopt});
+    }
 };
 
 } // namespace
@@ -120,6 +147,135 @@ public:
 class CarePagesTests final : public QObject {
     Q_OBJECT
 private slots:
+    void trendingOrdinaryActionsOnlyRequestRules()
+    {
+        FakeCareService service;
+        std::unique_ptr<CarePage> page(createTrendingPage(service));
+        page->activate();
+        QCOMPARE(service.trendingCalls.size(), 1);
+        auto filters = page->findChildren<QComboBox*>();
+        QCOMPARE(filters.size(), 2);
+        filters.at(0)->setCurrentIndex(1);
+        filters.at(1)->setCurrentIndex(1);
+        button(*page, QStringLiteral("刷新热榜"))->click();
+        QCOMPARE(service.trendingCalls.size(), 4);
+        for (const auto& call : service.trendingCalls)
+            QCOMPARE(call.request.summaryMode, TrendingSummaryMode::Rules);
+        const auto today = care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
+        QCOMPARE(service.trendingCalls.first().request.range.beginUtc, care_ui::midnight(today));
+        QCOMPARE(service.trendingCalls.at(1).request.range.beginUtc,
+                 care_ui::midnight(today.addDays(1 - today.dayOfWeek())));
+        QCOMPARE(service.trendingCalls.last().request.kind, TrendingKind::SearchTerms);
+    }
+
+    void trendingModelRequiresClickAndDiscardsOlderRules()
+    {
+        FakeCareService service;
+        std::unique_ptr<CarePage> page(createTrendingPage(service));
+        page->activate();
+        auto* model = page->findChild<QPushButton*>(QStringLiteral("careTrendingModelSummary"));
+        QVERIFY(model);
+        QCOMPARE(model->text(), QStringLiteral("生成 AI 摘要"));
+        model->click();
+        QCOMPARE(service.trendingCalls.size(), 2);
+        QCOMPARE(service.trendingCalls.at(1).request.summaryMode, TrendingSummaryMode::Model);
+        QCOMPARE(service.trendingCalls.at(1).request.kind, service.trendingCalls.at(0).request.kind);
+        QCOMPARE(service.trendingCalls.at(1).request.range.beginUtc, service.trendingCalls.at(0).request.range.beginUtc);
+        QCOMPARE(service.trendingCalls.at(1).request.range.endUtc, service.trendingCalls.at(0).request.range.endUtc);
+        QVERIFY(!model->isEnabled());
+        model->click();
+        QCOMPARE(service.trendingCalls.size(), 2);
+        const auto modelText = QStringLiteral("<b>模型摘要</b>");
+        service.finishTrending(1, modelText);
+        QVERIFY(model->isEnabled());
+        service.finishTrending(0, QStringLiteral("过期规则摘要"));
+        auto* table = page->findChild<QTableWidget*>(QStringLiteral("careTrendingTable"));
+        QCOMPARE(table->item(0, 1)->text(), modelText);
+        QLabel* summary = nullptr;
+        for (auto* label : page->findChildren<QLabel*>())
+            if (label->text().contains(modelText))
+                summary = label;
+        QVERIFY(summary);
+        QCOMPARE(summary->textFormat(), Qt::PlainText);
+        QVERIFY(summary->text().startsWith(QStringLiteral("AI 摘要")));
+    }
+
+    void trendingModelFailureAllowsRetryIncludingSynchronousFailure()
+    {
+        FakeCareService service;
+        std::unique_ptr<CarePage> page(createTrendingPage(service));
+        page->activate();
+        auto* model = page->findChild<QPushButton*>(QStringLiteral("careTrendingModelSummary"));
+        QVERIFY(model);
+        model->click();
+        service.failTrending(1);
+        QVERIFY(model->isEnabled());
+        service.immediateTrendingFailure = true;
+        model->click();
+        QCOMPARE(service.trendingCalls.size(), 3);
+        QVERIFY(model->isEnabled());
+        QCOMPARE(page->findChild<QLabel*>(QStringLiteral("careStatus"))->text(), QStringLiteral("请登录"));
+    }
+
+    void trendingFilterAndRefreshInvalidatePendingModel()
+    {
+        FakeCareService service;
+        std::unique_ptr<CarePage> page(createTrendingPage(service));
+        page->activate();
+        auto* model = page->findChild<QPushButton*>(QStringLiteral("careTrendingModelSummary"));
+        QVERIFY(model);
+        model->click();
+        page->findChildren<QComboBox*>().at(1)->setCurrentIndex(1);
+        QVERIFY(model->isEnabled());
+        QCOMPARE(service.trendingCalls.at(2).request.summaryMode, TrendingSummaryMode::Rules);
+        service.finishTrending(2, QStringLiteral("新筛选结果"));
+        service.finishTrending(1, QStringLiteral("过期模型结果"));
+        auto* table = page->findChild<QTableWidget*>(QStringLiteral("careTrendingTable"));
+        QCOMPARE(table->item(0, 1)->text(), QStringLiteral("新筛选结果"));
+        model->click();
+        button(*page, QStringLiteral("刷新热榜"))->click();
+        QVERIFY(model->isEnabled());
+        QCOMPARE(service.trendingCalls.at(4).request.summaryMode, TrendingSummaryMode::Rules);
+        service.finishTrending(4, QStringLiteral("刷新结果"));
+        service.finishTrending(3, QStringLiteral("刷新前模型结果"));
+        QCOMPARE(table->item(0, 1)->text(), QStringLiteral("刷新结果"));
+    }
+
+    void trendingSessionTransitionsIgnorePendingModel_data()
+    {
+        QTest::addColumn<bool>("resetSession");
+        QTest::newRow("deactivate") << false;
+        QTest::newRow("reset-session") << true;
+    }
+
+    void trendingSessionTransitionsIgnorePendingModel()
+    {
+        QFETCH(bool, resetSession);
+        FakeCareService service;
+        std::unique_ptr<CarePage> page(createTrendingPage(service));
+        page->activate();
+        service.finishTrending(0, QStringLiteral("旧账号结果"));
+        auto* model = page->findChild<QPushButton*>(QStringLiteral("careTrendingModelSummary"));
+        QVERIFY(model);
+        model->click();
+        if (resetSession)
+            page->resetSession();
+        else
+            page->deactivate();
+        QVERIFY(model->isEnabled());
+        auto* table = page->findChild<QTableWidget*>(QStringLiteral("careTrendingTable"));
+        QCOMPARE(table->rowCount(), 0);
+        service.finishTrending(1, QStringLiteral("迟到旧账号模型结果"));
+        QCOMPARE(table->rowCount(), 0);
+        QVERIFY(page->findChild<QLabel*>(QStringLiteral("careStatus"))->text().isEmpty());
+        page->activate();
+        QCOMPARE(service.trendingCalls.size(), 3);
+        QCOMPARE(service.trendingCalls.at(2).request.summaryMode, TrendingSummaryMode::Rules);
+        QVERIFY(model->isEnabled());
+        for (auto* label : page->findChildren<QLabel*>())
+            QVERIFY(!label->text().contains(QStringLiteral("旧账号")));
+    }
+
     void worksSecondPageIsReachable()
     {
         FakeCareService service;

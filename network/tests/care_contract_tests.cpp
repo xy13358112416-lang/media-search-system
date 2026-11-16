@@ -118,6 +118,15 @@ private slots:
         people.query = " "; QVERIFY(!validate(people).ok());
         people.query = "actor"; people.page.limit = 0; QVERIFY(!validate(people).ok());
     }
+    void trendingSummaryModesAreExplicitAndValidated() {
+        TrendingRequest request{TrendingKind::Works, {100, 200}, 5};
+        QCOMPARE(request.summaryMode, TrendingSummaryMode::Rules);
+        QVERIFY(validate(request).ok());
+        request.summaryMode = TrendingSummaryMode::Model;
+        QVERIFY(validate(request).ok());
+        request.summaryMode = static_cast<TrendingSummaryMode>(999);
+        QCOMPARE(validate(request).code, warehouse_contract::ErrorCode::InvalidArgument);
+    }
     void recommendedResourcesCanBecomeBehaviorWithoutGuessingIdentity() {
         RecommendedResource item;
         item.work.resource = {"work:canonical-1", {1, 2}};
