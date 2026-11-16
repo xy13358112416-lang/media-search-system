@@ -90,16 +90,18 @@ PeriodFootprint的views/searches是去重事件后的原始次数；uniqueWorks�
 | set_participation_settings / setParticipationSettings | settings | 空对象 |
 | clear_history / clearHistory | 空对象 | 空对象 |
 | get_resource / getResource | source | work（ResourceSummary） |
-| search_people / searchPeople | query,page | page（PersonSummary） |
-| list_work_feedback / listWorkFeedback | page | page（WorkFeedback） |
+| search_people / searchPeople | query,offset,limit | page（PersonSummary） |
+| list_work_feedback / listWorkFeedback | offset,limit | page（WorkFeedback） |
 | set_work_feedback / setWorkFeedback | resource,feedback | 空对象 |
-| list_follows / listFollows | page | page（PersonSummary） |
+| list_follows / listFollows | offset,limit | page（PersonSummary） |
 | set_follow / setFollow | person_id,followed布尔值 | 空对象 |
-| get_person_works / getPersonWorks | person_id,page | page（ResourceSummary） |
-| get_person_updates / getPersonUpdates | person_id,range,page | page（PersonUpdate） |
+| get_person_works / getPersonWorks | person_id,offset,limit | page（ResourceSummary） |
+| get_person_updates / getPersonUpdates | person_id,range,offset,limit | page（PersonUpdate） |
 | get_trending / getTrending | kind,range,limit整数 | result（TrendingResult） |
 | get_footprint / getFootprint | range,comparison可省略 | report（FootprintReport） |
 | recommend_temporal / recommendTemporal | category,file_type,scene,limit整数 | result（TemporalRecommendationResult） |
+
+分页请求中的 `offset` 是十进制字符串、`limit` 是整数，两者直接位于请求 `payload`，不再额外嵌套 `page`。例如 `search_people` 的 `payload` 为 `{"query":"名字","offset":"0","limit":20}`。分页响应仍以 `page` 对象返回。此约定与已实现的 `list_work_feedback` 请求保持一致；新增人物 RPC 及资讯客户端应按此格式实现并参与联调。
 
 沿用4字节长度前缀与JSON `{type,req_id,token,payload}`。响应type为请求type＋`_resp`，错误使用现有error_resp/Status。cancel_recommendation复用于recommend_resources和recommend_temporal，target_req_id作用域为同一连接；本地先以Cancelled完成原回调，取消确认不再次调用原回调。未知操作在当前未实现服务端被拒绝，不返回伪造业务成功。
 

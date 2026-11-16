@@ -400,8 +400,8 @@ private slots:
         care_contract::CareService* care = &client;
         int calls = 0;
         Status status;
-        care->searchPeople({}, [&](auto result) { ++calls; status = result.status; QVERIFY(!result.value); });
-        QCOMPARE(calls, 1); QCOMPARE(status.code, ErrorCode::ServerError);
+        care->searchPeople({"person", {}}, [&](auto result) { ++calls; status = result.status; QVERIFY(!result.value); });
+        QCOMPARE(calls, 1); QCOMPARE(status.code, ErrorCode::NotConnected);
         calls = 0;
         care->recordBehavior({"search-1", BehaviorAction::Search, std::nullopt, "music"},
                              [&](Status result) { ++calls; status = result; });
