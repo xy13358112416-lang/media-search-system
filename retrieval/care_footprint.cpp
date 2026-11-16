@@ -38,10 +38,13 @@ PeriodFootprint summarize(const TimeRange& range, const CalendarWindow& calendar
     result.range = range;
     result.coverageStartUtc = coverageStart;
     result.days.reserve(calendar.days);
-    for (int i = 0; i < calendar.days; ++i)
-        // The last legal UTC seconds fall on Shanghai's year 10000 day;
-        // Qt::ISODate would return an empty string beyond year 9999.
-        result.days.append({calendar.first.addDays(i).toString(QStringLiteral("yyyy-MM-dd")), 0, 0});
+    for (int i = 0; i < calendar.days; ++i) {
+        // Format numeric parts explicitly: Qt versions differ on the sign for year 10000.
+        const QDate date = calendar.first.addDays(i);
+        const QString label = QStringLiteral("%1-%2-%3").arg(date.year(), 4, 10, QLatin1Char('0'))
+            .arg(date.month(), 2, 10, QLatin1Char('0')).arg(date.day(), 2, 10, QLatin1Char('0'));
+        result.days.append({label, 0, 0});
+    }
 
     QSet<QString> uniqueWorks;
     QMap<QString, qint64> categories;
