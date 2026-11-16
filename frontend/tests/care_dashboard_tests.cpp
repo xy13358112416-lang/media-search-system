@@ -1,6 +1,8 @@
 #include "care_dashboard.h"
 #include "library_style.h"
 #include <QApplication>
+#include <QComboBox>
+#include <QDateEdit>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -101,6 +103,27 @@ private slots:
             auto* report = footprint->findChild<QLabel*>("careStatus");
             QVERIFY(report && report->text().contains(QStringLiteral("含模拟数据")));
             QVERIFY(footprint->findChildren<QTableWidget*>().size() == 3);
+            auto* period = footprint->findChild<QComboBox*>("footprintPeriod");
+            const auto dates = footprint->findChildren<QDateEdit*>();
+            QVERIFY(period);
+            QCOMPARE(dates.size(), 2);
+            period->setCurrentIndex(period->findText(QStringLiteral("自然年")));
+            QVERIFY(!dates[0]->isVisible() && !dates[1]->isVisible());
+            period->setCurrentIndex(period->findText(QStringLiteral("自选区间")));
+            QVERIFY(dates[0]->isVisible() && dates[0]->isEnabled());
+            QVERIFY(dates[1]->isVisible() && dates[1]->isEnabled());
+            QVERIFY(dates[0]->calendarPopup() && dates[1]->calendarPopup());
+            const auto end = dates[1]->maximumDate().addDays(-1);
+            const auto start = end.addDays(-1);
+            dates[0]->setDate(start);
+            dates[1]->setDate(end);
+            auto* fetch = button(footprint, QStringLiteral("查看足迹"));
+            QVERIFY(fetch);
+            fetch->click();
+            QVERIFY(report->text().startsWith(QStringLiteral("%1 至 %2")
+                .arg(start.toString(Qt::ISODate), end.toString(Qt::ISODate))));
+            period->setCurrentIndex(period->findText(QStringLiteral("自然周")));
+            QVERIFY(!dates[0]->isVisible() && !dates[1]->isVisible());
             auto* clearHistory = button(footprint, QStringLiteral("清理历史"));
             QVERIFY(clearHistory);
             QLabel* counts = nullptr;

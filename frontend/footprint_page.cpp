@@ -55,6 +55,7 @@ public:
         auto* bar = new QHBoxLayout;
         mode_->addItems({QStringLiteral("自然周"), QStringLiteral("自然月"), QStringLiteral("自然年"), QStringLiteral("自选区间")});
         mode_->setAccessibleName(QStringLiteral("统计区间类型"));
+        mode_->setObjectName(QStringLiteral("footprintPeriod"));
         from_->setDate(today.addDays(-6));
         to_->setDate(today);
         from_->setAccessibleName(QStringLiteral("开始日期"));
@@ -66,8 +67,15 @@ public:
         }
         auto* fetch = new QPushButton(QStringLiteral("查看足迹"));
         bar->addWidget(mode_);
-        bar->addWidget(from_);
-        bar->addWidget(to_);
+        auto* dates = new QHBoxLayout(dates_);
+        dates->setContentsMargins(0, 0, 0, 0);
+        dates->addWidget(from_);
+        dates->addWidget(new QLabel(QStringLiteral("至")));
+        dates->addWidget(to_);
+        dates_->hide();
+        bar->addWidget(dates_);
+        presetHint_->setObjectName(QStringLiteral("muted"));
+        bar->addWidget(presetHint_);
         bar->addStretch();
         bar->addWidget(fetch);
         layout->addLayout(bar);
@@ -91,7 +99,7 @@ public:
         layout->addLayout(actions);
         clearHistory_->setObjectName(QStringLiteral("danger"));
         connect(clearHistory_, &QPushButton::clicked, this, [this] { clearHistory(); });
-        connect(mode_, &QComboBox::activated, this, [this] { activate(); });
+        connect(mode_, &QComboBox::currentIndexChanged, this, [this] { activate(); });
         connect(fetch, &QPushButton::clicked, this, [this] { activate(); });
     }
 
@@ -103,10 +111,10 @@ public:
         const auto today = care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
         const auto mode = mode_->currentIndex();
         const bool custom = mode == 3;
-        from_->setEnabled(custom);
-        to_->setEnabled(custom);
-        auto start = custom ? from_->date() : periodStart(today, mode);
-        auto end = custom ? to_->date().addDays(1) : nextPeriod(start, mode, 1);
+        dates_->setVisible(custom);
+        presetHint_->setVisible(!custom);
+        const auto start = custom ? from_->date() : periodStart(today, mode);
+        const auto end = custom ? to_->date().addDays(1) : nextPeriod(start, mode, 1);
         if (start >= end) {
             status->setText(QStringLiteral("开始日期应早于或等于结束日期。"));
             return;
@@ -217,6 +225,8 @@ private:
     bool active_ = false;
     QPushButton* clearHistory_ = new QPushButton(QStringLiteral("清理历史"));
     QComboBox* mode_ = new QComboBox;
+    QWidget* dates_ = new QWidget;
+    QLabel* presetHint_ = new QLabel(QStringLiteral("手动选择日期请切换到「自选区间」"));
     QDateEdit* from_ = new QDateEdit;
     QDateEdit* to_ = new QDateEdit;
     QLabel* counts_ = new QLabel;
