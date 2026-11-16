@@ -19,22 +19,29 @@ inline QString libraryStyle()
         QLabel#traceStep { background: #ffffff; color: #314b70; border: 1px solid #d4e2f8;
                            border-radius: 8px; padding: 7px 10px; }
         QProgressBar { background: #e1eaf6; border: none; border-radius: 7px; min-height: 14px; }
-        QProgressBar::chunk { border-radius: 7px; }
+        QProgressBar::chunk { background: #4177c0; border-radius: 7px; }
         QProgressBar#linearBar::chunk { background: #667b98; }
         QProgressBar#fixedBar::chunk { background: #4177c0; }
         QProgressBar#shortBar::chunk { background: #007c70; }
         QFrame#recommendCard { background: #ffffff; border: 1px solid #d7e1ef; border-radius: 12px; }
         QFrame#detailCard { background: #ffffff; border: 1px solid #d7e1ef; border-radius: 12px; }
         QWidget#detailBody { background: #ffffff; }
-        QScrollArea#detailScroll { border: none; background: transparent; }
+        QScrollArea#detailScroll { border: none; background: #ffffff; }
+        QWidget#detailViewport { background: #ffffff; }
+        QScrollArea#todayScroll, QWidget#todayViewport, QWidget#todayContent {
+            background: #f1f5fb; border: none;
+        }
+        QTabWidget::pane { background: #f8faff; border: 1px solid #d7e1ef; border-radius: 9px; }
+        QWidget#carePage { background: #f8faff; }
+        QTabBar { qproperty-drawBase: false; }
         QTabBar::tab { background: #e6edf7; color: #314766; padding: 9px 22px;
                        margin-right: 6px; border-radius: 8px; font-weight: 600; }
         QTabBar::tab:last { margin-right: 0; }
         QTabBar::tab:hover { background: #dce8fb; }
         QTabBar::tab:selected { color: #ffffff; background: #244f91; }
-        QLineEdit, QComboBox { background: #ffffff; border: 1px solid #c9d6e8;
+        QLineEdit, QComboBox, QSpinBox, QDateEdit { background: #ffffff; border: 1px solid #c9d6e8;
                                border-radius: 8px; padding: 7px 10px; min-height: 20px; }
-        QLineEdit:focus, QComboBox:focus { border-color: #315fa4; }
+        QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDateEdit:focus { border-color: #315fa4; }
         QComboBox { padding-right: 22px; combobox-popup: 0; }
         QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right;
                               width: 24px; border: none; background: transparent; }
@@ -53,6 +60,9 @@ inline QString libraryStyle()
         QAbstractItemView#keywordSuggestions::item:selected {
             background-color: #244f91; color: #ffffff;
         }
+        QCalendarWidget QWidget#qt_calendar_navigationbar { background: #e7eef9; }
+        QCalendarWidget QAbstractItemView { background: #ffffff; alternate-background-color: #f5f8fd;
+            selection-background-color: #244f91; selection-color: #ffffff; }
         QPushButton { background: #ffffff; border: 1px solid #c9d6e8;
                       border-radius: 8px; padding: 8px 14px; font-weight: 600; }
         QPushButton:hover { background: #eaf1fc; border-color: #9cb5dc; }
@@ -71,13 +81,12 @@ inline QString libraryStyle()
                        selection-background-color: #dceaff; selection-color: #143362; }
         QHeaderView::section { background: #e7eef9; color: #27476e; border: none;
                                 padding: 9px 8px; font-weight: 700; }
-        QListWidget#onlineWarehouseList, QListWidget#onlineWarehouseItems,
-        QListWidget#onlineWarehouseRecommendations {
+        QListWidget {
             background: #ffffff; border: 1px solid #d7e1ef; border-radius: 8px;
             selection-background-color: #dceaff; selection-color: #143362; padding: 4px;
         }
-        QListWidget#onlineWarehouseList::item, QListWidget#onlineWarehouseItems::item,
-        QListWidget#onlineWarehouseRecommendations::item { padding: 6px; }
+        QListWidget::item { padding: 6px; }
+        QListWidget::item:hover:!selected { background: #edf3fc; }
         QSplitter::handle { background: transparent; }
     )qss");
 }

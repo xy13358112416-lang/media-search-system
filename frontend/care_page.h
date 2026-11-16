@@ -15,6 +15,8 @@ public:
     explicit CarePage(const QString& title, QWidget* parent = nullptr)
         : QWidget(parent), layout(new QVBoxLayout(this)), status(new QLabel)
     {
+        setObjectName(QStringLiteral("carePage"));
+        setAttribute(Qt::WA_StyledBackground);
         layout->setSpacing(10);
         auto* heading = new QLabel(title);
         heading->setObjectName(QStringLiteral("sectionTitle"));

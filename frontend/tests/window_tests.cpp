@@ -387,6 +387,39 @@ private slots:
         QVERIFY(!dialog->isVisible());
     }
 
+    void todayRecommendationGapsStayLightWithDarkPalette()
+    {
+        const auto original = qApp->palette();
+        const auto restore = qScopeGuard([&] { qApp->setPalette(original); });
+        auto dark = original;
+        dark.setColor(QPalette::Window, QColor("#474747"));
+        dark.setColor(QPalette::Base, QColor("#292929"));
+        qApp->setPalette(dark);
+
+        Fixture f(QString::fromUtf8(SAMPLE_CSV));
+        AccountHistoryServiceImpl accounts(f.library);
+        QVERIFY(accounts.initializeDatabase(f.directory.filePath("today.sqlite")).ok());
+        QVERIFY(accounts.createInitialAdmin("admin", "secret").ok());
+        QVERIFY(accounts.login("admin", "secret").status.ok());
+        const auto records = [&] { return f.library.records(); };
+        recommendation_contract::PersonalRecommendationServiceImpl recommendations(accounts, records);
+        recommendation_contract::TodayRecommendationServiceImpl today(recommendations, records);
+        LibraryWindow window(f.library, &accounts, &recommendations, &today);
+        window.show();
+        window.findChild<QTabBar*>()->setCurrentIndex(2);
+        QCoreApplication::processEvents();
+        auto* content = window.findChild<QWidget*>("todayContent");
+        QVERIFY(content && content->isVisible());
+        const auto cards = content->findChildren<QFrame*>("recommendCard");
+        QVERIFY(cards.size() >= 2);
+        const auto left = cards.at(0)->geometry();
+        const auto right = cards.at(1)->geometry();
+        const auto image = content->grab().toImage();
+        const auto dpr = image.devicePixelRatio();
+        const QPoint gap((left.right() + right.left()) / 2, left.center().y());
+        QCOMPARE(image.pixelColor(qRound(gap.x() * dpr), qRound(gap.y() * dpr)), QColor("#f1f5fb"));
+    }
+
     void accountFrontendStartsRealSession() {
         Fixture f(QString::fromUtf8(SAMPLE_CSV));
         const auto database = f.directory.filePath("startup.sqlite");

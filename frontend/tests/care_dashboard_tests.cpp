@@ -1,4 +1,5 @@
 #include "care_dashboard.h"
+#include "library_style.h"
 #include <QApplication>
 #include <QLabel>
 #include <QLineEdit>
@@ -23,6 +24,48 @@ QPushButton* button(QWidget* parent, const QString& name)
 class CareDashboardTests : public QObject {
     Q_OBJECT
 private slots:
+    void careSurfacesStayLightWithDarkSystemPalette()
+    {
+        const auto original = qApp->palette();
+        const auto originalStyleSheet = qApp->styleSheet();
+        const auto restore = qScopeGuard([&] {
+            qApp->setStyleSheet(originalStyleSheet);
+            qApp->setPalette(original);
+        });
+        qApp->setStyle(QStringLiteral("Fusion"));
+        auto dark = original;
+        dark.setColor(QPalette::Window, QColor("#474747"));
+        dark.setColor(QPalette::Base, QColor("#292929"));
+        dark.setColor(QPalette::Button, QColor("#474747"));
+        qApp->setPalette(dark);
+        qApp->setStyleSheet(libraryStyle());
+
+        bool exercised = false;
+        QTimer::singleShot(0, this, [&] {
+            auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            QVERIFY(dialog);
+            const auto close = qScopeGuard([&] { dialog->reject(); });
+            auto* tabs = dialog->findChild<QTabWidget*>("careDashboardTabs");
+            QVERIFY(tabs);
+            for (int index = 0; index < tabs->count(); ++index) {
+                tabs->setCurrentIndex(index);
+                auto* page = tabs->currentWidget();
+                QVERIFY(page);
+                const auto panel = page->grab().toImage();
+                QCOMPARE(panel.pixelColor(4, panel.height() / 2), QColor("#f8faff"));
+                for (auto* list : page->findChildren<QListWidget*>()) {
+                    if (!list->isVisible())
+                        continue;
+                    const auto body = list->viewport()->grab().toImage();
+                    QCOMPARE(body.pixelColor(body.width() / 2, body.height() - 12), QColor("#ffffff"));
+                }
+            }
+            exercised = true;
+        });
+        showCareDemonstration(nullptr, care_contract::BrowseScene::Neutral);
+        QVERIFY(exercised);
+    }
+
     void demoPagesRenderAndHandleUserActions()
     {
         bool exercised = false;

@@ -432,6 +432,7 @@ public:
         detailLayout->addWidget(detailTitle);
         auto* detailScroll = new QScrollArea;
         detailScroll->setObjectName(QStringLiteral("detailScroll"));
+        detailScroll->viewport()->setObjectName(QStringLiteral("detailViewport"));
         detailScroll->setWidgetResizable(true);
         auto* detailBody = new QWidget;
         detailBody->setObjectName(QStringLiteral("detailBody"));
@@ -470,6 +471,9 @@ public:
         recommendationBar->insertWidget(0, todayTitle_);
         todayTitle_->hide();
         auto* todayBody = new QWidget;
+        todayBody->setObjectName(QStringLiteral("todayContent"));
+        todayPage_->setObjectName(QStringLiteral("todayScroll"));
+        todayPage_->viewport()->setObjectName(QStringLiteral("todayViewport"));
         auto* todayLayout = new QVBoxLayout(todayBody);
         todayLayout->setContentsMargins(0, 0, 0, 0);
         todayGrid_ = new QGridLayout;
