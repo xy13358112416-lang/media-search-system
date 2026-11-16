@@ -1,14 +1,15 @@
 #include "online_care_client.h"
 #include "media_json.h"
+#include "person_json.h"
 #include <QJsonArray>
 #include <QRegularExpression>
+#include <algorithm>
+#include <type_traits>
 
 using namespace care_contract;
 using warehouse_contract::ErrorCode;
 namespace {
-Status unavailable() { return {ErrorCode::ServerError, QStringLiteral("此关怀功能尚未接入服务器。")}; }
 Status malformed() { return {ErrorCode::ProtocolError, QStringLiteral("服务器关怀响应格式无效。")}; }
-template<class T> void unavailableResult(Callback<T> done) { done({unavailable(), {}}); }
 QJsonObject sourceJson(const WarehouseItemRef& source) {
     return {{"warehouse_id", QString::number(source.warehouseId)}, {"item_id", QString::number(source.itemId)}};
 }
@@ -72,53 +73,12 @@ QJsonObject rangeJson(const TimeRange& range) {
     return {{"begin_utc", QString::number(range.beginUtc)}, {"end_utc", QString::number(range.endUtc)}};
 }
 bool sameRange(const TimeRange& a, const TimeRange& b) { return a.beginUtc == b.beginUtc && a.endUtc == b.endUtc; }
-bool parsePerson(const QJsonValue& value, PersonSummary& person);
-bool parseWork(const QJsonValue& value, ResourceSummary& result) {
-    const auto work = value.toObject(); const auto refValue = work.value("resource"); const auto ref = refValue.toObject();
-    const auto sourceValue = ref.value("source"); const auto source = sourceValue.toObject(); QString error;
-    if (!value.isObject() || !refValue.isObject() || !sourceValue.isObject() || !ref.value("work_id").isString() ||
-        !positiveId(source.value("warehouse_id"), result.resource.source.warehouseId) ||
-        !positiveId(source.value("item_id"), result.resource.source.itemId) || !work.value("media").isObject() ||
-        !media_json::fromJson(work.value("media").toObject(), result.media, error) || !work.value("people").isArray()) return false;
-    result.resource.workId = ref.value("work_id").toString();
-    if (!validate(result.resource).ok()) return false;
-    for (const auto& entry : work.value("people").toArray()) {
-        PersonSummary person;
-        if (!parsePerson(entry, person)) return false;
-        result.people.append(person);
-    }
-    return true;
-}
 QJsonObject preferenceJson(const recommendation_contract::PreferenceSelection& value) {
     using recommendation_contract::PreferenceMode;
     const QString mode = value.mode == PreferenceMode::Auto ? "auto" : value.mode == PreferenceMode::Any ? "any" : "explicit";
     return {{"mode", mode}, {"value", value.value}};
 }
-bool parsePerson(const QJsonValue& value, PersonSummary& person) {
-    const auto p = value.toObject();
-    if (!value.isObject() || !p.value("person_id").isString() || p.value("person_id").toString().isEmpty() ||
-        !p.value("name").isString() || !p.value("roles").isArray() || !p.value("followed").isBool()) return false;
-    person.personId = p.value("person_id").toString(); person.name = p.value("name").toString(); person.followed = p.value("followed").toBool();
-    for (const auto& role : p.value("roles").toArray()) {
-        if (role == "actor") person.roles.append(PersonRole::Actor);
-        else if (role == "director") person.roles.append(PersonRole::Director);
-        else if (role == "musician") person.roles.append(PersonRole::Musician);
-        else return false;
-    }
-    return validate(PersonUpdatesRequest{person.personId, {0, 1}, {0, 1}}).ok() && !person.name.trimmed().isEmpty();
-}
-template<class T, class Parser> bool parsePage(const QJsonValue& value, const PageRequest& request, Page<T>& page, Parser parser) {
-    const auto object = value.toObject();
-    if (!value.isObject() || !object.value("items").isArray() || object.value("items").toArray().size() > request.limit) return false;
-    for (const auto& entry : object.value("items").toArray()) { T item; if (!parser(entry, item)) return false; page.items.append(item); }
-    const auto next = object.value("next_offset");
-    if (!next.isUndefined() && !next.isNull()) {
-        qint64 offset = 0;
-        if (!nonnegative(next, offset) || offset <= request.offset || !validate(PageRequest{offset, request.limit}).ok()) return false;
-        page.nextOffset = offset;
-    }
-    return true;
-}
+
 }
 
 void OnlineCareClient::recordBehavior(const BehaviorEvent& event, StatusCallback done) {
@@ -184,15 +144,42 @@ void OnlineCareClient::getResource(const WarehouseItemRef& source, Callback<Reso
         done({{}, result});
     });
 }
-void OnlineCareClient::searchPeople(const PersonSearchRequest& input, Callback<Page<PersonSummary>> done) {
-    const auto status = validate(input); if (!status.ok()) { done({status, {}}); return; }
-    request("search_people", {{"query", input.query}, {"offset", QString::number(input.page.offset)}, {"limit", input.page.limit}},
-        [this, input, done=std::move(done)](Status result, QJsonObject payload) {
-        if (!result.ok()) { done({result, {}}); return; }
-        Page<PersonSummary> page;
-        if (!parsePage(payload.value("page"), input.page, page, parsePerson)) { abortProtocol(); done({malformed(), {}}); return; }
-        done({{}, page});
+template<class Item>
+void OnlineCareClient::requestPersonPage(const QString& type, QJsonObject payload, const PageRequest& page,
+                                         Callback<Page<Item>> done)
+{
+    const auto pagination = person_json::encodePageRequest(page);
+    for (auto it = pagination.constBegin(); it != pagination.constEnd(); ++it)
+        payload.insert(it.key(), it.value());
+    request(type, payload, [this, page, payload, done = std::move(done)](Status status, QJsonObject response) {
+        if (!status.ok()) {
+            done({status, {}});
+            return;
+        }
+        Page<Item> result;
+        if (!person_json::decode(response.value("page"), page, result)) {
+            abortProtocol();
+            done({malformed(), {}});
+            return;
+        }
+        if constexpr (std::is_same_v<Item, PersonUpdate>) {
+            const auto personId = payload.value("person_id").toString();
+            const auto wrongPerson = [&personId](const PersonUpdate& update) { return update.personId != personId; };
+            if (std::any_of(result.items.cbegin(), result.items.cend(), wrongPerson)) {
+                abortProtocol();
+                done({malformed(), {}});
+                return;
+            }
+        }
+        done({{}, std::move(result)});
     });
+}
+
+void OnlineCareClient::searchPeople(const PersonSearchRequest& input, Callback<Page<PersonSummary>> done)
+{
+    const auto status = validate(input);
+    if (!status.ok()) { done({status, {}}); return; }
+    requestPersonPage("search_people", {{"query", input.query}}, input.page, std::move(done));
 }
 void OnlineCareClient::listWorkFeedback(const PageRequest& input, Callback<Page<WorkFeedback>> done) {
     const auto status = validate(input);
@@ -210,7 +197,7 @@ void OnlineCareClient::listWorkFeedback(const PageRequest& input, Callback<Page<
         }
         for (const auto& entry : object.value("items").toArray()) {
             const auto row = entry.toObject(); WorkFeedback item;
-            if (!entry.isObject() || row.value("feedback") != "not_interested" || !parseWork(row.value("work"), item.work)) { ok = false; break; }
+            if (!entry.isObject() || row.value("feedback") != "not_interested" || !person_json::decode(row.value("work"), item.work)) { ok = false; break; }
             item.feedback = WorkFeedbackKind::NotInterested; page.items.append(item);
         }
         if (!ok) { abortProtocol(); done({malformed(), {}}); return; }
@@ -225,33 +212,33 @@ void OnlineCareClient::setWorkFeedback(const WorkFeedbackRequest& input, StatusC
     const QString feedback = input.feedback == WorkFeedbackKind::Neutral ? "neutral" : "not_interested";
     request("set_work_feedback", {{"resource", resource}, {"feedback", feedback}}, [done=std::move(done)](Status result, QJsonObject) { done(result); });
 }
-void OnlineCareClient::listFollows(const PageRequest& input, Callback<Page<PersonSummary>> done) {
-    const auto status = validate(input); if (!status.ok()) { done({status, {}}); return; }
-    request("list_follows", {{"offset", QString::number(input.offset)}, {"limit", input.limit}},
-        [this, input, done=std::move(done)](Status result, QJsonObject payload) {
-        if (!result.ok()) { done({result, {}}); return; }
-        Page<PersonSummary> page;
-        if (!parsePage(payload.value("page"), input, page, parsePerson)) { abortProtocol(); done({malformed(), {}}); return; }
-        done({{}, page});
-    });
+void OnlineCareClient::listFollows(const PageRequest& input, Callback<Page<PersonSummary>> done)
+{
+    const auto status = validate(input);
+    if (!status.ok()) { done({status, {}}); return; }
+    requestPersonPage("list_follows", {}, input, std::move(done));
 }
 void OnlineCareClient::setFollow(const QString& personId, bool followed, StatusCallback done) {
-    const auto status = validate(PersonUpdatesRequest{personId, {0, 1}, {0, 1}});
+    const auto status = validatePersonId(personId);
     if (!status.ok()) { done(status); return; }
     request("set_follow", {{"person_id", personId}, {"followed", followed}}, [done=std::move(done)](Status result, QJsonObject) { done(result); });
 }
-void OnlineCareClient::getPersonWorks(const QString& personId, const PageRequest& input, Callback<Page<ResourceSummary>> done) {
-    const auto status = validate(PersonUpdatesRequest{personId, {0, 1}, input});
+void OnlineCareClient::getPersonWorks(const QString& personId, const PageRequest& input, Callback<Page<ResourceSummary>> done)
+{
+    const auto person = validatePersonId(personId);
+    if (!person.ok()) { done({person, {}}); return; }
+    const auto status = validate(input);
     if (!status.ok()) { done({status, {}}); return; }
-    request("get_person_works", {{"person_id", personId}, {"offset", QString::number(input.offset)}, {"limit", input.limit}},
-        [this, input, done=std::move(done)](Status result, QJsonObject payload) {
-        if (!result.ok()) { done({result, {}}); return; }
-        Page<ResourceSummary> page;
-        if (!parsePage(payload.value("page"), input, page, parseWork)) { abortProtocol(); done({malformed(), {}}); return; }
-        done({{}, page});
-    });
+    requestPersonPage("get_person_works", {{"person_id", personId}}, input, std::move(done));
 }
-void OnlineCareClient::getPersonUpdates(const PersonUpdatesRequest&, Callback<Page<PersonUpdate>> done) { unavailableResult(std::move(done)); }
+
+void OnlineCareClient::getPersonUpdates(const PersonUpdatesRequest& input, Callback<Page<PersonUpdate>> done)
+{
+    const auto status = validate(input);
+    if (!status.ok()) { done({status, {}}); return; }
+    requestPersonPage("get_person_updates", {{"person_id", input.personId}, {"range", rangeJson(input.range)}},
+                      input.page, std::move(done));
+}
 void OnlineCareClient::getTrending(const TrendingRequest& requestValue, Callback<TrendingResult> done) {
     const auto valid = validate(requestValue);
     if (!valid.ok()) { done({valid, {}}); return; }
@@ -352,7 +339,7 @@ warehouse_contract::RecommendationHandle OnlineCareClient::recommendTemporal(con
             result.generatedAtUtc < MaxUtcExclusive;
         for (const auto& entry : object.value("items").toArray()) {
             const auto row = entry.toObject(); RecommendedResource item;
-            if (!entry.isObject() || !row.value("reason").isString() || !parseWork(row.value("work"), item.work)) { ok = false; break; }
+            if (!entry.isObject() || !row.value("reason").isString() || !person_json::decode(row.value("work"), item.work)) { ok = false; break; }
             item.reason = row.value("reason").toString(); result.items.append(item);
         }
         if (!ok) { abortProtocol(); done({malformed(), {}}); return; }
