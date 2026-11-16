@@ -20,6 +20,58 @@ bool positiveId(const QJsonValue& value, qint64& result) {
     result = s.toLongLong(&ok);
     return ok && result > 0 && format.match(s).hasMatch();
 }
+bool nonnegative(const QJsonValue& value, qint64& result) {
+    if (!value.isString()) return false;
+    static const QRegularExpression format(QStringLiteral("\\A(?:0|[1-9][0-9]*)\\z"));
+    const auto s = value.toString(); bool ok = false; result = s.toLongLong(&ok);
+    return ok && format.match(s).hasMatch();
+}
+bool parseRange(const QJsonValue& value, TimeRange& result) {
+    if (!value.isObject()) return false;
+    const auto o = value.toObject();
+    return nonnegative(o.value("begin_utc"), result.beginUtc) && nonnegative(o.value("end_utc"), result.endUtc) && validate(result).ok();
+}
+bool parsePeriod(const QJsonValue& value, PeriodFootprint& result) {
+    if (!value.isObject()) return false;
+    const auto o = value.toObject();
+    if (!parseRange(o.value("range"), result.range) || !nonnegative(o.value("views"), result.views) ||
+        !nonnegative(o.value("searches"), result.searches) || !nonnegative(o.value("unique_works"), result.uniqueWorks) ||
+        !nonnegative(o.value("active_days"), result.activeDays) || !o.value("categories").isArray() ||
+        !o.value("people").isArray() || !o.value("days").isArray()) return false;
+    if (o.value("categories").toArray().size() > 10000 || o.value("people").toArray().size() > 10000 ||
+        o.value("days").toArray().size() > 3660) return false;
+    const auto coverage = o.value("coverage_start_utc");
+    if (!coverage.isUndefined() && !coverage.isNull()) {
+        qint64 parsed = 0; if (!nonnegative(coverage, parsed) || parsed >= MaxUtcExclusive) return false;
+        result.coverageStartUtc = parsed;
+    }
+    for (const auto& value : o.value("categories").toArray()) {
+        const auto item = value.toObject(); CountBucket bucket;
+        if (!value.isObject() || !item.value("key").isString() || !item.value("label").isString() || !nonnegative(item.value("count"), bucket.count)) return false;
+        bucket.key = item.value("key").toString(); bucket.label = item.value("label").toString(); result.categories.append(bucket);
+    }
+    for (const auto& value : o.value("people").toArray()) {
+        const auto item = value.toObject(); PersonCount person;
+        if (!value.isObject() || !item.value("person_id").isString() || !item.value("name").isString() || !item.value("role").isString() || !nonnegative(item.value("count"), person.count)) return false;
+        person.personId = item.value("person_id").toString(); person.name = item.value("name").toString();
+        const auto role = item.value("role").toString();
+        if (role == "actor") person.role = PersonRole::Actor;
+        else if (role == "director") person.role = PersonRole::Director;
+        else if (role == "musician") person.role = PersonRole::Musician;
+        else return false;
+        result.people.append(person);
+    }
+    for (const auto& value : o.value("days").toArray()) {
+        const auto item = value.toObject(); DailyActivity day;
+        if (!value.isObject() || !item.value("local_date").isString() || !nonnegative(item.value("views"), day.views) || !nonnegative(item.value("searches"), day.searches)) return false;
+        day.localDate = item.value("local_date").toString(); result.days.append(day);
+    }
+    return true;
+}
+QJsonObject rangeJson(const TimeRange& range) {
+    return {{"begin_utc", QString::number(range.beginUtc)}, {"end_utc", QString::number(range.endUtc)}};
+}
+bool sameRange(const TimeRange& a, const TimeRange& b) { return a.beginUtc == b.beginUtc && a.endUtc == b.endUtc; }
 }
 
 void OnlineCareClient::recordBehavior(const BehaviorEvent& event, StatusCallback done) {
@@ -93,6 +145,28 @@ void OnlineCareClient::setFollow(const QString&, bool, StatusCallback done) { do
 void OnlineCareClient::getPersonWorks(const QString&, const PageRequest&, Callback<Page<ResourceSummary>> done) { unavailableResult(std::move(done)); }
 void OnlineCareClient::getPersonUpdates(const PersonUpdatesRequest&, Callback<Page<PersonUpdate>> done) { unavailableResult(std::move(done)); }
 void OnlineCareClient::getTrending(const TrendingRequest&, Callback<TrendingResult> done) { unavailableResult(std::move(done)); }
-void OnlineCareClient::getFootprint(const FootprintRequest&, Callback<FootprintReport> done) { unavailableResult(std::move(done)); }
+void OnlineCareClient::getFootprint(const FootprintRequest& requestValue, Callback<FootprintReport> done) {
+    const auto valid = validate(requestValue);
+    if (!valid.ok()) { done({valid, {}}); return; }
+    QJsonObject payload{{"range", rangeJson(requestValue.range)}};
+    if (requestValue.comparison) payload.insert("comparison", rangeJson(*requestValue.comparison));
+    request("get_footprint", payload, [this, requestValue, done=std::move(done)](Status status, QJsonObject response) {
+        if (!status.ok()) { done({status, {}}); return; }
+        const auto value = response.value("report"); const auto o = value.toObject();
+        FootprintReport report;
+        bool ok = value.isObject() && parsePeriod(o.value("current"), report.current) && sameRange(report.current.range, requestValue.range) &&
+                  nonnegative(o.value("generated_at_utc"), report.generatedAtUtc) && report.generatedAtUtc < MaxUtcExclusive &&
+                  o.value("message").isString() && o.value("contains_synthetic_data").isBool();
+        const auto comparison = o.value("comparison");
+        if (!comparison.isUndefined() && !comparison.isNull()) {
+            PeriodFootprint parsed;
+            if (!requestValue.comparison || !parsePeriod(comparison, parsed) || !sameRange(parsed.range, *requestValue.comparison)) ok = false;
+            else report.comparison = parsed;
+        } else if (requestValue.comparison) ok = false;
+        if (!ok) { abortProtocol(); done({malformed(), {}}); return; }
+        report.message = o.value("message").toString(); report.containsSyntheticData = o.value("contains_synthetic_data").toBool();
+        done({{}, report});
+    });
+}
 warehouse_contract::RecommendationHandle OnlineCareClient::recommendTemporal(const TemporalRecommendationRequest&, Callback<TemporalRecommendationResult> done) { unavailableResult(std::move(done)); return {}; }
 bool OnlineCareClient::cancelRecommendation(const warehouse_contract::RecommendationHandle& handle) { return WarehouseClient::cancelRecommendation(handle); }
