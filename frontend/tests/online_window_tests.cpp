@@ -32,6 +32,7 @@ public:
     bool denyPublic = false, deferTemporal = false;
     QStringList cancelled;
     Callback<TemporalRecommendationResult> temporalDone;
+    TemporalRecommendationResult temporalResult;
     WarehouseSummary mine{1, "Mine", 7, Visibility::Private};
     WarehouseSummary shared{2, "Shared", 8, Visibility::Public};
     MediaRecord media(QString title) { MediaRecord m; m.id="duplicate"; m.fileName=title; m.director="Director"; m.fileType="MP4"; return m; }
@@ -77,13 +78,28 @@ public:
     RecommendationHandle recommendTemporal(const TemporalRecommendationRequest&,Callback<TemporalRecommendationResult> cb) override {
         ++temporalCalls;
         if (deferTemporal) { temporalDone=std::move(cb); return "today-pending"; }
-        cb(ok(TemporalRecommendationResult{})); return {};
+        cb(ok(temporalResult)); return {};
     }
 };
 }
 class OnlineWindowTests final : public QObject {
     Q_OBJECT
 private slots:
+    void todayOnlyShowsTitlesAndUserFacingNotices() {
+        FakeService service;
+        ResourceSummary work;
+        work.resource = {"canonical", {1, 11}};
+        work.media = service.media("Public movie");
+        service.temporalResult.items.append({work, QStringLiteral("近期兴趣权重 0.6，总分 0.9")});
+        service.temporalResult.message = QStringLiteral("按内部权重排序");
+        service.temporalResult.containsSyntheticData = true;
+        std::unique_ptr<QWidget> window(createOnlineWindow(service,service,{7,"reader"},[]{}));
+        window->findChild<QTabWidget*>("onlineTabs")->setCurrentIndex(2);
+        auto* list=window->findChild<QListWidget*>("onlineTodayList");
+        QCOMPARE(list->count(), 1);
+        QCOMPARE(list->item(0)->text(), QStringLiteral("Public movie"));
+        QCOMPARE(window->findChild<QLabel*>("onlineTodayStatus")->text(), QStringLiteral("含模拟数据"));
+    }
     void searchWaitsForCatalog() {
         FakeService service; service.defer = true;
         std::unique_ptr<QWidget> window(createOnlineWindow(service,service,{7,"reader"},[]{}));

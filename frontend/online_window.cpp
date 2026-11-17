@@ -147,9 +147,10 @@ public:
         searchLayout->addWidget(searchList_,1); tabs_->addTab(search,QStringLiteral("检索"));
         auto* today = new QWidget;
         auto* todayLayout = new QVBoxLayout(today);
-        auto* explanation = new QLabel(QStringLiteral("今日推荐：服务器个性化候选池，按日期洗牌；相同候选池在同一天顺序固定。重新进入时核验最新权限和偏好。动态推荐可在独立页面随时更新。"));
+        auto* explanation = new QLabel(QStringLiteral("每日更新，点击作品查看详情。"));
         explanation->setWordWrap(true); todayLayout->addWidget(explanation);
         todayStatus_ = new QLabel; todayStatus_->setTextFormat(Qt::PlainText); todayStatus_->setWordWrap(true);
+        todayStatus_->setObjectName(QStringLiteral("onlineTodayStatus"));
         todayLayout->addWidget(todayStatus_);
         auto* retryToday = new QPushButton(QStringLiteral("加载今日推荐"));
         todayLayout->addWidget(retryToday);
@@ -351,14 +352,17 @@ private:
         const auto date=care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
         todayLoading_=true;
         const auto todayGeneration=++todayGeneration_;
-        todayStatus_->setText(QStringLiteral("正在加载今日候选…"));
+        todayStatus_->setText(QStringLiteral("正在加载今日推荐…"));
         TemporalRecommendationRequest request; request.limit=30; request.scene=scene_;
         // Temporal is the server rules engine; this does not request DeepSeek.
         const auto handle=care_.recommendTemporal(request,[self=QPointer<OnlineWindow>(this),date,todayGeneration](Result<TemporalRecommendationResult> result) {
             if (!self || self->finished_ || self->todayGeneration_!=todayGeneration) return;
             self->todayLoading_=false;
             self->todayHandle_.clear();
-            if (!result.status.ok() || !result.value) { self->todayStatus_->setText(result.status.message); return; }
+            if (!result.status.ok() || !result.value) {
+                self->todayStatus_->setText(QStringLiteral("暂时无法加载今日推荐，请重试。"));
+                return;
+            }
             QHash<QString,RecommendedResource> pool; QStringList keys;
             for (const auto& item:result.value->items) {
                 const auto key=item.work.resource.workId;
@@ -367,10 +371,17 @@ private:
             self->daily_.clear(); self->todayList_->clear();
             for (const auto& key:dailyPick(keys,static_cast<quint64>(date.toJulianDay()),6)) {
                 const auto item=pool.value(key); self->daily_.append(item);
-                new QListWidgetItem(item.work.media.fileName+QStringLiteral("\n")+item.reason,self->todayList_);
+                new QListWidgetItem(item.work.media.fileName, self->todayList_);
             }
             self->dailyDate_=date;
-            self->todayStatus_->setText(result.value->message.isEmpty()?QStringLiteral("今日推荐已更新，点击作品查看详情。"):result.value->message);
+            QStringList notices;
+            if (self->daily_.isEmpty())
+                notices.append(QStringLiteral("暂无可推荐的作品。"));
+            if (result.value->fallback)
+                notices.append(QStringLiteral("已使用备用推荐。"));
+            if (result.value->containsSyntheticData)
+                notices.append(QStringLiteral("含模拟数据"));
+            self->todayStatus_->setText(notices.join(QStringLiteral(" · ")));
         });
         if (todayLoading_ && todayGeneration_==todayGeneration) todayHandle_=handle;
     }

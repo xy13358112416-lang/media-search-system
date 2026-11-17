@@ -965,8 +965,8 @@ private:
             preferenceChoice(categoryPreference_), preferenceChoice(typePreference_)});
         todayTitle_->setText(result.dateKey.isEmpty()
             ? QStringLiteral("今日推荐") : QStringLiteral("今日推荐 · %1").arg(result.dateKey));
-        recommendationReason_->setText(result.success ? result.reason : result.error);
-        recommendationReason_->setVisible(!recommendationReason_->text().isEmpty());
+        recommendationReason_->clear();
+        recommendationReason_->hide();
         int position = 0;
         if (result.success) {
             for (const auto& id : result.mediaIds) {
@@ -1012,7 +1012,10 @@ private:
                 ++position;
             }
         }
-        todayStatus_->setText(result.success && position == 0 ? QStringLiteral("暂无可推荐的媒体。") : QString());
+        if (!result.success)
+            todayStatus_->setText(QStringLiteral("暂时无法加载今日推荐，请重试。"));
+        else
+            todayStatus_->setText(position == 0 ? QStringLiteral("暂无可推荐的作品。") : QString());
         todayStatus_->setVisible(!todayStatus_->text().isEmpty());
     }
 
