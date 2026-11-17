@@ -181,6 +181,34 @@ void OnlineCareClient::searchPeople(const PersonSearchRequest& input, Callback<P
     if (!status.ok()) { done({status, {}}); return; }
     requestPersonPage("search_people", {{"query", input.query}}, input.page, std::move(done));
 }
+
+void OnlineCareClient::searchPersonWeb(const QString& name, Callback<QList<PersonWebSource>> done)
+{
+    request("search_person_web", {{"name", name}}, [done = std::move(done)](Status status, QJsonObject payload) {
+        if (!status.ok()) {
+            done({status, {}});
+            return;
+        }
+        const auto encoded = payload.value("sources");
+        if (!encoded.isArray() || encoded.toArray().size() > 1) {
+            done({malformed(), {}});
+            return;
+        }
+        QList<PersonWebSource> sources;
+        for (const auto& row : encoded.toArray()) {
+            const auto item = row.toObject();
+            const auto title = item.value("title").toString();
+            const QUrl url(item.value("url").toString(), QUrl::StrictMode);
+            if (title.isEmpty() || title.size() > 200 || !url.isValid() || url.scheme() != "https" ||
+                url.host().isEmpty() || !url.userInfo().isEmpty() || url.port() != -1 || url.toEncoded().size() > 2048) {
+                done({malformed(), {}});
+                return;
+            }
+            sources.append({title, url});
+        }
+        done({{}, std::move(sources)});
+    });
+}
 void OnlineCareClient::listWorkFeedback(const PageRequest& input, Callback<Page<WorkFeedback>> done) {
     const auto status = validate(input);
     if (!status.ok()) { done({status, {}}); return; }

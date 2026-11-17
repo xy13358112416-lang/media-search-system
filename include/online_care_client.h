@@ -22,6 +22,7 @@ public:
     void clearHistory(care_contract::StatusCallback) override;
     void getResource(const care_contract::WarehouseItemRef&, care_contract::Callback<care_contract::ResourceSummary>) override;
     void searchPeople(const care_contract::PersonSearchRequest&, care_contract::Callback<care_contract::Page<care_contract::PersonSummary>>) override;
+    void searchPersonWeb(const QString&, care_contract::Callback<QList<care_contract::PersonWebSource>>) override;
     void listWorkFeedback(const care_contract::PageRequest&, care_contract::Callback<care_contract::Page<care_contract::WorkFeedback>>) override;
     void setWorkFeedback(const care_contract::WorkFeedbackRequest&, care_contract::StatusCallback) override;
     void listFollows(const care_contract::PageRequest&, care_contract::Callback<care_contract::Page<care_contract::PersonSummary>>) override;

@@ -271,7 +271,7 @@ private slots:
         media.fileName = "Quiet Film";
         client.addItem(publicWarehouse->value->warehouseId, media, [&](auto result) { item = std::move(result); });
         QTRY_VERIFY(item && item->status.ok() && item->value);
-        auto* publicOnly = matching<QCheckBox>(page, QStringLiteral("查看公开仓库"));
+        auto* publicOnly = matching<QCheckBox>(page, QStringLiteral("浏览所有公开仓库"));
         auto* search = named<QLineEdit>(page, "warehousePublicSearch");
         auto* submit = matching<QPushButton>(page, QStringLiteral("搜索当前公开仓库"));
         auto* clear = matching<QPushButton>(page, QStringLiteral("清除搜索"));
@@ -450,7 +450,7 @@ private slots:
         auto* create = matching<QPushButton>(alice, QStringLiteral("新建仓库"));
         QVERIFY(create);
         QTRY_VERIFY(create->isEnabled());
-        auto* publicOnly = matching<QCheckBox>(bob, QStringLiteral("查看公开仓库"));
+        auto* publicOnly = matching<QCheckBox>(bob, QStringLiteral("浏览所有公开仓库"));
         QVERIFY(publicOnly);
         QTRY_VERIFY(publicOnly->isEnabled());
         QCOMPARE(named<QLineEdit>(alice, "warehousePassword")->text(), QString());
@@ -481,6 +481,12 @@ private slots:
         bobItems->setCurrentRow(0);
         QVERIFY(!matching<QPushButton>(bob, QStringLiteral("添加本地作品"))->isEnabled());
         QVERIFY(!matching<QPushButton>(bob, QStringLiteral("删除条目"))->isEnabled());
+        publicOnly->setChecked(false);
+        QCOMPARE(bobWarehouses->accessibleName(), QStringLiteral("我的仓库"));
+        QCOMPARE(bobWarehouses->count(), 0);
+        QCOMPARE(bobItems->count(), 0);
+        QTRY_COMPARE(named<QLabel>(bob, "warehouseStatus")->text(), QStringLiteral("你还没有仓库。"));
+        QCOMPARE(aliceWarehouses->count(), 1);
 
         auto* query = named<QLineEdit>(alice, "warehouseRecommendationQuery");
         auto* recommend = matching<QPushButton>(alice, QStringLiteral("获取推荐"));

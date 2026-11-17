@@ -41,7 +41,7 @@ WarehousePage::WarehousePage(WarehouseService& service,
       cancel_(new QPushButton(QStringLiteral("取消推荐"))),
       addSuggestion_(new QPushButton(QStringLiteral("确认加入所选仓库"))),
       warehouseList_(new QListWidget), itemList_(new QListWidget), recommendationList_(new QListWidget),
-      publicOnly_(new QCheckBox(QStringLiteral("查看公开仓库"))),
+      publicOnly_(new QCheckBox(QStringLiteral("浏览所有公开仓库"))),
       useTarget_(new QCheckBox(QStringLiteral("使用所选仓库"))), query_(new QLineEdit), reason_(new QLabel)
 {
     auto* layout = new QVBoxLayout(this);
@@ -91,6 +91,7 @@ WarehousePage::WarehousePage(WarehouseService& service,
     layout->addWidget(status_);
 
     auto* toolbar = new QHBoxLayout;
+    publicOnly_->setToolTip(QStringLiteral("取消勾选时显示自己创建的仓库，包括自己公开的仓库。"));
     toolbar->addWidget(publicOnly_);
     toolbar->addWidget(refresh_);
     toolbar->addWidget(create_);
@@ -137,8 +138,9 @@ WarehousePage::WarehousePage(WarehouseService& service,
         column->addWidget(label);
         column->addWidget(list, 1);
         panes->addLayout(column, stretch);
+        return label;
     };
-    addPane(QStringLiteral("仓库"), warehouseList_, 2);
+    auto* scope = addPane(QStringLiteral("我的仓库"), warehouseList_, 2);
     addPane(QStringLiteral("条目"), itemList_, 3);
     addPane(QStringLiteral("推荐建议"), recommendationList_, 3);
     layout->addLayout(panes, 1);
@@ -166,7 +168,21 @@ WarehousePage::WarehousePage(WarehouseService& service,
     connect(create_, &QPushButton::clicked, this, [this] { createWarehouse(); });
     connect(add_, &QPushButton::clicked, this, [this] { addLocalMedia(); });
     connect(remove_, &QPushButton::clicked, this, [this] { removeItem(); });
-    connect(publicOnly_, &QCheckBox::toggled, this, [this] { refresh(); });
+    connect(publicOnly_, &QCheckBox::toggled, this, [this, scope](bool showPublic) {
+        const auto title = showPublic ? QStringLiteral("公开仓库") : QStringLiteral("我的仓库");
+        scope->setText(title);
+        warehouseList_->setAccessibleName(title);
+        if (!user_)
+            return;
+        warehouses_.clear();
+        {
+            const QSignalBlocker block(warehouseList_);
+            warehouseList_->clear();
+        }
+        clearRecommendation();
+        refreshDetail();
+        refresh();
+    });
     connect(warehouseList_, &QListWidget::currentRowChanged, this, [this] {
         clearRecommendation();
         refreshDetail();
@@ -391,8 +407,11 @@ void WarehousePage::refresh()
             int selectedRow = -1;
             for (int row = 0; row < warehouses_.size(); ++row) {
                 const auto& warehouse = warehouses_.at(row);
+                const bool mine = warehouse.ownerId == user_->userId;
+                const auto visibility = warehouse.visibility == Visibility::Public
+                    ? QStringLiteral("公开") : QStringLiteral("私有");
                 warehouseList_->addItem(QStringLiteral("%1 · %2").arg(warehouse.name,
-                    warehouse.visibility == Visibility::Public ? QStringLiteral("公开") : QStringLiteral("私有")));
+                    mine && publicOnly_->isChecked() ? QStringLiteral("我的%1").arg(visibility) : visibility));
                 if (warehouse.warehouseId == previousId)
                     selectedRow = row;
             }
@@ -402,7 +421,9 @@ void WarehousePage::refresh()
         const auto currentId = current ? current->warehouseId : 0;
         if (currentId != previousId)
             clearRecommendation();
-        status_->setText(warehouses_.isEmpty() ? QStringLiteral("当前列表没有仓库。") : QString());
+        status_->setText(warehouses_.isEmpty()
+            ? (publicOnly_->isChecked() ? QStringLiteral("当前没有公开仓库。") : QStringLiteral("你还没有仓库。"))
+            : QString());
         refreshDetail();
     });
     if (publicOnly_->isChecked())

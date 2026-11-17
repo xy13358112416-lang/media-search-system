@@ -22,6 +22,7 @@ struct PersonSummary {
 struct ResourceSummary { ResourceRef resource; MediaRecord media; QList<PersonSummary> people; };
 struct RecommendedResource { ResourceSummary work; QString reason; };
 struct PersonSearchRequest { QString query; PageRequest page; };
+struct PersonWebSource { QString title; QUrl url; };
 struct WorkFeedbackRequest { ResourceRef resource; WorkFeedbackKind feedback = WorkFeedbackKind::NotInterested; };
 struct WorkFeedback { ResourceSummary work; WorkFeedbackKind feedback = WorkFeedbackKind::NotInterested; };
 struct PersonUpdatesRequest { QString personId; TimeRange range; PageRequest page; };
@@ -119,6 +120,10 @@ public:
     virtual void clearHistory(StatusCallback done) = 0;
     virtual void getResource(const WarehouseItemRef& source, Callback<ResourceSummary> done) = 0;
     virtual void searchPeople(const PersonSearchRequest& request, Callback<Page<PersonSummary>> done) = 0;
+    virtual void searchPersonWeb(const QString&, Callback<QList<PersonWebSource>> done)
+    {
+        done({{warehouse_contract::ErrorCode::ServerError, QStringLiteral("当前服务未接通联网人物搜索。")}, {}});
+    }
     virtual void listWorkFeedback(const PageRequest& page, Callback<Page<WorkFeedback>> done) = 0;
     virtual void setWorkFeedback(const WorkFeedbackRequest& request, StatusCallback done) = 0;
     virtual void listFollows(const PageRequest& page, Callback<Page<PersonSummary>> done) = 0;

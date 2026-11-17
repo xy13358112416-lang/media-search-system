@@ -15,15 +15,18 @@
 #include <QDate>
 #include <QDialog>
 #include <QFrame>
+#include <QHeaderView>
 #include <QHBoxLayout>
 #include <QHash>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QPointer>
 #include <QPushButton>
 #include <QSet>
 #include <QTabWidget>
+#include <QTableWidget>
 #include <QTimer>
 #include <QUuid>
 #include <QVBoxLayout>
@@ -40,6 +43,44 @@ using warehouse_contract::WarehouseRecommendationRequest;
 using warehouse_contract::WarehouseRecommendationResult;
 using namespace care_contract;
 struct CatalogEntry { MediaRecord media; WarehouseItemRef source; };
+
+QTableWidget* createMediaTable(const QString& name)
+{
+    auto* table = new QTableWidget(0, 5);
+    table->setObjectName(name);
+    table->setHorizontalHeaderLabels({QStringLiteral("作品名称"), QStringLiteral("类别"),
+        QStringLiteral("文件类型"), QStringLiteral("导演"), QStringLiteral("发行日期")});
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table->setSelectionBehavior(QAbstractItemView::SelectRows);
+    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    table->setAlternatingRowColors(true);
+    table->setShowGrid(false);
+    table->verticalHeader()->hide();
+    table->verticalHeader()->setDefaultSectionSize(34);
+    table->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    return table;
+}
+
+QString mediaValue(const QString& value)
+{
+    return value.trimmed().isEmpty() ? QStringLiteral("—") : value;
+}
+
+void setMediaRow(QTableWidget* table, int row, const QString& key, const MediaRecord& media)
+{
+    const QStringList cells{media.fileName, media.category, media.fileType, media.director,
+                            media.releaseDate.toString(Qt::ISODate)};
+    for (qsizetype column = 0; column < cells.size(); ++column) {
+        auto* item = new QTableWidgetItem(mediaValue(cells.at(column)));
+        table->setItem(row, column, item);
+    }
+    auto* title = table->item(row, 0);
+    title->setData(Qt::UserRole, key);
+    title->setToolTip(QStringLiteral("<b>%1</b><br>演员或艺人：%2")
+        .arg(mediaValue(media.fileName).toHtmlEscaped(),
+             mediaValue(media.actors.join(QStringLiteral("、"))).toHtmlEscaped()));
+}
 
 class OnlineWindow final : public QWidget {
 public:
@@ -83,9 +124,8 @@ public:
         auto* media = new QWidget;
         auto* mediaLayout = new QVBoxLayout(media);
         auto* refresh = new QPushButton(QStringLiteral("刷新在线媒体"));
-        mediaLayout->addWidget(refresh);
-        mediaList_ = new QListWidget;
-        mediaList_->setObjectName("onlineMediaList");
+        mediaLayout->addWidget(refresh, 0, Qt::AlignLeft);
+        mediaList_ = createMediaTable(QStringLiteral("onlineMediaList"));
         mediaLayout->addWidget(mediaList_,1);
         tabs_->addTab(media,QStringLiteral("媒体库"));
         auto* search = new QWidget;
@@ -103,17 +143,20 @@ public:
         auto* submit = new QPushButton(QStringLiteral("搜索")); submit->setObjectName("onlineSearchSubmit");
         fields->addWidget(submit); searchLayout->addLayout(fields);
         searchStatus_ = new QLabel; searchStatus_->setTextFormat(Qt::PlainText); searchLayout->addWidget(searchStatus_);
-        searchList_ = new QListWidget; searchList_->setObjectName("onlineSearchList");
+        searchList_ = createMediaTable(QStringLiteral("onlineSearchList"));
         searchLayout->addWidget(searchList_,1); tabs_->addTab(search,QStringLiteral("检索"));
         auto* today = new QWidget;
         auto* todayLayout = new QVBoxLayout(today);
-        auto* explanation = new QLabel(QStringLiteral("今日推荐：服务器个性化候选池，按日期洗牌；相同候选池在同一天顺序固定。重新进入时核验最新权限和偏好。动态推荐可在独立页面随时更新。"));
+        auto* explanation = new QLabel(QStringLiteral("每日更新，点击作品查看详情。"));
         explanation->setWordWrap(true); todayLayout->addWidget(explanation);
         todayStatus_ = new QLabel; todayStatus_->setTextFormat(Qt::PlainText); todayStatus_->setWordWrap(true);
+        todayStatus_->setObjectName(QStringLiteral("onlineTodayStatus"));
         todayLayout->addWidget(todayStatus_);
         auto* retryToday = new QPushButton(QStringLiteral("加载今日推荐"));
         todayLayout->addWidget(retryToday);
         todayList_ = new QListWidget; todayList_->setObjectName("onlineTodayList");
+        todayList_->setWordWrap(true);
+        todayList_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         todayLayout->addWidget(todayList_,1); tabs_->addTab(today,QStringLiteral("今日推荐"));
         warehouse_ = new WarehousePage(warehouses_,[this] {
             QList<MediaRecord> records;
@@ -132,6 +175,7 @@ public:
         const QStringList labels{QStringLiteral("个人足迹"),QStringLiteral("全站热榜"),QStringLiteral("动态推荐"),QStringLiteral("关注中心")};
         for (int i=0;i<carePages_.size();++i) tabs_->addTab(carePages_[i],labels[i]);
         connect(tabs_,&QTabWidget::currentChanged,this,[this](int index) {
+            ++tabGeneration_;
             if (previousTab_==2 && index!=2) clearToday();
             previousTab_=index;
             if (activeCare_) activeCare_->deactivate();
@@ -140,12 +184,13 @@ public:
             if (index==2) loadToday();
             if (index!=3) warehouse_->suspend();
         });
-        detail_ = new QLabel(QStringLiteral("选择作品以查看详情。"));
-        detail_->setObjectName("onlineMediaDetail"); detail_->setTextFormat(Qt::PlainText); detail_->setWordWrap(true);
-        layout->addWidget(detail_);
-        for (auto* list : {mediaList_,searchList_}) connect(list,&QListWidget::itemClicked,this,[this](QListWidgetItem* item) {
-            const auto key = item->data(Qt::UserRole).toString();
-            if (catalog_.contains(key)) openWork(catalog_.value(key).source);
+        for (auto* table : {mediaList_,searchList_}) connect(table,&QTableWidget::cellClicked,this,[this,table](int row, int) {
+            const auto* title = table->item(row, 0);
+            if (!title)
+                return;
+            const auto found = catalog_.constFind(title->data(Qt::UserRole).toString());
+            if (found != catalog_.cend())
+                warehouse_->recordMediaView(found->source);
         });
         connect(todayList_,&QListWidget::itemClicked,this,[this](QListWidgetItem* item) {
             int row=todayList_->row(item); if (row>=0 && row<daily_.size()) openWork(daily_[row].work.resource.source);
@@ -186,7 +231,7 @@ public:
         for (auto* page:carePages_) page->resetSession();
         warehouse_->connectionLost();
         catalog_.clear(); order_.clear(); index_.rebuild({});
-        mediaList_->clear(); searchList_->clear(); todayList_->clear(); daily_.clear(); detail_->clear();
+        mediaList_->setRowCount(0); searchList_->setRowCount(0); todayList_->clear(); daily_.clear();
         hide();
         const auto callback=logout_;
         if (callback) callback();
@@ -201,19 +246,33 @@ private:
     }
     void openWork(const WarehouseItemRef& source) {
         if (finished_) return;
-        warehouse_->recordMediaView(source,guard(generation_,[this](Result<ResourceSummary> result) {
-            if (!result.status.ok() || !result.value) { detail_->setText(result.status.message); return; }
+        const auto tab = tabGeneration_;
+        warehouse_->recordMediaView(source,guard(generation_,[this,tab](Result<ResourceSummary> result) {
+            if (tab != tabGeneration_)
+                return;
+            auto* dialog = new QMessageBox(this);
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            dialog->setTextFormat(Qt::PlainText);
+            if (!result.status.ok() || !result.value) {
+                dialog->setWindowTitle(QStringLiteral("无法打开作品"));
+                dialog->setText(result.status.message);
+                dialog->show();
+                return;
+            }
             const auto& m=result.value->media;
-            detail_->setText(QStringLiteral("%1 · %2\n导演：%3\n演员：%4").arg(m.fileName,m.fileType,m.director,m.actors.join(QStringLiteral("、"))));
+            dialog->setWindowTitle(QStringLiteral("作品详情"));
+            dialog->setText(QStringLiteral("%1\n类别：%2\n导演：%3\n演员或艺人：%4")
+                .arg(m.fileName, mediaValue(m.category), mediaValue(m.director),
+                     mediaValue(m.actors.join(QStringLiteral("、")))));
+            dialog->show();
         }));
     }
     void reloadCatalog() {
         if (finished_) return;
         const auto generation=++generation_;
         catalogReady_=false;
-        catalog_.clear(); order_.clear(); index_.rebuild({}); mediaList_->clear(); searchList_->clear();
+        catalog_.clear(); order_.clear(); index_.rebuild({}); mediaList_->setRowCount(0); searchList_->setRowCount(0);
         searchStatus_->clear();
-        detail_->setText(QStringLiteral("选择作品以查看详情。"));
         status_->setText(QStringLiteral("正在加载服务器公开仓库及我的仓库…"));
         warehouses_.listPublicWarehouses(guard(generation,[this,generation](Result<QList<WarehouseSummary>> result) {
             if (!result.status.ok() || !result.value) { status_->setText(result.status.message); return; }
@@ -234,7 +293,11 @@ private:
             for (const auto& key:order_) { auto record=catalog_[key].media; record.id=key; records.append(record); }
             index_.rebuild(records);
             catalogReady_=true;
-            for (const auto& key:order_) { auto* item=new QListWidgetItem(rowLabel(catalog_[key].media),mediaList_); item->setData(Qt::UserRole,key); }
+            mediaList_->setRowCount(order_.size());
+            for (qsizetype row = 0; row < order_.size(); ++row) {
+                const auto& key = order_.at(row);
+                setMediaRow(mediaList_, row, key, catalog_[key].media);
+            }
             status_->setText(QStringLiteral("在线可读作品 %1 条；未能读取的仓库 %2 个。权限由服务器核验。").arg(catalog_.size()).arg(failedDetails_));
             return;
         }
@@ -270,14 +333,16 @@ private:
         if (terms.isEmpty()) { searchStatus_->setText(QStringLiteral("请填写至少一个搜索条件。")); return; }
         BehaviorEvent event; event.eventId=QUuid::createUuid().toString(QUuid::WithoutBraces);
         event.action=BehaviorAction::Search; event.query=terms.join(QStringLiteral(" ")).left(MaxQueryUnits);
-        searchList_->clear();
+        searchList_->setRowCount(0);
         const auto hits=index_.search(query);
         for (const auto& key:hits) if (catalog_.contains(key) && catalog_[key].media.fileName.contains(title,Qt::CaseInsensitive)
             && (assistantCategory_.isEmpty() || catalog_[key].media.category==assistantCategory_)
             && media_mood::matches(catalog_[key].media,assistantMood_)) {
-            auto* item=new QListWidgetItem(rowLabel(catalog_[key].media),searchList_); item->setData(Qt::UserRole,key);
+            const int row = searchList_->rowCount();
+            searchList_->insertRow(row);
+            setMediaRow(searchList_, row, key, catalog_[key].media);
         }
-        searchStatus_->setText(QStringLiteral("索引搜索命中 %1 条；搜索记录遵循服务器参与设置。").arg(searchList_->count()));
+        searchStatus_->setText(QStringLiteral("共 %1 条结果").arg(searchList_->rowCount()));
         care_.recordBehavior(event,guard(generation_,[this](Status status) {
             if (!status.ok()) searchStatus_->setText(QStringLiteral("搜索记录未保存：%1").arg(status.message));
         }));
@@ -287,14 +352,17 @@ private:
         const auto date=care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
         todayLoading_=true;
         const auto todayGeneration=++todayGeneration_;
-        todayStatus_->setText(QStringLiteral("正在加载今日候选…"));
+        todayStatus_->setText(QStringLiteral("正在加载今日推荐…"));
         TemporalRecommendationRequest request; request.limit=30; request.scene=scene_;
         // Temporal is the server rules engine; this does not request DeepSeek.
         const auto handle=care_.recommendTemporal(request,[self=QPointer<OnlineWindow>(this),date,todayGeneration](Result<TemporalRecommendationResult> result) {
             if (!self || self->finished_ || self->todayGeneration_!=todayGeneration) return;
             self->todayLoading_=false;
             self->todayHandle_.clear();
-            if (!result.status.ok() || !result.value) { self->todayStatus_->setText(result.status.message); return; }
+            if (!result.status.ok() || !result.value) {
+                self->todayStatus_->setText(QStringLiteral("暂时无法加载今日推荐，请重试。"));
+                return;
+            }
             QHash<QString,RecommendedResource> pool; QStringList keys;
             for (const auto& item:result.value->items) {
                 const auto key=item.work.resource.workId;
@@ -303,10 +371,17 @@ private:
             self->daily_.clear(); self->todayList_->clear();
             for (const auto& key:dailyPick(keys,static_cast<quint64>(date.toJulianDay()),6)) {
                 const auto item=pool.value(key); self->daily_.append(item);
-                new QListWidgetItem(item.work.media.fileName+QStringLiteral("\n")+item.reason,self->todayList_);
+                new QListWidgetItem(item.work.media.fileName, self->todayList_);
             }
             self->dailyDate_=date;
-            self->todayStatus_->setText(result.value->message.isEmpty()?QStringLiteral("今日推荐已更新，点击作品查看详情。"):result.value->message);
+            QStringList notices;
+            if (self->daily_.isEmpty())
+                notices.append(QStringLiteral("暂无可推荐的作品。"));
+            if (result.value->fallback)
+                notices.append(QStringLiteral("已使用备用推荐。"));
+            if (result.value->containsSyntheticData)
+                notices.append(QStringLiteral("含模拟数据"));
+            self->todayStatus_->setText(notices.join(QStringLiteral(" · ")));
         });
         if (todayLoading_ && todayGeneration_==todayGeneration) todayHandle_=handle;
     }
@@ -316,13 +391,10 @@ private:
         const auto handle=std::exchange(todayHandle_,{});
         if (!handle.isEmpty()) care_.cancelRecommendation(handle);
     }
-    static QString rowLabel(const MediaRecord& media) {
-        return QStringLiteral("%1    |    %2    |    %3    |    %4").arg(media.fileName,media.fileType,media.director,media.releaseDate.toString(Qt::ISODate));
-    }
     WarehouseService& warehouses_; CareService& care_; std::function<void()> logout_;
     WarehousePage* warehouse_=nullptr; QList<CarePage*> carePages_; CarePage* activeCare_=nullptr;
-    QTabWidget* tabs_; QListWidget *mediaList_,*searchList_,*todayList_;
-    QLineEdit *title_,*director_,*actor_,*type_; QLabel *status_,*searchStatus_,*todayStatus_,*detail_;
+    QTabWidget* tabs_; QTableWidget *mediaList_, *searchList_; QListWidget* todayList_;
+    QLineEdit *title_,*director_,*actor_,*type_; QLabel *status_,*searchStatus_,*todayStatus_;
     QHash<QString,CatalogEntry> catalog_; QStringList order_; MediaSearch index_;
     bool catalogReady_=false;
     QList<WarehouseSummary> pending_; int pendingPosition_=0,failedDetails_=0;
@@ -332,6 +404,7 @@ private:
     media_mood::Mood assistantMood_=media_mood::Mood::Any; QString assistantCategory_;
     quint64 todayGeneration_=0; RecommendationHandle todayHandle_;
     int previousTab_=0;
+    quint64 tabGeneration_=0;
 };
 }
 
