@@ -61,12 +61,6 @@ QString displayText(const QString& value)
     return value.isEmpty() ? QStringLiteral("—") : value;
 }
 
-// Display a record's date using the same format in the list and the details.
-QString displayDate(const QDate& date)
-{
-    return displayText(date.toString(Qt::ISODate));
-}
-
 // Split the form's list fields and discard empty entries.
 QStringList splitEntries(const QString& text)
 {
@@ -681,11 +675,22 @@ private:
         QLineEdit name, type, size(QStringLiteral("0")), director, actors;
         QLineEdit views(QStringLiteral("0")), date, awards, category;
         type.setPlaceholderText(QStringLiteral("例如 MP4"));
-        date.setPlaceholderText(QStringLiteral("YYYY-MM-DD"));
+        date.setPlaceholderText(QStringLiteral("YYYY、YYYY-MM 或 YYYY-MM-DD"));
         const QString listHint = QStringLiteral("多项用顿号「、」分隔");
         actors.setPlaceholderText(listHint);
         awards.setPlaceholderText(listHint);
         form->addRow(QStringLiteral("文件名"), &name);
+        auto* chooseFile = new QPushButton(QStringLiteral("从文件填写名称和类型"));
+        form->addRow(chooseFile);
+        connect(chooseFile, &QPushButton::clicked, &dialog, [&] {
+            const auto path = QFileDialog::getOpenFileName(&dialog, QStringLiteral("选择媒体文件"));
+            if (path.isEmpty())
+                return;
+            const QFileInfo file(path);
+            name.setText(file.fileName());
+            type.setText(file.suffix().toUpper());
+            size.setText(QString::number(file.size()));
+        });
         form->addRow(QStringLiteral("文件类型"), &type);
         form->addRow(QStringLiteral("文件大小（字节）"), &size);
         form->addRow(QStringLiteral("导演"), &director);
@@ -712,7 +717,6 @@ private:
             record.category = category.text().trimmed();
 
             const QString dateText = date.text().trimmed();
-            record.releaseDate = QDate::fromString(dateText, Qt::ISODate);
             if (record.fileName.isEmpty() || record.fileType.isEmpty() || record.fileType.contains('.')) {
                 QMessageBox::warning(&dialog, QStringLiteral("检查输入"),
                                      QStringLiteral("请填写文件名和文件类型，类型无需带点。"));
@@ -727,9 +731,9 @@ private:
                 type.selectAll();
                 return;
             }
-            if (!record.releaseDate.isValid() || record.releaseDate.toString(Qt::ISODate) != dateText) {
+            if (!parseMediaRelease(dateText, record)) {
                 QMessageBox::warning(&dialog, QStringLiteral("检查输入"),
-                                     QStringLiteral("请输入有效的发行日期，格式为 YYYY-MM-DD。"));
+                                     QStringLiteral("请输入有效的发行年份、年月或日期。"));
                 return;
             }
             if (!readCount(size.text(), record.fileSize) || !readCount(views.text(), record.viewCount)) {
@@ -1005,7 +1009,7 @@ private:
                     dialog.setTextFormat(Qt::PlainText);
                     dialog.setInformativeText(QStringLiteral("导演：%1\n演员：%2\n发行日期：%3\n所获奖项：%4")
                         .arg(displayText(current.director), displayText(current.actors.join(QStringLiteral("、"))),
-                             displayDate(current.releaseDate), displayText(current.awards.join(QStringLiteral("、")))));
+                             displayText(mediaReleaseText(current)), displayText(current.awards.join(QStringLiteral("、")))));
                     dialog.exec();
                 });
                 todayGrid_->addWidget(card, position / 2, position % 2);
@@ -1096,7 +1100,7 @@ private:
                 selectedRow = row;
             const QStringList values{record.fileName, record.fileType,
                 recommended ? record.category : record.director,
-                recommended ? QLocale().toString(record.viewCount) : displayDate(record.releaseDate)};
+                recommended ? QLocale().toString(record.viewCount) : displayText(mediaReleaseText(record))};
             for (int column = 0; column < values.size(); ++column)
                 table_->setItem(row, column, new QTableWidgetItem(displayText(values.at(column))));
         }
@@ -1125,7 +1129,7 @@ private:
         const QStringList values{record.id, record.fileName, record.fileType,
                                  record.fileType.isEmpty() ? QStringLiteral("未知") : QStringLiteral("%1 字节").arg(locale.toString(record.fileSize)),
                                  record.director, record.actors.join(QStringLiteral("、")),
-                                 locale.toString(record.viewCount), displayDate(record.releaseDate),
+                                 locale.toString(record.viewCount), displayText(mediaReleaseText(record)),
                                  record.awards.join(QStringLiteral("、")), record.category};
         for (qsizetype i = 0; i < values.size(); ++i)
             detailValues_.at(i)->setText(displayText(values.at(i)));

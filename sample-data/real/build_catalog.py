@@ -14,9 +14,12 @@ def read_csv(path):
     with path.open(encoding='utf-8', newline='') as stream:
         return list(csv.DictReader(stream))
 
-def exact_date(value):
+def release_info(value):
     try:
-        return date.fromisoformat(value).isoformat() if len(value) == 10 else ''
+        suffix = {4: '-01-01', 7: '-01', 10: ''}.get(len(value))
+        if suffix is not None and date.fromisoformat(value + suffix).isoformat().startswith(value):
+            return value
+        return ''
     except (ValueError, TypeError):
         return ''
 
@@ -30,7 +33,8 @@ def main():
         key = entry['uci_key']
         title = old['file_name'][:-4] if old['file_name'].endswith('.mp4') else old['file_name']
         records.append(dict(id='uci:' + key, title=title, kind='电影', creator=old['director'],
-                            people=json.loads(old['actors']), release_date='', release_raw=entry['source_year'],
+                            people=json.loads(old['actors']), release_date=release_info(entry['source_year']),
+                            release_raw=entry['source_year'],
                             genres=[old['category']] if old['category'] else [],
                             source='UCI Movie', source_id=key, source_url='https://archive.ics.uci.edu/dataset/132/movie'))
 
@@ -39,7 +43,7 @@ def main():
     for show in shows[:150]:
         raw = show.get('premiered') or ''
         records.append(dict(id='tvmaze:' + str(show['id']), title=show['name'], kind='电视剧', creator='',
-                            people=[], release_date=exact_date(raw), release_raw=raw, genres=show.get('genres') or [],
+                            people=[], release_date=release_info(raw), release_raw=raw, genres=show.get('genres') or [],
                             source='TVmaze', source_id=str(show['id']), source_url=show['url']))
 
     artists = ['0383dadf-2a4e-4d10-a46a-e9e041da8eb3',
@@ -61,7 +65,7 @@ def main():
             names = [name for name in names if name]
             raw = item.get('first-release-date') or ''
             records.append(dict(id='musicbrainz:' + key, title=item['title'], kind='音乐', creator='',
-                                people=names, release_date=exact_date(raw), release_raw=raw, genres=[],
+                                people=names, release_date=release_info(raw), release_raw=raw, genres=[],
                                 source='MusicBrainz', source_id=key,
                                 source_url='https://musicbrainz.org/recording/' + key))
             count += 1

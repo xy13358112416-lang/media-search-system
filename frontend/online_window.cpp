@@ -49,7 +49,7 @@ QTableWidget* createMediaTable(const QString& name)
     auto* table = new QTableWidget(0, 5);
     table->setObjectName(name);
     table->setHorizontalHeaderLabels({QStringLiteral("作品名称"), QStringLiteral("类别"),
-        QStringLiteral("文件类型"), QStringLiteral("导演"), QStringLiteral("发行日期")});
+        QStringLiteral("文件类型"), QStringLiteral("导演"), QStringLiteral("发行时间")});
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -70,7 +70,7 @@ QString mediaValue(const QString& value)
 void setMediaRow(QTableWidget* table, int row, const QString& key, const MediaRecord& media)
 {
     const QStringList cells{media.fileName, media.category, media.fileType, media.director,
-                            media.releaseDate.toString(Qt::ISODate)};
+                            mediaReleaseText(media)};
     for (qsizetype column = 0; column < cells.size(); ++column) {
         auto* item = new QTableWidgetItem(mediaValue(cells.at(column)));
         table->setItem(row, column, item);
@@ -139,7 +139,13 @@ public:
         title_ = field("onlineSearchTitle",QStringLiteral("作品关键词"));
         director_ = field("onlineSearchDirector",QStringLiteral("导演全名"));
         actor_ = field("onlineSearchActor",QStringLiteral("演员全名"));
-        type_ = field("onlineSearchType",QStringLiteral("文件类型，如 MP4"));
+        release_ = field("onlineSearchRelease", QStringLiteral("发行时间，如 1981"));
+        release_->setMaxLength(10);
+        type_ = new QComboBox;
+        type_->setObjectName(QStringLiteral("onlineSearchType"));
+        type_->setAccessibleName(QStringLiteral("文件类型"));
+        type_->addItems({QStringLiteral("全部文件类型"), QStringLiteral("未记录文件类型")});
+        fields->addWidget(type_);
         auto* submit = new QPushButton(QStringLiteral("搜索")); submit->setObjectName("onlineSearchSubmit");
         fields->addWidget(submit); searchLayout->addLayout(fields);
         searchStatus_ = new QLabel; searchStatus_->setTextFormat(Qt::PlainText); searchLayout->addWidget(searchStatus_);
@@ -293,6 +299,18 @@ private:
             for (const auto& key:order_) { auto record=catalog_[key].media; record.id=key; records.append(record); }
             index_.rebuild(records);
             catalogReady_=true;
+            QStringList types;
+            for (const auto& record : records) {
+                const auto type = record.fileType.trimmed().toUpper();
+                if (!type.isEmpty() && !types.contains(type))
+                    types.append(type);
+            }
+            types.sort();
+            const auto selectedType = type_->currentText();
+            type_->clear();
+            type_->addItems({QStringLiteral("全部文件类型"), QStringLiteral("未记录文件类型")});
+            type_->addItems(types);
+            type_->setCurrentIndex(qMax(0, type_->findText(selectedType)));
             mediaList_->setRowCount(order_.size());
             for (qsizetype row = 0; row < order_.size(); ++row) {
                 const auto& key = order_.at(row);
@@ -321,13 +339,24 @@ private:
             return;
         }
         if (!fromAssistant) { assistantMood_=media_mood::Mood::Any; assistantCategory_.clear(); }
-        SearchQuery query{director_->text().trimmed(),actor_->text().trimmed(),type_->text().trimmed()};
+        const bool unknownType = type_->currentIndex() == 1;
+        SearchQuery query{director_->text().trimmed(), actor_->text().trimmed(),
+                          type_->currentIndex() >= 2 ? type_->currentText() : QString()};
         const auto title=title_->text().trimmed();
+        const auto period = release_->text().trimmed();
+        MediaRecord checkedDate;
+        if (!parseMediaRelease(period, checkedDate)) {
+            searchList_->setRowCount(0);
+            searchStatus_->setText(QStringLiteral("请输入有效的发行年份、年月或日期，如 1981、1981-05 或 1981-05-22。"));
+            return;
+        }
         QStringList terms;
         if (!title.isEmpty()) terms<<title;
         if (!query.director.isEmpty()) terms<<QStringLiteral("导演:%1").arg(query.director);
         if (!query.actor.isEmpty()) terms<<QStringLiteral("演员:%1").arg(query.actor);
         if (!query.fileType.isEmpty()) terms<<QStringLiteral("格式:%1").arg(query.fileType);
+        if (unknownType) terms << QStringLiteral("格式:未记录");
+        if (!period.isEmpty()) terms << QStringLiteral("发行时间:%1").arg(period);
         if (!assistantCategory_.isEmpty()) terms<<QStringLiteral("类别:%1").arg(assistantCategory_);
         if (assistantMood_!=media_mood::Mood::Any) terms<<media_mood::label(assistantMood_);
         if (terms.isEmpty()) { searchStatus_->setText(QStringLiteral("请填写至少一个搜索条件。")); return; }
@@ -336,6 +365,8 @@ private:
         searchList_->setRowCount(0);
         const auto hits=index_.search(query);
         for (const auto& key:hits) if (catalog_.contains(key) && catalog_[key].media.fileName.contains(title,Qt::CaseInsensitive)
+            && (!unknownType || catalog_[key].media.fileType.trimmed().isEmpty())
+            && (period.isEmpty() || mediaReleaseText(catalog_[key].media).startsWith(period))
             && (assistantCategory_.isEmpty() || catalog_[key].media.category==assistantCategory_)
             && media_mood::matches(catalog_[key].media,assistantMood_)) {
             const int row = searchList_->rowCount();
@@ -394,7 +425,9 @@ private:
     WarehouseService& warehouses_; CareService& care_; std::function<void()> logout_;
     WarehousePage* warehouse_=nullptr; QList<CarePage*> carePages_; CarePage* activeCare_=nullptr;
     QTabWidget* tabs_; QTableWidget *mediaList_, *searchList_; QListWidget* todayList_;
-    QLineEdit *title_,*director_,*actor_,*type_; QLabel *status_,*searchStatus_,*todayStatus_;
+    QLineEdit *title_, *director_, *actor_, *release_;
+    QComboBox* type_;
+    QLabel *status_,*searchStatus_,*todayStatus_;
     QHash<QString,CatalogEntry> catalog_; QStringList order_; MediaSearch index_;
     bool catalogReady_=false;
     QList<WarehouseSummary> pending_; int pendingPosition_=0,failedDetails_=0;
