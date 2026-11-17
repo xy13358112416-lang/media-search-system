@@ -1243,9 +1243,11 @@ int main(int argc, char* argv[])
         warehouse_contract::UserInfo user;
         while (online_ui::signIn(client, user, nullptr, parser.value(configOption))) {
             bool returnToLogin = false;
-            QDialog session;
+            QDialog session(nullptr, Qt::Window | Qt::WindowMinMaxButtonsHint
+                | Qt::WindowCloseButtonHint);
             session.setWindowTitle(QStringLiteral("多媒体文件管理及检索系统"));
             session.resize(1200, 780);
+            session.setWindowState(Qt::WindowMaximized);
             auto* layout = new QVBoxLayout(&session);
             layout->setContentsMargins(0, 0, 0, 0);
             const auto disconnected = client.onDisconnected(&session, [&] {
