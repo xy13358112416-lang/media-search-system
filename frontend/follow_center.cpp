@@ -1,6 +1,7 @@
 #include "follow_center.h"
 
 #include <QDesktopServices>
+#include <QDialog>
 #include <QHBoxLayout>
 #include <QLineEdit>
 #include <QListWidget>
@@ -24,6 +25,7 @@ public:
         auto* followed = new QPushButton(QStringLiteral("我的关注"));
         searchBar->addWidget(query_, 1);
         searchBar->addWidget(search);
+        searchBar->addWidget(webSearch_);
         searchBar->addWidget(followed);
         searchBar->addWidget(more_);
         layout->addLayout(searchBar);
@@ -55,6 +57,8 @@ public:
         layout->addLayout(actions);
 
         auto startSearch = [this] {
+            invalidate(5);
+            webSearch_->setEnabled(true);
             submitted_ = query_->text().trimmed();
             if (submitted_.isEmpty()) {
                 status->setText(QStringLiteral("请输入人物姓名。"));
@@ -65,6 +69,7 @@ public:
         };
         connect(search, &QPushButton::clicked, this, startSearch);
         connect(query_, &QLineEdit::returnPressed, this, startSearch);
+        connect(webSearch_, &QPushButton::clicked, this, [this] { searchWeb(); });
         connect(followed, &QPushButton::clicked, this, [this] { activate(); });
         connect(more_, &QPushButton::clicked, this, [this] { if (next_) loadPeople(*next_); });
         connect(worksMore_, &QPushButton::clicked, this, [this] { if (nextWorks_) loadWorks(*nextWorks_); });
@@ -96,6 +101,8 @@ public:
 
     void activate() override
     {
+        invalidate(5);
+        webSearch_->setEnabled(true);
         followingOnly_ = true;
         loadPeople(0);
     }
@@ -112,9 +119,58 @@ public:
         next_.reset();
         more_->setEnabled(false);
         status->clear();
+        webSearch_->setEnabled(true);
     }
 
 private:
+    void searchWeb()
+    {
+        const auto name = query_->text().trimmed();
+        if (name.isEmpty()) {
+            status->setText(QStringLiteral("请输入要联网查询的人物姓名。"));
+            return;
+        }
+        invalidate(0);
+        webSearch_->setEnabled(false);
+        status->setText(QStringLiteral("正在用 DeepSeek 搜索并核对网页原文…"));
+        service_.searchPersonWeb(name, latest(5, [this, name](Result<QList<PersonWebSource>> result) {
+            webSearch_->setEnabled(true);
+            if (!result.status.ok() || !result.value) {
+                reportError(result);
+                return;
+            }
+            if (result.value->isEmpty()) {
+                status->setText(QStringLiteral("未找到可核对的人物网页，可尝试全名。"));
+                return;
+            }
+            status->clear();
+            auto* dialog = new QDialog(this);
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            dialog->setWindowTitle(QStringLiteral("联网人物来源"));
+            dialog->resize(570, 240);
+            auto* body = new QVBoxLayout(dialog);
+            auto* heading = new QLabel(QStringLiteral("「%1」的外部参考来源").arg(name));
+            heading->setTextFormat(Qt::PlainText);
+            heading->setWordWrap(true);
+            body->addWidget(heading);
+            auto* list = new QListWidget;
+            list->setWordWrap(true);
+            body->addWidget(list);
+            for (const auto& source : *result.value) {
+                auto* item = new QListWidgetItem(source.title + QStringLiteral("\n") + source.url.host(), list);
+                item->setData(Qt::UserRole, source.url);
+            }
+            auto* open = new QPushButton(QStringLiteral("打开来源网页"));
+            body->addWidget(open, 0, Qt::AlignRight);
+            list->setCurrentRow(0);
+            connect(open, &QPushButton::clicked, dialog, [list] {
+                if (const auto* row = list->currentItem())
+                    QDesktopServices::openUrl(row->data(Qt::UserRole).toUrl());
+            });
+            dialog->open();
+        }));
+    }
+
     void loadPeople(qint64 offset)
     {
         more_->setEnabled(false);
@@ -138,7 +194,7 @@ private:
             }
             more_->setEnabled(next_.has_value());
             status->setText(entries_.isEmpty()
-                ? QStringLiteral("没有找到匹配的人物。可尝试全名或别名，关注中心使用服务器已导入的人物资料。")
+                ? QStringLiteral("人物目录中没有匹配项。可以尝试全名、别名或点击「联网找人物」。")
                 : QString());
             if (people_->currentRow() < 0 && !entries_.isEmpty())
                 people_->setCurrentRow(0);
@@ -310,6 +366,7 @@ private:
     QLabel* workDetails_ = new QLabel;
     QPushButton* openWork_ = new QPushButton(QStringLiteral("查看作品详情"));
     QLineEdit* query_ = new QLineEdit;
+    QPushButton* webSearch_ = new QPushButton(QStringLiteral("联网找人物"));
     QListWidget* people_ = new QListWidget;
     QListWidget* works_ = new QListWidget;
     QListWidget* news_ = new QListWidget;

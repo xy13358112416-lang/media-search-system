@@ -4,7 +4,9 @@
 #include "../trending_page.h"
 
 #include <QComboBox>
+#include <QDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
 #include <QTabWidget>
@@ -55,6 +57,8 @@ public:
     QList<WorksCall> worksCalls;
     QList<UpdatesCall> updatesCalls;
     QList<TrendingCall> trendingCalls;
+    QString webName;
+    Callback<QList<PersonWebSource>> webDone;
     bool immediateTrendingFailure = false;
     Callback<TemporalRecommendationResult> recommendationDone;
     BrowseScene lastScene = BrowseScene::Neutral;
@@ -70,6 +74,8 @@ public:
     void clearHistory(StatusCallback done) override { done({}); }
     void getResource(const WarehouseItemRef&, Callback<ResourceSummary> done) override { done(success(ResourceSummary{})); }
     void searchPeople(const PersonSearchRequest&, Callback<Page<PersonSummary>> done) override { listFollows({}, std::move(done)); }
+    void searchPersonWeb(const QString& name, Callback<QList<PersonWebSource>> done) override
+    { webName = name; webDone = std::move(done); }
     void listWorkFeedback(const PageRequest&, Callback<Page<WorkFeedback>> done) override { done(success(Page<WorkFeedback>{})); }
     void setWorkFeedback(const WorkFeedbackRequest&, StatusCallback done) override { done({}); }
     void listFollows(const PageRequest&, Callback<Page<PersonSummary>> done) override
@@ -147,6 +153,36 @@ public:
 class CarePagesTests final : public QObject {
     Q_OBJECT
 private slots:
+    void personWebResultsCannotPopulateAnInactivePage()
+    {
+        FakeCareService service;
+        std::unique_ptr<CarePage> page(createFollowCenter(service));
+        auto* query = page->findChild<QLineEdit*>();
+        auto* online = button(*page, QStringLiteral("联网找人物"));
+        QVERIFY(query && online);
+        query->setText("Alan Alda");
+        online->click();
+        QCOMPARE(service.webName, QString("Alan Alda"));
+        QVERIFY(!online->isEnabled());
+        QVERIFY(service.webDone);
+        auto result = success(QList<PersonWebSource>{{"Alan Alda", QUrl("https://catalog.afi.com/Catalog/PersonDetails/8664")}});
+        auto first = std::move(service.webDone);
+        page->deactivate();
+        first(result);
+        QVERIFY(online->isEnabled());
+        QVERIFY(!page->findChild<QDialog*>());
+
+        query->setText("Alan Alda");
+        online->click();
+        QVERIFY(service.webDone);
+        auto second = std::move(service.webDone);
+        second(result);
+        auto* dialog = page->findChild<QDialog*>();
+        QVERIFY(dialog);
+        QCOMPARE(dialog->findChild<QListWidget*>()->count(), 1);
+        QVERIFY(service.worksCalls.isEmpty());
+        dialog->close();
+    }
     void onlineRowClicksKeepServerSourcesAndDoNotCountSelection()
     {
         FakeCareService service;

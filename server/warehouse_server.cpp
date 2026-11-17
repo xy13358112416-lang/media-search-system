@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QNetworkAccessManager>
 #include <QRegularExpression>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -161,7 +162,8 @@ std::optional<QList<WarehouseItem>> listItems(const QSqlDatabase& db, qint64 war
 } // namespace
 
 WarehouseServer::WarehouseServer(llm_recommendation::Config config)
-    : recommender_(config), trendSummarizer_(std::move(config)), dbName_(QUuid::createUuid().toString())
+    : personLookupNetwork_(new QNetworkAccessManager(this)), recommender_(config),
+      trendSummarizer_(std::move(config)), dbName_(QUuid::createUuid().toString())
 {
     connect(this, &QTcpServer::newConnection, this, [this] {
         while (auto* socket = nextPendingConnection()) {
@@ -186,6 +188,7 @@ WarehouseServer::~WarehouseServer()
     // Finish accepted connections while both async clients and the database still live.
     // disconnected cancels their pending jobs before callbacks can outlive this server.
     for (auto* socket : findChildren<QTcpSocket*>()) socket->abort();
+    delete personLookupNetwork_;
     personContextLoader_ = {};
     personStore_.reset();
     db_ = {};
@@ -401,11 +404,15 @@ void WarehouseServer::readRequests(QTcpSocket* socket, const std::shared_ptr<Ses
             return;
         }
         const QString id = request.value("req_id").toString();
-        if (session->pending.contains(id) || session->summaries.contains(id)) {
+        if (session->pending.contains(id) || session->summaries.contains(id) || session->personLookup == id) {
             socket->abort();
             return;
         }
         const auto type = request.value("type").toString();
+        if (type == "search_person_web") {
+            startPersonLookup(socket, session, request);
+            continue;
+        }
         if (type == "get_trending" && request.value("payload").toObject().value("summary_mode") == QJsonValue("model")) {
             startTrendingSummary(socket, session, request);
             continue;

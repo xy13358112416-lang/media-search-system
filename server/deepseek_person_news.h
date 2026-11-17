@@ -17,6 +17,10 @@ struct Request {
 care_contract::Result<QUrl> cacheSource(const Request& request);
 bool isSearchSource(const QUrl& source);
 
+// Returns public profile links found by Search and checked with Fetch.
+void findPeople(QNetworkAccessManager& network, const QString& name, const QByteArray& apiKey,
+                care_contract::Callback<QList<care_contract::PersonWebSource>> done);
+
 // Operates on an already registered source on the store's thread.
 void refresh(person_store::Store& store, QNetworkAccessManager& network, const Request& request,
              const QByteArray& apiKey, care_contract::StatusCallback done);

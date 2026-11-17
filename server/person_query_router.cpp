@@ -1,14 +1,18 @@
 #include "warehouse_server.h"
 
 #include "care_person.h"
+#include "deepseek_person_news.h"
 #include "media_json.h"
 #include "person_json.h"
 #include "person_store_sqlite.h"
 
 #include <QDateTime>
+#include <QJsonArray>
 #include <QJsonDocument>
+#include <QPointer>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QTcpSocket>
 
 using namespace care_contract;
 using warehouse_contract::ErrorCode;
@@ -33,6 +37,50 @@ Result<QJsonObject> pageResponse(Result<Page<Item>> result)
     return {{}, std::move(response)};
 }
 } // namespace
+
+void WarehouseServer::startPersonLookup(QTcpSocket* socket, const std::shared_ptr<Session>& session,
+                                        const QJsonObject& request)
+{
+    const auto id = request.value("req_id").toString();
+    const auto fail = [this, socket, id](const char* code, const QString& message) {
+        sendResponse(socket, {{"type", "error_resp"}, {"req_id", id}, {"code", code}, {"message", message}});
+    };
+    const auto token = request.value("token").toString();
+    if (!session->userId || token != session->token) {
+        fail("NotAuthenticated", QStringLiteral("请在当前连接登录。"));
+        return;
+    }
+    const auto name = request.value("payload").toObject().value("name");
+    if (!name.isString() || name.toString().size() > 128) {
+        fail("InvalidArgument", QStringLiteral("请输入人物姓名。"));
+        return;
+    }
+    if (!session->personLookup.isEmpty() || personLookupsInFlight_ >= 3) {
+        fail("ServerError", QStringLiteral("联网人物查询正在处理，请稍后再试。"));
+        return;
+    }
+    session->personLookup = id;
+    ++personLookupsInFlight_;
+    deepseek_person_news::findPeople(*personLookupNetwork_, name.toString(),
+        qgetenv("MEDIA_SERVER_DEEPSEEK_API_KEY"),
+        [this, guarded = QPointer<QTcpSocket>(socket), session, id, token](Result<QList<PersonWebSource>> result) {
+            --personLookupsInFlight_;
+            session->personLookup.clear();
+            if (!guarded || guarded->state() != QAbstractSocket::ConnectedState || token != session->token)
+                return;
+            if (!result.status.ok() || !result.value) {
+                const auto code = result.status.code == ErrorCode::InvalidArgument ? "InvalidArgument" : "ServerError";
+                sendResponse(guarded, {{"type", "error_resp"}, {"req_id", id}, {"code", code},
+                                       {"message", result.status.message}});
+                return;
+            }
+            QJsonArray sources;
+            for (const auto& source : *result.value)
+                sources.append(QJsonObject{{"title", source.title}, {"url", source.url.toString(QUrl::FullyEncoded)}});
+            sendResponse(guarded, {{"type", "search_person_web_resp"}, {"req_id", id},
+                                   {"payload", QJsonObject{{"sources", sources}}}});
+        });
+}
 
 Result<care_algorithms::CatalogSnapshot> WarehouseServer::readablePersonCatalog(
     qint64 userId, const QString& personId, bool includeAliases)
