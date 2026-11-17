@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 PROJECT = ROOT.parent
 SOURCE = ROOT / 'source'
-FIELDS = ['id', 'file_name', 'file_type', 'file_size', 'director', 'actors',
+FIELDS = ['id', 'file_name', 'file_type', 'file_size', 'creator', 'actors',
           'view_count', 'release_date', 'awards', 'category']
 
 def read_csv(path):
@@ -64,7 +64,7 @@ def main():
             names = [c.get('name') or c.get('artist', {}).get('name', '') for c in credits]
             names = [name for name in names if name]
             raw = item.get('first-release-date') or ''
-            records.append(dict(id='musicbrainz:' + key, title=item['title'], kind='音乐', creator='',
+            records.append(dict(id='musicbrainz:' + key, title=item['title'], kind='音乐', creator=(names[0] if names else ''),
                                 people=names, release_date=release_info(raw), release_raw=raw, genres=[],
                                 source='MusicBrainz', source_id=key,
                                 source_url='https://musicbrainz.org/recording/' + key))
@@ -84,7 +84,7 @@ def main():
         writer.writeheader()
         for row in records:
             writer.writerow(dict(id=row['id'], file_name=row['title'], file_type='', file_size=0,
-                                 director=row['creator'], actors=json.dumps(row['people'], ensure_ascii=False),
+                                 creator=row['creator'], actors=json.dumps(row['people'], ensure_ascii=False),
                                  view_count=0, release_date=row['release_date'], awards='[]', category=row['kind']))
     print('Wrote 500 records: 200 movies, 150 TV shows, 150 recordings')
 

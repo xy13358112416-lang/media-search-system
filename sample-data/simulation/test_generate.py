@@ -35,7 +35,7 @@ class FixtureTests(unittest.TestCase):
             # the fixture content without making this test Windows-only.
             normalized = (a / "algorithm_fixture.json").read_bytes().replace(b"\r\n", b"\n")
             self.assertEqual(hashlib.sha256(normalized).hexdigest(),
-                             "aa6da1ff810c46501d84fa9e3309027c97216919639c189cd6aeabb0275f631e")
+                             "69205e0aa0d3b5a1644034510549ec862099107e34829520c3da0631f4622e50")
             self.assertEqual(manifest["sha256"]["events.csv"],
                              "eb813c5b7d4e8848b04561c3513d607aeaf0266be0edbfc2f8b4df4fc1c08c92")
             fixture = json.loads((a / "algorithm_fixture.json").read_text(encoding="utf-8"))

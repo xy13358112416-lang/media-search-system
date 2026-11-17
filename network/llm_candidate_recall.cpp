@@ -46,7 +46,7 @@ int score(const Candidate& candidate, const QString& query, const QStringList& t
     static const QRegularExpression mediaExtension(QStringLiteral("\\.(mp3|mp4|mkv|wav|flac|avi|mov|m4a|ogg|webm)$"), QRegularExpression::CaseInsensitiveOption);
     title.remove(mediaExtension);
     int value = fieldScore(normalized(title), query, terms, 500, 450, 220);
-    value = std::max(value, fieldScore(normalized(candidate.media.director.trimmed().left(80)), query, terms, 350, 350, 150));
+    value = std::max(value, fieldScore(normalized(candidate.media.creator.trimmed().left(80)), query, terms, 350, 350, 150));
     for (const auto& actor : candidate.media.actors)
         value = std::max(value, fieldScore(normalized(actor.trimmed().left(80)), query, terms, 350, 350, 150));
     return std::max(value, fieldScore(normalized(candidate.media.category.trimmed().left(80)), query, terms, 100, 100, 80));

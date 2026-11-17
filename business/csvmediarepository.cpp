@@ -12,7 +12,7 @@
 
 namespace {
 RepositoryResult fail(const QString& message) { return {false, message}; }
-const QStringList header = {"id", "file_name", "file_type", "file_size", "director", "actors",
+const QStringList header = {"id", "file_name", "file_type", "file_size", "creator", "actors",
                             "view_count", "release_date", "awards", "category"};
 
 // 将 CSV 解析为行；引号、逗号、换行和 CRLF 均按 CSV 规则处理。
@@ -160,12 +160,15 @@ RepositoryResult CsvMediaRepository::load(QList<MediaRecord>& records) {
     QList<QStringList> rows;
     if (!parseCsv(text, rows) || rows.isEmpty()) return fail(QStringLiteral("CSV 格式错误"));
     const auto columns = rows.takeFirst();
-    const bool legacy = columns == header.mid(0, 9);
-    if (!legacy && columns != header) return fail(QStringLiteral("CSV 表头不匹配"));
+    // 兼容旧版 CSV 的 director 表头；现统一为 creator（创作者）。
+    QStringList normalized = columns;
+    if (normalized.size() > 4 && normalized.at(4) == QStringLiteral("director")) normalized[4] = QStringLiteral("creator");
+    const bool legacy = normalized == header.mid(0, 9);
+    if (!legacy && normalized != header) return fail(QStringLiteral("CSV 表头不匹配"));
     QList<MediaRecord> next; QSet<QString> ids;
     for (const auto& row : rows) {
         if (row.size() != columns.size()) return fail(QStringLiteral("CSV 列数不匹配"));
-        MediaRecord r; r.id=row[0]; r.fileName=row[1]; r.fileType=row[2]; r.director=row[4];
+        MediaRecord r; r.id=row[0]; r.fileName=row[1]; r.fileType=row[2]; r.creator=row[4];
         if (!legacy) r.category=row[9];
         if (!parseNumber(row[3], r.fileSize) || !parseNumber(row[6], r.viewCount) ||
             !parseList(row[5], r.actors) || !parseList(row[8], r.awards) ||
@@ -181,7 +184,7 @@ RepositoryResult CsvMediaRepository::save(const QList<MediaRecord>& records) {
     if (!file.open(QIODevice::WriteOnly)) return fail(QStringLiteral("无法保存 CSV：") + file.errorString());
     QByteArray output = header.join(',').toUtf8() + '\n';
     for (const auto& r : records) {
-        QStringList values{r.id, r.fileName, r.fileType, QString::number(r.fileSize), r.director,
+        QStringList values{r.id, r.fileName, r.fileType, QString::number(r.fileSize), r.creator,
                            listJson(r.actors), QString::number(r.viewCount), mediaReleaseText(r),
                            listJson(r.awards), r.category};
         for (auto& value : values) value = quoted(value);

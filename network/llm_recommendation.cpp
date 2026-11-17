@@ -28,7 +28,7 @@ Result fallback(const QList<Candidate>& candidates, int limit, const QString& me
 QJsonObject metadata(const Candidate& candidate, const QString& context) {
     QJsonObject object{{"id", candidate.key}, {"title", candidate.media.fileName.trimmed().left(200)}};
     if (!candidate.media.category.trimmed().isEmpty()) object["category"] = candidate.media.category.trimmed().left(80);
-    if (!candidate.media.director.trimmed().isEmpty()) object["director"] = candidate.media.director.trimmed().left(80);
+    if (!candidate.media.creator.trimmed().isEmpty()) object["creator"] = candidate.media.creator.trimmed().left(80);
     QJsonArray actors;
     for (const auto& actor : selectActorMetadata(candidate.media.actors, context)) actors.append(actor);
     if (!actors.isEmpty()) object["actors"] = actors;

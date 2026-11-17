@@ -18,7 +18,7 @@ ResourceSummary work(QString id = "wk_7a1", qint64 warehouse = 1, qint64 item = 
     value.media.id = "42"; // Deliberately collides across every synthetic source.
     value.media.fileName = "Synthetic fixture work";
     value.media.actors = {"Alex Vale", "<script>alert(1)</script>"};
-    value.media.director = "Alex Vale";
+    value.media.creator = "Alex Vale";
     return value;
 }
 PersonSummary person(QString id = "ps_2c4", QString name = "Alex Vale",
@@ -163,7 +163,7 @@ void CarePersonSnapshotTests::whitespaceTitlePreservesAcceptedMedia() {
     QCOMPARE(result.media.fileSize, current.media.fileSize);
     QCOMPARE(result.media.viewCount, current.media.viewCount);
     QCOMPARE(result.media.releaseDate, current.media.releaseDate);
-    QCOMPARE(result.media.director, current.media.director);
+    QCOMPARE(result.media.creator, current.media.creator);
     QCOMPARE(result.media.actors, current.media.actors);
     QCOMPARE(result.media.awards, current.media.awards);
     QCOMPARE(result.people.size(), 1);

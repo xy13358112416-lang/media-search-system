@@ -85,7 +85,7 @@ bool readCount(const QString& text, quint64& value)
 QString fieldName(SearchField field)
 {
     switch (field) {
-    case SearchField::Director: return QStringLiteral("导演");
+    case SearchField::Creator: return QStringLiteral("创作者");
     case SearchField::Actor: return QStringLiteral("演员");
     case SearchField::FileType: return QStringLiteral("文件类型");
     }
@@ -222,7 +222,7 @@ public:
                     assistant_ = new AssistantDialog(this, [this](const QString& keyword,
                                                        media_mood::Mood mood, const QString& category, bool useScene) {
                         sceneSearch_ = useScene;
-                        director_->clear();
+                        creator_->clear();
                         actor_->clear();
                         searchType_->clear();
                         keywordInput_->setText(keyword);
@@ -341,17 +341,17 @@ public:
         moodBar->addWidget(contentFilter_);
         moodBar->addStretch();
         searchLayout->addLayout(moodBar);
-        director_->setPlaceholderText(QStringLiteral("完整姓名"));
+        creator_->setPlaceholderText(QStringLiteral("完整姓名"));
         actor_->setPlaceholderText(QStringLiteral("完整姓名"));
         searchType_->setPlaceholderText(QStringLiteral("例如 MP4"));
-        auto* directorLabel = new QLabel(QStringLiteral("导演"));
+        auto* creatorLabel = new QLabel(QStringLiteral("创作者"));
         auto* actorLabel = new QLabel(QStringLiteral("演员"));
         auto* typeLabel = new QLabel(QStringLiteral("文件类型"));
-        directorLabel->setBuddy(director_);
+        creatorLabel->setBuddy(creator_);
         actorLabel->setBuddy(actor_);
         typeLabel->setBuddy(searchType_);
-        searchBar->addWidget(directorLabel);
-        searchBar->addWidget(director_);
+        searchBar->addWidget(creatorLabel);
+        searchBar->addWidget(creator_);
         searchBar->addWidget(actorLabel);
         searchBar->addWidget(actor_);
         searchBar->addWidget(typeLabel);
@@ -433,7 +433,7 @@ public:
         form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         const QStringList labels{QStringLiteral("编号"), QStringLiteral("文件名"),
                                  QStringLiteral("文件类型"), QStringLiteral("文件大小"),
-                                 QStringLiteral("导演"), QStringLiteral("演员"),
+                                 QStringLiteral("创作者"), QStringLiteral("演员"),
                                  QStringLiteral("浏览次数"), QStringLiteral("发行日期"),
                                  QStringLiteral("所获奖项"), QStringLiteral("类别")};
         for (const auto& label : labels) {
@@ -603,7 +603,7 @@ public:
             }
         });
         const auto submitSearch = [this] {
-            query_ = {director_->text(), actor_->text(), searchType_->text()};
+            query_ = {creator_->text(), actor_->text(), searchType_->text()};
             keyword_ = keywordInput_->text().trimmed();
             showSearchResults();
         };
@@ -613,7 +613,7 @@ public:
             submitSearch();
         });
         connect(contentFilter_, &QComboBox::activated, this, submitSearch);
-        for (auto* input : {keywordInput_, director_, actor_, searchType_})
+        for (auto* input : {keywordInput_, creator_, actor_, searchType_})
             connect(input, &QLineEdit::returnPressed, this, submitSearch);
         connect(suggestions, qOverload<const QString&>(&QCompleter::activated), this,
                 [this, submitSearch](const QString& fileName) {
@@ -622,7 +622,7 @@ public:
                 });
         connect(clearButton, &QPushButton::clicked, this, [this, submitSearch] {
             keywordInput_->clear();
-            director_->clear();
+            creator_->clear();
             actor_->clear();
             searchType_->clear();
             sceneSearch_ = false;
@@ -672,7 +672,7 @@ private:
         form->setContentsMargins(22, 20, 22, 22);
         form->setVerticalSpacing(10);
 
-        QLineEdit name, type, size(QStringLiteral("0")), director, actors;
+        QLineEdit name, type, size(QStringLiteral("0")), creator, actors;
         QLineEdit views(QStringLiteral("0")), date, awards, category;
         type.setPlaceholderText(QStringLiteral("例如 MP4"));
         date.setPlaceholderText(QStringLiteral("YYYY、YYYY-MM 或 YYYY-MM-DD"));
@@ -693,7 +693,7 @@ private:
         });
         form->addRow(QStringLiteral("文件类型"), &type);
         form->addRow(QStringLiteral("文件大小（字节）"), &size);
-        form->addRow(QStringLiteral("导演"), &director);
+        form->addRow(QStringLiteral("创作者"), &creator);
         form->addRow(QStringLiteral("演员"), &actors);
         form->addRow(QStringLiteral("浏览次数"), &views);
         form->addRow(QStringLiteral("发行日期"), &date);
@@ -711,7 +711,7 @@ private:
             MediaRecord record;
             record.fileName = name.text().trimmed();
             record.fileType = type.text().trimmed().toUpper();
-            record.director = director.text().trimmed();
+            record.creator = creator.text().trimmed();
             record.actors = splitEntries(actors.text());
             record.awards = splitEntries(awards.text());
             record.category = category.text().trimmed();
@@ -1007,8 +1007,8 @@ private:
                     QMessageBox dialog(QMessageBox::Information, QStringLiteral("记录详情"), current.fileName,
                                        QMessageBox::Ok, this);
                     dialog.setTextFormat(Qt::PlainText);
-                    dialog.setInformativeText(QStringLiteral("导演：%1\n演员：%2\n发行日期：%3\n所获奖项：%4")
-                        .arg(displayText(current.director), displayText(current.actors.join(QStringLiteral("、"))),
+                    dialog.setInformativeText(QStringLiteral("创作者：%1\n演员：%2\n发行日期：%3\n所获奖项：%4")
+                        .arg(displayText(current.creator), displayText(current.actors.join(QStringLiteral("、"))),
                              displayText(mediaReleaseText(current)), displayText(current.awards.join(QStringLiteral("、")))));
                     dialog.exec();
                 });
@@ -1090,7 +1090,7 @@ private:
         table_->clearSelection();
         records_ = records;
         table_->setHorizontalHeaderLabels({QStringLiteral("文件名"), QStringLiteral("类型"),
-            recommended ? QStringLiteral("类别") : QStringLiteral("导演"),
+            recommended ? QStringLiteral("类别") : QStringLiteral("创作者"),
             recommended ? QStringLiteral("浏览次数") : QStringLiteral("发行日期")});
         table_->setRowCount(static_cast<int>(records_.size()));
         int selectedRow = 0;
@@ -1099,7 +1099,7 @@ private:
             if (record.id == selectedId)
                 selectedRow = row;
             const QStringList values{record.fileName, record.fileType,
-                recommended ? record.category : record.director,
+                recommended ? record.category : record.creator,
                 recommended ? QLocale().toString(record.viewCount) : displayText(mediaReleaseText(record))};
             for (int column = 0; column < values.size(); ++column)
                 table_->setItem(row, column, new QTableWidgetItem(displayText(values.at(column))));
@@ -1128,7 +1128,7 @@ private:
         const QLocale locale;
         const QStringList values{record.id, record.fileName, record.fileType,
                                  record.fileType.isEmpty() ? QStringLiteral("未知") : QStringLiteral("%1 字节").arg(locale.toString(record.fileSize)),
-                                 record.director, record.actors.join(QStringLiteral("、")),
+                                 record.creator, record.actors.join(QStringLiteral("、")),
                                  locale.toString(record.viewCount), displayText(mediaReleaseText(record)),
                                  record.awards.join(QStringLiteral("、")), record.category};
         for (qsizetype i = 0; i < values.size(); ++i)
@@ -1159,7 +1159,7 @@ private:
     warm_mode::Scene warmScene_ = warm_mode::Scene::Neutral;
     QTabBar* tabs_ = new QTabBar; // Switch between browsing and searching.
     QStackedWidget* controls_ = new QStackedWidget; // Controls for the selected tab.
-    QLineEdit* director_ = new QLineEdit; // Director full-name query.
+    QLineEdit* creator_ = new QLineEdit; // Director full-name query.
     QLineEdit* actor_ = new QLineEdit; // Actor full-name query.
     QString keyword_; // Last submitted file-name keyword.
     QComboBox* moodFilter_ = new QComboBox;

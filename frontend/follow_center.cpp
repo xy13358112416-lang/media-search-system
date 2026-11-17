@@ -312,7 +312,7 @@ private:
             }
             const auto& media = result.value->media;
             QStringList details{media.fileName};
-            for (const auto& field : {media.category, media.fileType, media.director,
+            for (const auto& field : {media.category, media.fileType, media.creator,
                                       media.releaseDate.toString(Qt::ISODate)})
                 if (!field.isEmpty()) details.append(field);
             workDetails_->setText(details.join(QStringLiteral(" · ")));
