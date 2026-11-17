@@ -10,6 +10,6 @@
 
 这不是随机抽样：电影较老，电视剧集中在 API 首页，音乐仅来自三位艺人，不应据此声称覆盖均衡或计算真实流行度。MusicBrainz 的核心元数据通常为 CC0，其他数据可能适用不同许可，参见 [MusicBrainz 数据许可](https://musicbrainz.org/doc/MusicBrainz_Database/Download)。TVmaze 样例需保留来源及链接；若后续分发，核对相关使用条款。
 
-`metadata.jsonl` 为每条作品记录来源 ID、来源 URL、原始日期和来源类别；当前程序尚未展示这份侧车文件。CSV 的 `category` 是电影、电视剧或音乐，原来源的具体题材不参与当前推荐。空类型、0 大小和空奖项都是未知占位，初始浏览量 0 只表示系统内尚无浏览数据。仅在来源给出合法的年、月、日时填写完整发行日期。
+`metadata.jsonl` 保存作品来源 ID、来源 URL、原始日期和来源类别。CSV 的 `category` 是电影、电视剧或音乐。空类型、0 大小和空奖项表示未知，初始浏览量 0 表示系统内尚无浏览数据。`release_date` 按原始数据精度保存 `YYYY`、`YYYY-MM` 或完整日期。在线检索页的发行时间搜索按输入的日期精度匹配。
 
 `source/` 是本次下载快照；`fetch_sources.py` 可重新下载（可能改变记录，需联网），`build_catalog.py` 用当前快照和历史 UCI 夹具生成默认 CSV 与元数据，运行会覆盖这两个仓库文件，不会修改运行时媒体库。音乐候选通过来源的艺术家 ID 筛选。数据核对：`python -m unittest discover -s sample-data/real/tests -v`。

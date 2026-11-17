@@ -1,6 +1,7 @@
 #include "../online_window.h"
 #include "../warehouse_page.h"
 #include <QLabel>
+#include <QComboBox>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
@@ -29,13 +30,24 @@ public:
     QList<WarehouseItemRef> opened;
     Callback<WarehouseDetail> delayed;
     bool defer = false, removed = false;
+    bool metadataVariants = false;
     bool denyPublic = false, deferTemporal = false;
     QStringList cancelled;
     Callback<TemporalRecommendationResult> temporalDone;
     TemporalRecommendationResult temporalResult;
     WarehouseSummary mine{1, "Mine", 7, Visibility::Private};
     WarehouseSummary shared{2, "Shared", 8, Visibility::Public};
-    MediaRecord media(QString title) { MediaRecord m; m.id="duplicate"; m.fileName=title; m.director="Director"; m.fileType="MP4"; return m; }
+    MediaRecord media(QString title) {
+        MediaRecord m;
+        m.id="duplicate"; m.fileName=title; m.director="Director"; m.fileType="MP4";
+        if (metadataVariants && title == "Private movie") {
+            m.fileType.clear();
+            m.releasePeriod = "1981";
+        } else if (metadataVariants) {
+            m.releaseDate = QDate(1981, 5, 22);
+        }
+        return m;
+    }
     void connectToServer(const QString&, quint16, StatusCallback cb) override { ++connects; cb({}); }
     void disconnectFromServer() override { ++disconnects; }
     void login(const QString&, const QString&, Callback<UserInfo> cb) override { ++logins; cb(ok(UserInfo{7,"reader"})); }
@@ -85,6 +97,40 @@ public:
 class OnlineWindowTests final : public QObject {
     Q_OBJECT
 private slots:
+    void searchCombinesReleasePrecisionAndActualFileType()
+    {
+        FakeService service;
+        service.metadataVariants = true;
+        std::unique_ptr<QWidget> window(createOnlineWindow(service, service, {7,"reader"}, [] {}));
+        auto* catalog = window->findChild<QTableWidget*>("onlineMediaList");
+        QTRY_COMPARE(catalog->rowCount(), 2);
+        QCOMPARE(catalog->item(1, 4)->text(), QString("1981"));
+
+        auto* type = window->findChild<QComboBox*>("onlineSearchType");
+        auto* release = window->findChild<QLineEdit*>("onlineSearchRelease");
+        auto* submit = window->findChild<QPushButton*>("onlineSearchSubmit");
+        auto* results = window->findChild<QTableWidget*>("onlineSearchList");
+        release->setText("1981");
+        submit->click();
+        QCOMPARE(results->rowCount(), 2);
+        const auto mp4 = type->findText("MP4");
+        QVERIFY(mp4 >= 0);
+        type->setCurrentIndex(mp4);
+        submit->click();
+        QCOMPARE(results->rowCount(), 1);
+        QCOMPARE(results->item(0, 4)->text(), QString("1981-05-22"));
+        type->setCurrentIndex(0);
+        release->setText("1981-05");
+        submit->click();
+        QCOMPARE(results->rowCount(), 1);
+        type->setCurrentIndex(1);
+        submit->click();
+        QCOMPARE(results->rowCount(), 0);
+        release->setText("1981");
+        submit->click();
+        QCOMPARE(results->rowCount(), 1);
+        QCOMPARE(results->item(0, 4)->text(), QString("1981"));
+    }
     void todayOnlyShowsTitlesAndUserFacingNotices() {
         FakeService service;
         ResourceSummary work;

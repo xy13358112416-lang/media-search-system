@@ -4,11 +4,14 @@
 
 namespace media_json {
 QJsonObject toJson(const MediaRecord& r) {
-    return {{"id",r.id},{"file_name",r.fileName},{"file_type",r.fileType},
+    QJsonObject result{{"id",r.id},{"file_name",r.fileName},{"file_type",r.fileType},
             {"file_size",QString::number(r.fileSize)},{"director",r.director},
             {"actors",QJsonArray::fromStringList(r.actors)},{"view_count",QString::number(r.viewCount)},
             {"release_date",r.releaseDate.toString(Qt::ISODate)},{"awards",QJsonArray::fromStringList(r.awards)},
             {"category",r.category}};
+    if (!r.releasePeriod.isEmpty())
+        result.insert("release_period", r.releasePeriod);
+    return result;
 }
 bool fromJson(const QJsonObject& j, MediaRecord& output, QString& error) {
     error.clear();
@@ -39,8 +42,14 @@ bool fromJson(const QJsonObject& j, MediaRecord& output, QString& error) {
     if (!numberField("view_count",r.viewCount)) return invalid("view_count");
     QString date; if (!stringField("release_date",date)) return invalid("release_date");
     r.releaseDate = QDate::fromString(date,Qt::ISODate);
-    if (date.isEmpty()) { if (!r.fileType.isEmpty()) return invalid("release_date"); }
-    else if (!r.releaseDate.isValid() || r.releaseDate.toString(Qt::ISODate) != date) return invalid("release_date");
+    if (!date.isEmpty() && (!r.releaseDate.isValid() || r.releaseDate.toString(Qt::ISODate) != date))
+        return invalid("release_date");
+    const auto period = j.value("release_period");
+    if (!period.isUndefined()) {
+        if (!date.isEmpty() || !period.isString() || !validReleasePeriod(period.toString()))
+            return invalid("release_period");
+        r.releasePeriod = period.toString();
+    }
     if (!listField("awards",r.awards)) return invalid("awards");
     if (!stringField("category",r.category)) return invalid("category");
     output = r; return true;

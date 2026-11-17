@@ -4,6 +4,8 @@
 
 #include <QCheckBox>
 #include <QDialog>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QInputDialog>
@@ -11,6 +13,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QMimeDatabase>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
@@ -464,7 +467,7 @@ void WarehousePage::refreshDetail()
             row->setToolTip(QStringLiteral("<b>%1</b><br>导演：%2<br>演员：%3<br>发行日期：%4")
                 .arg(media.fileName.toHtmlEscaped(), media.director.toHtmlEscaped(),
                      media.actors.join(QStringLiteral("、")).toHtmlEscaped(),
-                     media.releaseDate.toString(Qt::ISODate)));
+                     mediaReleaseText(media)));
         }
         if (items_.isEmpty())
             status_->setText(QStringLiteral("这个仓库还没有条目。"));
@@ -584,18 +587,47 @@ void WarehousePage::addLocalMedia()
     if (!add_->isEnabled())
         return;
     const auto local = localRecords_();
-    if (local.isEmpty()) {
-        status_->setText(QStringLiteral("本地媒体库没有可添加的作品。"));
-        return;
-    }
+    const auto fromFile = QStringLiteral("从电脑选择文件…");
     QStringList choices;
     for (const auto& record : local)
         choices << QStringLiteral("%1 · %2").arg(itemLabel(record), record.id);
-    bool accepted = false;
-    const auto choice = QInputDialog::getItem(this, QStringLiteral("添加本地作品"), QStringLiteral("选择媒体"),
-                                             choices, 0, false, &accepted);
+    choices << fromFile;
+    bool accepted = local.isEmpty();
+    const auto choice = accepted ? fromFile :
+        QInputDialog::getItem(this, QStringLiteral("添加本地作品"), QStringLiteral("选择媒体"),
+                              choices, 0, false, &accepted);
+    if (!accepted)
+        return;
+    if (choice == fromFile) {
+        const auto path = QFileDialog::getOpenFileName(this, QStringLiteral("选择音视频文件以添加元数据"));
+        if (path.isEmpty())
+            return;
+        const QFileInfo file(path);
+        const auto mime = QMimeDatabase().mimeTypeForFile(file, QMimeDatabase::MatchExtension).name();
+        if (!file.isFile() || file.suffix().isEmpty() ||
+            (!mime.startsWith("audio/") && !mime.startsWith("video/"))) {
+            status_->setText(QStringLiteral("请选择带有可识别扩展名的音频或视频文件。"));
+            return;
+        }
+        const auto date = QInputDialog::getText(this, QStringLiteral("添加作品元数据"),
+            QStringLiteral("发行时间可留空，支持 YYYY、YYYY-MM 或 YYYY-MM-DD。"), QLineEdit::Normal, {}, &accepted);
+        if (!accepted)
+            return;
+        MediaRecord record;
+        if (!parseMediaRelease(date.trimmed(), record)) {
+            status_->setText(QStringLiteral("发行时间格式无效，请重新添加。"));
+            return;
+        }
+        record.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        record.fileName = file.fileName();
+        record.fileType = file.suffix().toUpper();
+        record.fileSize = file.size();
+        record.category = mime.startsWith("audio/") ? QStringLiteral("音频") : QStringLiteral("视频");
+        addMedia(record);
+        return;
+    }
     const auto row = choices.indexOf(choice);
-    if (accepted && row >= 0)
+    if (row >= 0)
         addMedia(local.at(row));
 }
 

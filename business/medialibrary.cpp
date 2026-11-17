@@ -7,7 +7,7 @@ namespace {
 bool sameRecord(const MediaRecord& a, const MediaRecord& b) {
     return a.id == b.id && a.fileName == b.fileName && a.fileType == b.fileType &&
            a.fileSize == b.fileSize && a.director == b.director && a.actors == b.actors &&
-           a.viewCount == b.viewCount && a.releaseDate == b.releaseDate &&
+           a.viewCount == b.viewCount && a.releaseDate == b.releaseDate && a.releasePeriod == b.releasePeriod &&
            a.awards == b.awards && a.category == b.category;
 }
 }
@@ -104,7 +104,9 @@ QList<MediaRecord> MediaLibrary::records(const QString& fileType) const {
     for (const auto& r : records_)
         if (fileType.isEmpty() || r.fileType.compare(fileType, Qt::CaseInsensitive) == 0) result.append(r);
     std::sort(result.begin(), result.end(), [](const MediaRecord& a, const MediaRecord& b) {
-        return a.releaseDate == b.releaseDate ? a.id < b.id : a.releaseDate > b.releaseDate;
+        const auto left = mediaReleaseText(a);
+        const auto right = mediaReleaseText(b);
+        return left == right ? a.id < b.id : left > right;
     });
     return result;
 }

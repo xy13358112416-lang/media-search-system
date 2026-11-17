@@ -52,7 +52,10 @@ def read_catalog(path):
             if not isinstance(value, list) or any(not isinstance(v, str) for v in value):
                 raise ValueError("catalog list must be a JSON string array")
         if row["release_date"]:
-            datetime.strptime(row["release_date"], "%Y-%m-%d")
+            value = row["release_date"]
+            suffix = {4: "-01-01", 7: "-01", 10: ""}.get(len(value))
+            if suffix is None or not datetime.fromisoformat(value + suffix).date().isoformat().startswith(value):
+                raise ValueError("invalid catalog release date")
     if not {"电影", "电视剧", "音乐"}.issubset({r["category"] for r in rows}):
         raise ValueError("demo needs movie, television and music categories")
     return raw, rows
@@ -129,10 +132,16 @@ def generate(output, catalog_path=DEFAULT_CATALOG, seed=SEED, user_count=20, end
 
     # Offline snapshot, NOT wire payload. IDs/synthetic/eligibility must be mapped
     # by the separate server demo importer; real clients cannot assert these.
+    works = []
+    for i, row in enumerate(catalog, 1):
+        work = dict(row, work_id=row["id"], source={"warehouse_id": "1", "item_id": str(i)}, people=[])
+        if len(work["release_date"]) in (4, 7):
+            work["release_period"] = work["release_date"]
+            work["release_date"] = ""
+        works.append(work)
     fixture = dict(schema_version=1, synthetic=True, seed=seed, now_utc=str(int(end.timestamp())),
                    start_utc=str(int(start.timestamp())), users=users,
-                   works=[dict(r, work_id=r["id"], source={"warehouse_id": "1", "item_id": str(i)},
-                               people=[]) for i, r in enumerate(catalog, 1)],
+                   works=works,
                    events=[dict(event_id=e["event_id"], user_ref=e["user_ref"], action=e["action"],
                                 work_id=e["media_id"], query=e["query"], synthetic=True, public_eligible=True,
                                 occurred_at_utc=str(int(datetime.fromisoformat(e["occurred_at"].replace("Z", "+00:00")).timestamp()))) for e in events])

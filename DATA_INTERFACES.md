@@ -6,6 +6,8 @@
 
 CSV 文件名约定为 `media_records.csv`。运行时由主程序确定该文件的具体目录并传给未来的 CSV 实现，不依赖当前工作目录；此提交不创建实际数据文件。字段顺序约定为 `id,file_name,file_type,file_size,director,actors,view_count,release_date,awards,category`。读取原来没有 `category` 的九列数据时，类别留空。
 
+发行时间在 CSV 中可以是年份、年月、完整日期或空值。网络媒体资料继续使用 `release_date` 传完整日期，日期精度不足时通过可选的 `release_period` 传年份或年月。
+
 主程序与检索模块对接顺序：
 
 1. `load(records)` 成功后调用 `rebuild(records)`。

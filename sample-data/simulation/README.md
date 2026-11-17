@@ -22,6 +22,9 @@ ctest --test-dir build -R "care_(simulation|footprint|trending|temporal|person)"
 
 ## 文件与用户
 
+已有演示库可在停服并备份后执行 `python sample-data/simulation/backfill_demo_release.py build/media-demo-200.sqlite sample-data/data/media_records.csv`。
+该命令只补原始演示作品缺失的发行时间，保留已有日期、用户、历史、关注和仓库内容。旧版本的导入器校验完整原始快照，补全后使用升级后的库直接启动。
+
 - `catalog.csv`：输入目录的原始副本；`users.csv`：独立模拟 user_ref 和场景描述。
 - `events.csv`：稳定 event_id、user_ref、动作、媒体 ID/查询、UTC ISO 时间。`manifest.json` 中 synthetic=true，导入器必须为整份数据保留模拟标记。
 - `summary.csv`：每人实际次数，供人工核对。
