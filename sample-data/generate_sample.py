@@ -3,7 +3,7 @@ import csv
 import json
 from pathlib import Path
 
-HEADERS = ['id', 'file_name', 'file_type', 'file_size', 'director', 'actors',
+HEADERS = ['id', 'file_name', 'file_type', 'file_size', 'creator', 'actors',
            'view_count', 'release_date', 'awards', 'category']
 directors = ['林川', '李宁', '赵岚', '周远']
 actor_pairs = [('陈明', '王青'), ('陈明', '李悦'), ('王青', '孙晓'),

@@ -150,7 +150,7 @@ private slots:
             // Existing media_json permits a nonempty whitespace title. Person attachment
             // must not introduce stricter media validation into get_resource or capture.
             MediaRecord media; media.id = "untrusted-person:evil"; media.fileName = "   ";
-            media.director = "Wrong name"; media.actors = {"Wrong name"}; media.category = "film";
+            media.creator = "Wrong name"; media.actors = {"Wrong name"}; media.category = "film";
             Result<WarehouseItem> item;
             alice.addItem(warehouse.value->warehouseId, media, [&](auto r) { item = r; done = true; });
             QTRY_VERIFY(done); QVERIFY(item.value); done = false;

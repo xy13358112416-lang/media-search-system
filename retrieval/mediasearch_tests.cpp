@@ -11,7 +11,7 @@ MediaRecord record(const QString& id, const QString& director,
     MediaRecord media;
     media.id = id;
     media.fileName = QStringLiteral("同名作品");
-    media.director = director;
+    media.creator = director;
     media.actors = actors;
     media.fileType = type;
     return media;
@@ -71,7 +71,7 @@ private slots:
         QCOMPARE(search.search(query, SearchStrategy::FixedIndexOrder, &trace), (QStringList{"M001"}));
         QCOMPARE(trace.recordsScanned, 0);
         QCOMPARE(trace.steps.size(), 3);
-        QCOMPARE(trace.steps[0].field, SearchField::Director);
+        QCOMPARE(trace.steps[0].field, SearchField::Creator);
         QCOMPARE(trace.steps[1].field, SearchField::Actor);
         QCOMPARE(trace.steps[2].field, SearchField::FileType);
         QCOMPARE(trace.steps[2].remainingCount, 1);
@@ -124,7 +124,7 @@ private slots:
         QCOMPARE(search.search(query, SearchStrategy::LinearScan), expected);
         QCOMPARE(search.search(query, SearchStrategy::FixedIndexOrder, &fixed), expected);
         QCOMPARE(search.search(query, SearchStrategy::SmallestListFirst, &optimized), expected);
-        QCOMPARE(fixed.steps.first().field, SearchField::Director);
+        QCOMPARE(fixed.steps.first().field, SearchField::Creator);
         QCOMPARE(fixed.steps.first().remainingCount, 3);
         QCOMPARE(optimized.steps.first().field, SearchField::Actor);
         QCOMPARE(optimized.steps.first().remainingCount, 1);

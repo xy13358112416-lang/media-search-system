@@ -6,7 +6,7 @@
 namespace {
 bool sameRecord(const MediaRecord& a, const MediaRecord& b) {
     return a.id == b.id && a.fileName == b.fileName && a.fileType == b.fileType &&
-           a.fileSize == b.fileSize && a.director == b.director && a.actors == b.actors &&
+           a.fileSize == b.fileSize && a.creator == b.creator && a.actors == b.actors &&
            a.viewCount == b.viewCount && a.releaseDate == b.releaseDate && a.releasePeriod == b.releasePeriod &&
            a.awards == b.awards && a.category == b.category;
 }

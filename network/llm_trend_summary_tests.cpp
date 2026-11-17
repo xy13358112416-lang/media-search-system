@@ -19,7 +19,7 @@ TrendingResult input(bool works = true) {
         care_contract::ResourceSummary work;
         work.resource = {"private-work-id", {654321, 876543}};
         work.media.id = "private-media-id"; work.media.fileName = QStringLiteral("音乐合集");
-        work.media.director = "private-director";
+        work.media.creator = "private-director";
         work.people.append({"private-person-id", "private-person", {}, true});
         row.work = work;
     } else row.term = QStringLiteral("公开音乐");

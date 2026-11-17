@@ -26,10 +26,13 @@ def read_catalog(path):
         raise ValueError("catalog exceeds 64 MiB")
     raw = path.read_bytes()
     reader = csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))
-    required = {"id", "file_name", "file_type", "file_size", "director", "actors",
+    required = {"id", "file_name", "file_type", "file_size", "actors",
                 "view_count", "release_date", "awards", "category"}
     if not required.issubset(reader.fieldnames or []):
         raise ValueError("catalog is missing required columns")
+    # 创作者字段新名为 creator，旧版目录为 director，二者皆可。
+    if "creator" not in (reader.fieldnames or []) and "director" not in (reader.fieldnames or []):
+        raise ValueError("catalog is missing creator column")
     rows = list(reader)
     if not 1 <= len(rows) <= 5000:
         raise ValueError("catalog must contain 1 to 5000 works")

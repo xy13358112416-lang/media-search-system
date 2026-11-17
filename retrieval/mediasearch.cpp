@@ -9,7 +9,7 @@ namespace {
 
 // 将人名首尾空白去掉、类型转成大写，并清理重复演员。
 MediaRecord normalizedRecord(MediaRecord record) {
-    record.director = record.director.trimmed();
+    record.creator = record.creator.trimmed();
     record.fileType = record.fileType.trimmed().toUpper();
     for (QString& actor : record.actors) {
         actor = actor.trimmed();
@@ -21,7 +21,7 @@ MediaRecord normalizedRecord(MediaRecord record) {
 
 // 查询和索引使用同样的字段规范。ID 保持数据模块分配的原值。
 SearchQuery normalizedQuery(const SearchQuery& query) {
-    return {query.director.trimmed(), query.actor.trimmed(), query.fileType.trimmed().toUpper()};
+    return {query.creator.trimmed(), query.actor.trimmed(), query.fileType.trimmed().toUpper()};
 }
 
 using PostingIndex = QHash<QString, QStringList>;
@@ -59,7 +59,7 @@ void MediaSearch::rebuild(const QList<MediaRecord>& records) {
         loaded.records_.insert(entry.id, entry);
         loaded.indexRecord(entry, true);
     }
-    for (PostingIndex* index : {&loaded.directors_, &loaded.actors_, &loaded.fileTypes_}) {
+    for (PostingIndex* index : {&loaded.creators_, &loaded.actors_, &loaded.fileTypes_}) {
         for (QStringList& ids : *index) {
             ids.sort(Qt::CaseSensitive);
         }
@@ -80,7 +80,7 @@ void MediaSearch::indexRecord(const MediaRecord& record, bool appendOnly) {
             ids.insert(std::lower_bound(ids.cbegin(), ids.cend(), record.id), record.id);
         }
     };
-    add(directors_, record.director);
+    add(creators_, record.creator);
     for (const QString& actor : record.actors) {
         add(actors_, actor);
     }
@@ -101,7 +101,7 @@ void MediaSearch::removeRecord(const QString& id) {
     if (entry == records_.cend()) {
         throw std::out_of_range("Media record ID not found in search index");
     }
-    removePosting(directors_, entry->director, id);
+    removePosting(creators_, entry->creator, id);
     for (const QString& actor : entry->actors) {
         removePosting(actors_, actor, id);
     }
@@ -125,7 +125,7 @@ QStringList MediaSearch::search(const SearchQuery& query, SearchStrategy strateg
             trace->recordsScanned = records_.size();
         }
         for (const MediaRecord& record : records_) {
-            if ((!filters.director.isEmpty() && record.director != filters.director)
+            if ((!filters.creator.isEmpty() && record.creator != filters.creator)
                 || (!filters.actor.isEmpty() && !record.actors.contains(filters.actor))
                 || (!filters.fileType.isEmpty() && record.fileType != filters.fileType)) {
                 continue;
@@ -145,7 +145,7 @@ QStringList MediaSearch::search(const SearchQuery& query, SearchStrategy strateg
             active.append({field, found == index.cend() ? &empty : &found.value()});
         }
     };
-    collect(directors_, filters.director, SearchField::Director);
+    collect(creators_, filters.creator, SearchField::Creator);
     collect(actors_, filters.actor, SearchField::Actor);
     collect(fileTypes_, filters.fileType, SearchField::FileType);
 
@@ -156,7 +156,7 @@ QStringList MediaSearch::search(const SearchQuery& query, SearchStrategy strateg
     }
 
     if (strategy == SearchStrategy::SmallestListFirst) {
-        // 优先从候选少的条件开始，同样长时保留导演、演员、类型的固定顺序。
+        // 优先从候选少的条件开始，同样长时保留创作者、演员、类型的固定顺序。
         std::sort(active.begin(), active.end(), [](const ActivePosting& left, const ActivePosting& right) {
             return left.ids->size() == right.ids->size()
                 ? left.field < right.field : left.ids->size() < right.ids->size();
