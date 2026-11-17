@@ -26,7 +26,8 @@ struct TemporalScoringConfig {
 };
 
 // Pure scoring over an already authorized/recalled snapshot; performs no I/O.
-// Scene is validated but has no effect without confirmed scene tags in the DTO.
+// This pure rule engine validates scene without inventing scene tags. The server
+// applies optional live DeepSeek web-search selection after rule candidate recall.
 // Date freshness uses the Asia/Shanghai date at snapshot.nowUtc. With no usable
 // personal features, available heat/freshness weights are normalized to sum 1.
 // Positive-score candidates bound relevance: zero-score works do not fill an

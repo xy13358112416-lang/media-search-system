@@ -4,6 +4,7 @@
 #include "warehouse_protocol.h"
 #include "llm_recommendation.h"
 #include "llm_trend_summary.h"
+#include "llm_scene.h"
 #include <QHash>
 #include <QSet>
 #include "behavior_contract.h"
@@ -54,6 +55,7 @@ private:
         QHash<QString, Pending> pending;
         struct SummaryPending { quint64 modelId = 0; QString token; qint64 userId = 0; };
         QHash<QString, SummaryPending> summaries;
+        QHash<QString, SummaryPending> scenes;
         QString personLookup;
     };
     QJsonObject dispatch(Session& session, const QJsonObject& request);
@@ -73,11 +75,13 @@ private:
     static QJsonObject trendingJson(const care_contract::TrendingResult& result);
     care_contract::Result<care_contract::TrendingResult> currentTrending(const care_contract::TrendingRequest& input);
     void startTrendingSummary(QTcpSocket* socket, const std::shared_ptr<Session>& session, const QJsonObject& request);
+    void startSceneRecommendation(QTcpSocket* socket, const std::shared_ptr<Session>& session, const QJsonObject& request);
     void startPersonLookup(QTcpSocket* socket, const std::shared_ptr<Session>& session, const QJsonObject& request);
     QNetworkAccessManager* personLookupNetwork_;
     int personLookupsInFlight_ = 0;
     llm_recommendation::Client recommender_;
     llm_trend_summary::Client trendSummarizer_;
+    llm_scene::Client sceneRecommender_;
     QString dbName_;
     QSqlDatabase db_;
     std::unique_ptr<person_store::SqliteStore> personStore_;

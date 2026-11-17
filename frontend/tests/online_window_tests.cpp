@@ -34,6 +34,7 @@ public:
     bool denyPublic = false, deferTemporal = false;
     QStringList cancelled;
     Callback<TemporalRecommendationResult> temporalDone;
+    QList<BrowseScene> requestedScenes;
     TemporalRecommendationResult temporalResult;
     WarehouseSummary mine{1, "Mine", 7, Visibility::Private};
     WarehouseSummary shared{2, "Shared", 8, Visibility::Public};
@@ -87,7 +88,8 @@ public:
     void getPersonUpdates(const PersonUpdatesRequest&,Callback<Page<PersonUpdate>> cb) override { cb(ok(Page<PersonUpdate>{})); }
     void getTrending(const TrendingRequest&,Callback<TrendingResult> cb) override { cb(ok(TrendingResult{})); }
     void getFootprint(const FootprintRequest&,Callback<FootprintReport> cb) override { cb(ok(FootprintReport{})); }
-    RecommendationHandle recommendTemporal(const TemporalRecommendationRequest&,Callback<TemporalRecommendationResult> cb) override {
+    RecommendationHandle recommendTemporal(const TemporalRecommendationRequest& request,Callback<TemporalRecommendationResult> cb) override {
+        requestedScenes.append(request.scene);
         ++temporalCalls;
         if (deferTemporal) { temporalDone=std::move(cb); return "today-pending"; }
         cb(ok(temporalResult)); return {};
@@ -97,6 +99,21 @@ public:
 class OnlineWindowTests final : public QObject {
     Q_OBJECT
 private slots:
+    void sceneChangesReloadTodayAndCancelOldScene() {
+        FakeService service;
+        std::unique_ptr<QWidget> window(createOnlineWindow(service,service,{7,"reader"},[]{}));
+        window->findChild<QTabWidget*>("onlineTabs")->setCurrentIndex(2);
+        auto* scene=window->findChild<QComboBox*>("onlineScene");QVERIFY(scene);
+        scene->setCurrentIndex(1);QCOMPARE(service.requestedScenes.last(),BrowseScene::Relax);
+        service.deferTemporal=true;scene->setCurrentIndex(2);
+        auto late=service.temporalDone;
+        scene->setCurrentIndex(3);
+        QCOMPARE(service.requestedScenes.last(),BrowseScene::Explore);
+        QVERIFY(service.cancelled.contains("today-pending"));
+        TemporalRecommendationResult stale;RecommendedResource resource;resource.work.media.fileName="OLD";resource.work.resource.workId="old";
+        stale.items.append(resource);late(ok(stale));
+        QCOMPARE(window->findChild<QListWidget*>("onlineTodayList")->count(),0);
+    }
     void searchCombinesReleasePrecisionAndActualFileType()
     {
         FakeService service;

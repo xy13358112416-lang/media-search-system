@@ -163,7 +163,7 @@ std::optional<QList<WarehouseItem>> listItems(const QSqlDatabase& db, qint64 war
 
 WarehouseServer::WarehouseServer(llm_recommendation::Config config)
     : personLookupNetwork_(new QNetworkAccessManager(this)), recommender_(config),
-      trendSummarizer_(std::move(config)), dbName_(QUuid::createUuid().toString())
+      trendSummarizer_(config), sceneRecommender_(std::move(config)), dbName_(QUuid::createUuid().toString())
 {
     connect(this, &QTcpServer::newConnection, this, [this] {
         while (auto* socket = nextPendingConnection()) {
@@ -404,11 +404,16 @@ void WarehouseServer::readRequests(QTcpSocket* socket, const std::shared_ptr<Ses
             return;
         }
         const QString id = request.value("req_id").toString();
-        if (session->pending.contains(id) || session->summaries.contains(id) || session->personLookup == id) {
+        if (session->pending.contains(id) || session->summaries.contains(id) || session->scenes.contains(id) || session->personLookup == id) {
             socket->abort();
             return;
         }
         const auto type = request.value("type").toString();
+        const auto scene = request.value("payload").toObject().value("scene").toString();
+        if (type == "recommend_temporal" && (scene == "relax" || scene == "focus" || scene == "explore")) {
+            startSceneRecommendation(socket, session, request);
+            continue;
+        }
         if (type == "search_person_web") {
             startPersonLookup(socket, session, request);
             continue;
