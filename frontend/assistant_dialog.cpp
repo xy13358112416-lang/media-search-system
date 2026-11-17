@@ -122,7 +122,7 @@ AssistantDialog::AssistantDialog(QWidget* parent,
     keyword->setObjectName(QStringLiteral("assistantMediaKeyword"));
     keyword->setPlaceholderText(QStringLiteral("可选"));
     keyword->setMaxLength(200);
-    form->addRow(QStringLiteral("片名关键词"), keyword);
+    form->addRow(QStringLiteral("关键词"), keyword);
     layout->addLayout(form);
     layout->addStretch();
 
