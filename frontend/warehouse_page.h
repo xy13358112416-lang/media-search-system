@@ -25,6 +25,7 @@ public:
                          care_contract::Callback<care_contract::ResourceSummary> opened = {});
     bool isSignedIn() const { return user_.has_value(); }
     void setSessionChangedCallback(std::function<void()> callback) { sessionChanged_ = std::move(callback); }
+    void setItemsChangedCallback(std::function<void()> callback) { itemsChanged_ = std::move(callback); }
 
 private:
     std::optional<warehouse_contract::WarehouseSummary> selection() const;
@@ -59,6 +60,7 @@ private:
     warehouse_contract::WarehouseService& service_;
     care_contract::CareService* care_;
     std::function<void()> sessionChanged_;
+    std::function<void()> itemsChanged_;
     std::function<QList<MediaRecord>()> localRecords_;
     std::optional<warehouse_contract::UserInfo> user_;
     QList<warehouse_contract::WarehouseSummary> warehouses_;

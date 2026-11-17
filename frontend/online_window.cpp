@@ -96,7 +96,7 @@ public:
             edit->setAccessibleName(hint); edit->setMaxLength(200); fields->addWidget(edit);
             connect(edit,&QLineEdit::returnPressed,this,[this] { submitSearch(); }); return edit;
         };
-        title_ = field("onlineSearchTitle",QStringLiteral("片名关键词"));
+        title_ = field("onlineSearchTitle",QStringLiteral("作品关键词"));
         director_ = field("onlineSearchDirector",QStringLiteral("导演全名"));
         actor_ = field("onlineSearchActor",QStringLiteral("演员全名"));
         type_ = field("onlineSearchType",QStringLiteral("文件类型，如 MP4"));
@@ -173,6 +173,7 @@ public:
             dialog->setAttribute(Qt::WA_DeleteOnClose); dialog->open();
         });
         warehouse_->setSessionChangedCallback([this] { if (!warehouse_->isSignedIn()) finish(); });
+        warehouse_->setItemsChangedCallback([this] { reloadCatalog(); });
         QTimer::singleShot(0,this,[this] { reloadCatalog(); });
     }
     ~OnlineWindow() override { finished_=true; ++generation_; clearToday(); }
@@ -209,7 +210,10 @@ private:
     void reloadCatalog() {
         if (finished_) return;
         const auto generation=++generation_;
+        catalogReady_=false;
         catalog_.clear(); order_.clear(); index_.rebuild({}); mediaList_->clear(); searchList_->clear();
+        searchStatus_->clear();
+        detail_->setText(QStringLiteral("选择作品以查看详情。"));
         status_->setText(QStringLiteral("正在加载服务器公开仓库及我的仓库…"));
         warehouses_.listPublicWarehouses(guard(generation,[this,generation](Result<QList<WarehouseSummary>> result) {
             if (!result.status.ok() || !result.value) { status_->setText(result.status.message); return; }
@@ -229,6 +233,7 @@ private:
             QList<MediaRecord> records;
             for (const auto& key:order_) { auto record=catalog_[key].media; record.id=key; records.append(record); }
             index_.rebuild(records);
+            catalogReady_=true;
             for (const auto& key:order_) { auto* item=new QListWidgetItem(rowLabel(catalog_[key].media),mediaList_); item->setData(Qt::UserRole,key); }
             status_->setText(QStringLiteral("在线可读作品 %1 条；未能读取的仓库 %2 个。权限由服务器核验。").arg(catalog_.size()).arg(failedDetails_));
             return;
@@ -248,6 +253,10 @@ private:
     }
     void submitSearch(bool fromAssistant=false) {
         if (finished_) return;
+        if (!catalogReady_) {
+            searchStatus_->setText(QStringLiteral("媒体目录尚未就绪，请加载完成后再搜索。"));
+            return;
+        }
         if (!fromAssistant) { assistantMood_=media_mood::Mood::Any; assistantCategory_.clear(); }
         SearchQuery query{director_->text().trimmed(),actor_->text().trimmed(),type_->text().trimmed()};
         const auto title=title_->text().trimmed();
@@ -315,6 +324,7 @@ private:
     QTabWidget* tabs_; QListWidget *mediaList_,*searchList_,*todayList_;
     QLineEdit *title_,*director_,*actor_,*type_; QLabel *status_,*searchStatus_,*todayStatus_,*detail_;
     QHash<QString,CatalogEntry> catalog_; QStringList order_; MediaSearch index_;
+    bool catalogReady_=false;
     QList<WarehouseSummary> pending_; int pendingPosition_=0,failedDetails_=0;
     QList<RecommendedResource> daily_; QDate dailyDate_; bool todayLoading_=false,finished_=false;
     BrowseScene scene_=BrowseScene::Neutral; quint64 generation_=0;

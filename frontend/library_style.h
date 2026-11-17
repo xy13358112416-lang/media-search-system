@@ -1,12 +1,18 @@
 #pragma once
 
-#include <QString>
+#include <QApplication>
+#include <QPalette>
+#include <QStyleHints>
 
 inline QString libraryStyle()
 {
     return QString::fromLatin1(R"qss(
         QWidget { color: #182942; font-size: 14px; }
         QWidget#libraryWindow, QDialog { background: #f1f5fb; }
+        QTabWidget::pane { background: #f1f5fb; border: 1px solid #d7e1ef;
+                           border-radius: 8px; }
+        QStackedWidget { background: #f1f5fb; }
+        QScrollArea { background: #f1f5fb; }
         QFrame#banner { background: #173253; border-radius: 14px; }
         QLabel#appTitle { color: #ffffff; font-size: 27px; font-weight: 700; }
         QLabel#dialogTitle { color: #173253; font-size: 23px; font-weight: 700; }
@@ -32,9 +38,15 @@ inline QString libraryStyle()
         QTabBar::tab:last { margin-right: 0; }
         QTabBar::tab:hover { background: #dce8fb; }
         QTabBar::tab:selected { color: #ffffff; background: #244f91; }
-        QLineEdit, QComboBox { background: #ffffff; border: 1px solid #c9d6e8;
-                               border-radius: 8px; padding: 7px 10px; min-height: 20px; }
-        QLineEdit:focus, QComboBox:focus { border-color: #315fa4; }
+        QLineEdit, QComboBox, QAbstractSpinBox, QTextEdit, QPlainTextEdit {
+            background: #ffffff; border: 1px solid #c9d6e8;
+            border-radius: 8px; padding: 7px 10px; min-height: 20px;
+            selection-background-color: #244f91; selection-color: #ffffff;
+        }
+        QLineEdit:focus, QComboBox:focus, QAbstractSpinBox:focus,
+        QTextEdit:focus, QPlainTextEdit:focus { border-color: #315fa4; }
+        QLineEdit:disabled, QComboBox:disabled, QAbstractSpinBox:disabled,
+        QTextEdit:disabled, QPlainTextEdit:disabled { background: #eaf1fc; color: #536680; }
         QComboBox { padding-right: 22px; combobox-popup: 0; }
         QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right;
                               width: 24px; border: none; background: transparent; }
@@ -66,18 +78,45 @@ inline QString libraryStyle()
         QPushButton#avatarButton:hover, QPushButton#avatarButton:focus { border-color: #98b7ff; }
         QPushButton#danger { color: #9d2c41; }
         QPushButton:disabled, QPushButton#danger:disabled { color: #7d8ba0; background: #f2f5f9; }
-        QTableWidget { background: #ffffff; alternate-background-color: #f5f8fd;
-                       border: 1px solid #d7e1ef; border-radius: 11px;
+        QTableView, QListView, QTreeView { background: #ffffff; alternate-background-color: #f5f8fd;
+                       border: 1px solid #d7e1ef; border-radius: 8px; gridline-color: #d7e1ef;
                        selection-background-color: #dceaff; selection-color: #143362; }
+        QHeaderView, QTableCornerButton::section { background: #e7eef9; border: none; }
         QHeaderView::section { background: #e7eef9; color: #27476e; border: none;
                                 padding: 9px 8px; font-weight: 700; }
-        QListWidget#onlineWarehouseList, QListWidget#onlineWarehouseItems,
-        QListWidget#onlineWarehouseRecommendations, QListWidget#careTemporalList, QListWidget[careList="true"] {
-            background: #ffffff; border: 1px solid #d7e1ef; border-radius: 8px;
-            selection-background-color: #dceaff; selection-color: #143362; padding: 4px;
-        }
+        QListWidget { padding: 4px; }
         QListWidget#onlineWarehouseList::item, QListWidget#onlineWarehouseItems::item,
         QListWidget#onlineWarehouseRecommendations::item, QListWidget#careTemporalList::item { padding: 6px; }
         QSplitter::handle { background: transparent; }
     )qss");
+}
+
+inline void applyLibraryStyle(QApplication& app)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    app.styleHints()->setColorScheme(Qt::ColorScheme::Light);
+#endif
+    app.setStyle(QStringLiteral("Fusion"));
+
+    // Fusion still uses the application palette for surfaces without a stylesheet rule.
+    const QColor surface(QStringLiteral("#f1f5fb"));
+    const QColor text(QStringLiteral("#182942"));
+    const QColor muted(QStringLiteral("#536680"));
+    QPalette palette(QColor(Qt::white), surface);
+    palette.setColor(QPalette::Base, Qt::white);
+    palette.setColor(QPalette::AlternateBase, QColor(QStringLiteral("#f5f8fd")));
+    palette.setColor(QPalette::ToolTipBase, surface);
+    palette.setColor(QPalette::ToolTipText, text);
+    palette.setColor(QPalette::WindowText, text);
+    palette.setColor(QPalette::Text, text);
+    palette.setColor(QPalette::ButtonText, text);
+    palette.setColor(QPalette::PlaceholderText, muted);
+    palette.setColor(QPalette::Highlight, QColor(QStringLiteral("#244f91")));
+    palette.setColor(QPalette::HighlightedText, Qt::white);
+    palette.setColor(QPalette::Link, QColor(QStringLiteral("#244f91")));
+    palette.setColor(QPalette::Disabled, QPalette::WindowText, muted);
+    palette.setColor(QPalette::Disabled, QPalette::Text, muted);
+    palette.setColor(QPalette::Disabled, QPalette::ButtonText, muted);
+    app.setPalette(palette);
+    app.setStyleSheet(libraryStyle());
 }

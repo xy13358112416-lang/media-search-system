@@ -3,6 +3,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTabWidget>
 #include <QtTest>
@@ -26,7 +27,7 @@ public:
     QList<BehaviorEvent> events;
     QList<WarehouseItemRef> opened;
     Callback<WarehouseDetail> delayed;
-    bool defer = false;
+    bool defer = false, removed = false;
     bool denyPublic = false, deferTemporal = false;
     QStringList cancelled;
     Callback<TemporalRecommendationResult> temporalDone;
@@ -42,11 +43,13 @@ public:
     void getWarehouse(qint64 id, Callback<WarehouseDetail> cb) override {
         if (defer) { delayed=std::move(cb); return; }
         if (id==2 && denyPublic) { cb({{warehouse_contract::ErrorCode::PermissionDenied,"Denied"}, {}}); return; }
-        cb(ok(WarehouseDetail{id==1?mine:shared, {{11,media(id==1?"Private movie":"Public movie")}}}));
+        QList<WarehouseItem> items;
+        if (id != 1 || !removed) items.append({11,media(id==1?"Private movie":"Public movie")});
+        cb(ok(WarehouseDetail{id==1?mine:shared, items}));
     }
     void createWarehouse(const QString&, Visibility, Callback<WarehouseSummary> cb) override { cb(ok(mine)); }
     void addItem(qint64, const MediaRecord&, Callback<WarehouseItem> cb) override { cb(ok(WarehouseItem{})); }
-    void removeItem(qint64,qint64,StatusCallback cb) override { cb({}); }
+    void removeItem(qint64,qint64,StatusCallback cb) override { removed = true; cb({}); }
     RecommendationHandle recommendResources(const WarehouseRecommendationRequest&, Callback<WarehouseRecommendationResult> cb) override { cb(ok(WarehouseRecommendationResult{})); return {}; }
     bool cancelRecommendation(const RecommendationHandle& handle) override {
         cancelled.append(handle);
@@ -80,6 +83,41 @@ public:
 class OnlineWindowTests final : public QObject {
     Q_OBJECT
 private slots:
+    void searchWaitsForCatalog() {
+        FakeService service; service.defer = true;
+        std::unique_ptr<QWidget> window(createOnlineWindow(service,service,{7,"reader"},[]{}));
+        QTRY_VERIFY(bool(service.delayed));
+        window->findChild<QLineEdit*>("onlineSearchDirector")->setText("Director");
+        window->findChild<QPushButton*>("onlineSearchSubmit")->click();
+        QVERIFY(service.events.isEmpty());
+    }
+    void deleteRefreshesCatalogAndSearch() {
+        FakeService service;
+        std::unique_ptr<QWidget> window(createOnlineWindow(service,service,{7,"reader"},[]{}));
+        auto* media=window->findChild<QListWidget*>("onlineMediaList");
+        QTRY_COMPARE(media->count(),2);
+        auto* tabs=window->findChild<QTabWidget*>("onlineTabs");
+        tabs->setCurrentIndex(3);
+        auto* items=window->findChild<QListWidget*>("onlineWarehouseItems");
+        QCOMPARE(items->count(),1);
+        items->setCurrentRow(0);
+        auto buttons=window->findChildren<QPushButton*>();
+        auto remove=std::find_if(buttons.begin(),buttons.end(),[](auto* b) { return b->text()==QStringLiteral("删除条目"); });
+        QVERIFY(remove!=buttons.end());
+        QTimer::singleShot(0, [] {
+            if (auto* box=qobject_cast<QMessageBox*>(QApplication::activeModalWidget()))
+                box->button(QMessageBox::Yes)->click();
+        });
+        (*remove)->click();
+        QVERIFY(service.removed);
+        QCOMPARE(items->count(),0);
+        tabs->setCurrentIndex(0);
+        QTRY_COMPARE(media->count(),1);
+        tabs->setCurrentIndex(1);
+        window->findChild<QLineEdit*>("onlineSearchTitle")->setText("Private movie");
+        window->findChild<QPushButton*>("onlineSearchSubmit")->click();
+        QCOMPARE(window->findChild<QListWidget*>("onlineSearchList")->count(),0);
+    }
     void adoptedSessionDoesNotReconnectAndClearsOldRows() {
         FakeService service;
         WarehousePage page(service, [] { return QList<MediaRecord>{}; });
