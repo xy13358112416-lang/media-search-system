@@ -13,7 +13,7 @@ MediaRecord makeRecord(const QString& id, const QString& name, const QString& di
     MediaRecord record;
     record.id = id;
     record.fileName = name;
-    record.creator = director;
+    record.director = director;
     record.actors = actors;
     record.fileType = fileType;
     record.category = category;
@@ -23,7 +23,7 @@ MediaRecord makeRecord(const QString& id, const QString& name, const QString& di
 
 const char* fieldName(SearchField field) {
     switch (field) {
-    case SearchField::Creator: return "creator";
+    case SearchField::Director: return "director";
     case SearchField::Actor: return "actor";
     case SearchField::FileType: return "fileType";
     }
@@ -48,8 +48,8 @@ void printQuery(QTextStream& output, const MediaSearch& search, const SearchQuer
 }  // namespace
 
 int main() {
-    const QString directorA = QStringLiteral("创作者甲");
-    const QString directorB = QStringLiteral("创作者乙");
+    const QString directorA = QStringLiteral("导演甲");
+    const QString directorB = QStringLiteral("导演乙");
     const QString actorA = QStringLiteral("演员甲");
     const QString actorB = QStringLiteral("演员乙");
     const QString documentary = QStringLiteral("纪录片");
@@ -64,7 +64,7 @@ int main() {
     search.rebuild(records);
     const SearchQuery query{directorA, actorB, "MP4"};
     QTextStream output(stdout);
-    output << "Query: " << query.creator << " + " << query.actor << " + " << query.fileType << '\n';
+    output << "Query: " << query.director << " + " << query.actor << " + " << query.fileType << '\n';
     printQuery(output, search, query, SearchStrategy::LinearScan, "Linear scan");
     printQuery(output, search, query, SearchStrategy::FixedIndexOrder, "Fixed index order");
     printQuery(output, search, query, SearchStrategy::SmallestListFirst, "Smallest list first");

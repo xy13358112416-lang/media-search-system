@@ -40,7 +40,7 @@ public:
     WarehouseSummary shared{2, "Shared", 8, Visibility::Public};
     MediaRecord media(QString title) {
         MediaRecord m;
-        m.id="duplicate"; m.fileName=title; m.creator="Director"; m.fileType="MP4";
+        m.id="duplicate"; m.fileName=title; m.director="Director"; m.fileType="MP4";
         if (metadataVariants && title == "Private movie") {
             m.fileType.clear();
             m.releasePeriod = "1981";

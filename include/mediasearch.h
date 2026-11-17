@@ -6,16 +6,16 @@
 #include <QString>
 #include <QStringList>
 
-// 各项去除首尾空白后，非空条件按 AND 组合。创作者和演员按完整姓名匹配。
+// 各项去除首尾空白后，非空条件按 AND 组合。导演和演员按完整姓名匹配。
 struct SearchQuery {
-    QString creator;  // 创作者姓名，留空时不限创作者。
+    QString director;  // 导演姓名，留空时不限导演。
     QString actor;     // 一名演员的完整姓名，留空时不限演员。
     QString fileType;  // 文件扩展名，例如 MP4。忽略大小写，留空时不限类型。
 };
 
 // 三种策略采用相同的匹配规则，供联调与对照实验选择。
 enum class SearchStrategy { LinearScan, FixedIndexOrder, SmallestListFirst };
-enum class SearchField { Creator, Actor, FileType };
+enum class SearchField { Director, Actor, FileType };
 
 struct SearchStep {
     SearchField field;            // 本步使用的查询字段。
@@ -50,7 +50,7 @@ public:
 
 private:
     QHash<QString, MediaRecord> records_;  // 按唯一 ID 保存已规范化的媒体记录。
-    QHash<QString, QStringList> creators_;  // 创作者到有序 ID 列表的索引。
+    QHash<QString, QStringList> directors_;  // 导演到有序 ID 列表的索引。
     QHash<QString, QStringList> actors_;     // 演员到有序 ID 列表的索引。
     QHash<QString, QStringList> fileTypes_;  // 扩展名到有序 ID 列表的索引。
 

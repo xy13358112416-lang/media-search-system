@@ -41,7 +41,7 @@ void AccountHistoryTests::sharedMediaLibraryStaysSynchronized() {
     MediaRecord record;
     record.fileName = "shared.mp4";
     record.fileType = "MP4";
-    record.creator = QStringLiteral("共享导演");
+    record.director = QStringLiteral("共享导演");
     record.releaseDate = QDate(2024, 1, 1);
     const auto added = accounts.addMedia(record);
     QVERIFY(added.status.ok());

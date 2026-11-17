@@ -5,7 +5,7 @@
 namespace media_json {
 QJsonObject toJson(const MediaRecord& r) {
     QJsonObject result{{"id",r.id},{"file_name",r.fileName},{"file_type",r.fileType},
-            {"file_size",QString::number(r.fileSize)},{"creator",r.creator},
+            {"file_size",QString::number(r.fileSize)},{"director",r.director},
             {"actors",QJsonArray::fromStringList(r.actors)},{"view_count",QString::number(r.viewCount)},
             {"release_date",r.releaseDate.toString(Qt::ISODate)},{"awards",QJsonArray::fromStringList(r.awards)},
             {"category",r.category}};
@@ -37,10 +37,7 @@ bool fromJson(const QJsonObject& j, MediaRecord& output, QString& error) {
     if (!stringField("file_name",r.fileName) || r.fileName.isEmpty()) return invalid("file_name");
     if (!stringField("file_type",r.fileType)) return invalid("file_type");
     if (!numberField("file_size",r.fileSize)) return invalid("file_size");
-    // 旧版数据的导演字段名为 director；统一更名为 creator（创作者）后仍须可读。
-    if (j.contains(QLatin1String("creator"))) {
-        if (!stringField("creator",r.creator)) return invalid("creator");
-    } else if (!stringField("director",r.creator)) return invalid("creator");
+    if (!stringField("director",r.director)) return invalid("director");
     if (!listField("actors",r.actors)) return invalid("actors");
     if (!numberField("view_count",r.viewCount)) return invalid("view_count");
     QString date; if (!stringField("release_date",date)) return invalid("release_date");

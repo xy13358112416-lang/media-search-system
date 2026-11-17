@@ -65,7 +65,7 @@ quint64 Client::recommend(care_contract::BrowseScene scene, QList<llm_recommenda
         if (candidate.key.isEmpty() || job->allowed.contains(candidate.key)) continue;
         job->allowed.insert(candidate.key);
         rows.append(QJsonObject{{"id",candidate.key},{"title",candidate.media.fileName.left(160)},
-            {"creator",candidate.media.creator.left(80)},{"release",mediaReleaseText(candidate.media)},
+            {"creator",candidate.media.director.left(80)},{"release",mediaReleaseText(candidate.media)},
             {"category",candidate.media.category.left(40)}});
     }
     if (rows.isEmpty()) {

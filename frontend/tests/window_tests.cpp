@@ -128,7 +128,7 @@ private slots:
         f.tabs->setCurrentIndex(1);
         finishLayout(f.table);
         QCOMPARE(f.table->rowCount(), 30);
-        QCOMPARE(f.table->horizontalHeaderItem(2)->text(), QStringLiteral("创作者"));
+        QCOMPARE(f.table->horizontalHeaderItem(2)->text(), QStringLiteral("导演"));
     }
 
     void invalidTypeDoesNotCallBusinessOrRefresh() {

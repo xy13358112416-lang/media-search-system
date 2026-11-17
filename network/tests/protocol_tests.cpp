@@ -36,7 +36,7 @@ private slots:
     void mediaRoundTrip() {
         MediaRecord input;
         input.id = "M000001"; input.fileName = QStringLiteral("作品,\"甲\".mp4"); input.fileType = "MP4";
-        input.fileSize = std::numeric_limits<quint64>::max(); input.creator = QStringLiteral("导演");
+        input.fileSize = std::numeric_limits<quint64>::max(); input.director = QStringLiteral("导演");
         input.actors = {QStringLiteral("演员甲"), QStringLiteral("演员乙")}; input.viewCount = 9007199254740993ULL;
         input.releaseDate = QDate(2024, 2, 29); input.awards = {QStringLiteral("奖项")}; input.category = QStringLiteral("纪录片");
         const QJsonObject json = media_json::toJson(input);
@@ -45,7 +45,7 @@ private slots:
         MediaRecord output; QString error;
         QVERIFY2(media_json::fromJson(json, output, error), qPrintable(error));
         QCOMPARE(output.id, input.id); QCOMPARE(output.fileName, input.fileName); QCOMPARE(output.fileType, input.fileType);
-        QCOMPARE(output.fileSize, input.fileSize); QCOMPARE(output.creator, input.creator); QCOMPARE(output.actors, input.actors);
+        QCOMPARE(output.fileSize, input.fileSize); QCOMPARE(output.director, input.director); QCOMPARE(output.actors, input.actors);
         QCOMPARE(output.viewCount, input.viewCount); QCOMPARE(output.releaseDate, input.releaseDate);
         QCOMPARE(output.awards, input.awards); QCOMPARE(output.category, input.category);
     }

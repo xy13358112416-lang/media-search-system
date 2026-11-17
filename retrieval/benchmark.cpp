@@ -45,7 +45,7 @@ QList<MediaRecord> makeDataset(int size) {
         MediaRecord record;
         record.id = QStringLiteral("M%1").arg(i + 1, 6, 10, QLatin1Char('0'));
         record.fileName = record.id;
-        record.creator = (rareActor || rareType || directorDraw % 100 < 50)
+        record.director = (rareActor || rareType || directorDraw % 100 < 50)
             ? QStringLiteral("Hot Director") : QStringLiteral("Director %1").arg(directorDraw % 127);
         record.actors.append((rareType || actorDraw % 100 < 60)
             ? QStringLiteral("Hot Actor") : QStringLiteral("Actor %1").arg(actorDraw % 251));

@@ -49,7 +49,7 @@ QTableWidget* createMediaTable(const QString& name)
     auto* table = new QTableWidget(0, 5);
     table->setObjectName(name);
     table->setHorizontalHeaderLabels({QStringLiteral("作品名称"), QStringLiteral("类别"),
-        QStringLiteral("文件类型"), QStringLiteral("创作者"), QStringLiteral("发行时间")});
+        QStringLiteral("文件类型"), QStringLiteral("导演"), QStringLiteral("发行时间")});
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -69,7 +69,7 @@ QString mediaValue(const QString& value)
 
 void setMediaRow(QTableWidget* table, int row, const QString& key, const MediaRecord& media)
 {
-    const QStringList cells{media.fileName, media.category, media.fileType, media.creator,
+    const QStringList cells{media.fileName, media.category, media.fileType, media.director,
                             mediaReleaseText(media)};
     for (qsizetype column = 0; column < cells.size(); ++column) {
         auto* item = new QTableWidgetItem(mediaValue(cells.at(column)));
@@ -143,7 +143,7 @@ public:
             connect(edit,&QLineEdit::returnPressed,this,[this] { submitSearch(); }); return edit;
         };
         title_ = field("onlineSearchTitle",QStringLiteral("作品关键词"));
-        creator_ = field("onlineSearchDirector",QStringLiteral("创作者全名"));
+        director_ = field("onlineSearchDirector",QStringLiteral("导演全名"));
         actor_ = field("onlineSearchActor",QStringLiteral("演员全名"));
         release_ = field("onlineSearchRelease", QStringLiteral("发行时间，如 1981"));
         release_->setMaxLength(10);
@@ -273,8 +273,8 @@ private:
             }
             const auto& m=result.value->media;
             dialog->setWindowTitle(QStringLiteral("作品详情"));
-            dialog->setText(QStringLiteral("%1\n类别：%2\n创作者：%3\n演员或艺人：%4")
-                .arg(m.fileName, mediaValue(m.category), mediaValue(m.creator),
+            dialog->setText(QStringLiteral("%1\n类别：%2\n导演：%3\n演员或艺人：%4")
+                .arg(m.fileName, mediaValue(m.category), mediaValue(m.director),
                      mediaValue(m.actors.join(QStringLiteral("、")))));
             dialog->show();
         }));
@@ -346,7 +346,7 @@ private:
         }
         if (!fromAssistant) { assistantMood_=media_mood::Mood::Any; assistantCategory_.clear(); }
         const bool unknownType = type_->currentIndex() == 1;
-        SearchQuery query{creator_->text().trimmed(), actor_->text().trimmed(),
+        SearchQuery query{director_->text().trimmed(), actor_->text().trimmed(),
                           type_->currentIndex() >= 2 ? type_->currentText() : QString()};
         const auto title=title_->text().trimmed();
         const auto period = release_->text().trimmed();
@@ -358,7 +358,7 @@ private:
         }
         QStringList terms;
         if (!title.isEmpty()) terms<<title;
-        if (!query.creator.isEmpty()) terms<<QStringLiteral("创作者:%1").arg(query.creator);
+        if (!query.director.isEmpty()) terms<<QStringLiteral("导演:%1").arg(query.director);
         if (!query.actor.isEmpty()) terms<<QStringLiteral("演员:%1").arg(query.actor);
         if (!query.fileType.isEmpty()) terms<<QStringLiteral("格式:%1").arg(query.fileType);
         if (unknownType) terms << QStringLiteral("格式:未记录");
@@ -433,7 +433,7 @@ private:
     WarehouseService& warehouses_; CareService& care_; std::function<void()> logout_;
     WarehousePage* warehouse_=nullptr; QList<CarePage*> carePages_; CarePage* activeCare_=nullptr;
     QTabWidget* tabs_; QTableWidget *mediaList_, *searchList_; QListWidget* todayList_;
-    QLineEdit *title_, *creator_, *actor_, *release_;
+    QLineEdit *title_, *director_, *actor_, *release_;
     QComboBox* type_;
     QLabel *status_,*searchStatus_,*todayStatus_;
     QHash<QString,CatalogEntry> catalog_; QStringList order_; MediaSearch index_;

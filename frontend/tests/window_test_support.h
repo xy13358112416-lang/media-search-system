@@ -158,7 +158,7 @@ struct Fixture {
     void fillAddForm(QDialog* dialog, const QString& type) {
         addInput(dialog, QStringLiteral("文件名"))->setText(QStringLiteral("回归新增.mp4"));
         addInput(dialog, QStringLiteral("文件类型"))->setText(type);
-        addInput(dialog, QStringLiteral("创作者"))->setText(QStringLiteral("回归导演"));
+        addInput(dialog, QStringLiteral("导演"))->setText(QStringLiteral("回归导演"));
         addInput(dialog, QStringLiteral("演员"))->setText(QStringLiteral("回归演员"));
         addInput(dialog, QStringLiteral("发行日期"))->setText(QStringLiteral("2026-01-01"));
     }

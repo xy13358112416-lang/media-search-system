@@ -31,7 +31,7 @@ bool sameRef(const ResourceRef& a, const ResourceRef& b) {
 bool sameWork(const ResourceSummary& a, const ResourceSummary& b) {
     const auto& x = a.media; const auto& y = b.media;
     if (!sameRef(a.resource, b.resource) || x.id != y.id || x.fileName != y.fileName || x.category != y.category ||
-        x.fileType != y.fileType || x.fileSize != y.fileSize || x.viewCount != y.viewCount || x.creator != y.creator ||
+        x.fileType != y.fileType || x.fileSize != y.fileSize || x.viewCount != y.viewCount || x.director != y.director ||
         x.actors != y.actors || x.awards != y.awards || x.releaseDate != y.releaseDate || a.people.size() != b.people.size()) return false;
     for (qsizetype i = 0; i < a.people.size(); ++i) {
         const auto& p = a.people[i]; const auto& q = b.people[i];

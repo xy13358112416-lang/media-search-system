@@ -1,4 +1,4 @@
-id,file_name,file_type,file_size,creator,actors,view_count,release_date,awards,category
+id,file_name,file_type,file_size,director,actors,view_count,release_date,awards,category
 uci:AA13,Pygmalion,,0,Asquith,"[""Leslie Howard"", ""Wendy Hiller"", ""Wilfrid Lawson"", ""Scott Sunderland"", ""Marie Lohr""]",0,1938,[],电影
 uci:AA14,French Without Tears,,0,Asquith,"[""Ray Milland"", ""Ellen Drew"", ""Guy Middleton"", ""Ronald Culver""]",0,1939,[],电影
 uci:AA16,Quiet Wedding,,0,Asquith,"[""Margaret Lockwood"", ""Derek Farr"", ""A.E. Matthews"", ""Marjorie Fielding"", ""Athene Seyler""]",0,1940,[],电影
@@ -349,153 +349,153 @@ tvmaze:161,Dexter,,0,,[],0,2006-10-01,[],电视剧
 tvmaze:162,Carnivàle,,0,,[],0,2003-09-14,[],电视剧
 tvmaze:163,Human Target,,0,,[],0,2010-01-17,[],电视剧
 tvmaze:164,Banshee,,0,,[],0,2013-01-11,[],电视剧
-musicbrainz:0cd3344f-2bdd-44c2-b57a-e4bf154707f5,Soul Brother (B‐side of Under Pressure),,0,Queen,"[""Queen""]",0,1994,[],音乐
-musicbrainz:14c1430c-ef29-43a8-8a0b-73cf617a5837,I Want to Break Free (12″ version),,0,Queen,"[""Queen""]",0,1994,[],音乐
-musicbrainz:679ef4eb-0d13-4d50-b589-e1223e4a8bd5,Exercises in Free Love,,0,Queen,"[""Queen""]",0,1999,[],音乐
-musicbrainz:d7ff0605-dc91-46ec-aad7-0a99723b2a4f,Son and Daughter,,0,Queen,"[""Queen""]",0,1992,[],音乐
-musicbrainz:765f7fe3-f80d-44e1-a2fa-8f8077bbdd83,Great King Rat,,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:4c6153d9-5820-48fd-b800-adcf36c59e01,Stone Cold Crazy (re-produced by Trent Reznor),,0,Queen,"[""Queen""]",0,1992,[],音乐
-musicbrainz:f411e84d-d988-4bbb-a4ff-c349ec8b2b3c,Time,,0,Queen,"[""Queen""]",0,1999,[],音乐
-musicbrainz:e8a09de4-7ee3-42c5-a73b-f7c152f9310f,One Year of Love (extended version),,0,Queen,"[""Queen""]",0,2002-04-16,[],音乐
-musicbrainz:19948961-6140-4a12-b73f-f3bb82b24307,You’re the Only One (piano demo),,0,Queen,"[""Queen""]",0,2012,[],音乐
-musicbrainz:93de54dd-dd03-4e4f-b71f-2d936bdc9ee2,I’m in Love With My Car (1991 remix),,0,Queen,"[""Queen""]",0,1991-09-03,[],音乐
-musicbrainz:fc6e1ed2-1deb-41f4-aa52-4b25c1ba6214,Big Spender,,0,Queen,"[""Queen""]",0,2013,[],音乐
-musicbrainz:f2d433cd-0973-4138-be5c-8650d0b806a6,Death on Two Legs,,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:fde1b521-93aa-45ca-9f84-2ed52da1860d,Bye Bye Johnny,,0,Queen,"[""Queen""]",0,2009,[],音乐
-musicbrainz:4d6f4007-651e-43be-9d6d-e1c70050b3c4,Impromptu,,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:a878bd1a-3dac-4ceb-b1c9-290fd093e28f,Innuendo (Final version without Floating Text),,0,Queen,"[""Queen""]",0,2021-07,[],音乐
-musicbrainz:a961aee2-a35e-44b9-9803-af46c31ce53c,God Save the Queen,,0,Queen,"[""Queen""]",0,1986-12-01,[],音乐
-musicbrainz:217f8c48-b9e8-4b55-9a92-d7df82362a66,Love of My Life,,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:4170b149-d912-40a8-99b5-554adf5a5450,Spread Your Wings (1977: BBC session),,0,Queen,"[""Queen""]",0,1992,[],音乐
-musicbrainz:6331abf4-6967-4506-8c6c-911a3caf93d2,Now I’m Here,,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:05798d68-aa27-41ff-a3f0-210fafcbf61a,[talking],,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:174d9058-eb7b-4db0-9201-19d329cacf7d,Spread Your Wings (1977 Rock Show session),,0,Queen,"[""Queen""]",0,1996,[],音乐
-musicbrainz:a688496d-ae95-4ce1-bbd3-bc57f4bd8cae,The Show Must Go On,,0,Queen,"[""Queen""]",0,2003,[],音乐
-musicbrainz:7cc3299a-1733-4dd2-aa34-9f2b20c6f498,Dog With a Bone,,0,Queen,"[""Queen""]",0,1996,[],音乐
-musicbrainz:47fb31d0-32b6-46f7-926b-74e574c24660,In the Lap of the Gods… Revisited,,0,Queen,"[""Queen""]",0,2020-08,[],音乐
-musicbrainz:a97cd222-57c1-413c-9e8a-411a82dc4cb7,Hangman (live),,0,Queen,"[""Queen""]",0,1991,[],音乐
-musicbrainz:b3ac41fd-ecb0-4bfc-a02b-bf26b365ef51,Crazy Little Thing Called Love,,0,Queen,"[""Queen""]",0,2019,[],音乐
-musicbrainz:2adff3bf-75ad-40e1-aaa7-fdefbd6587c4,Too Much Love Will Kill You (Queen version),,0,Queen,"[""Queen""]",0,1991,[],音乐
-musicbrainz:f69e2d1e-83a3-4af3-b015-d7a70a24487c,Face It Alone (outtake #1),,0,Queen,"[""Queen""]",0,1991,[],音乐
-musicbrainz:1c520efd-03c6-4900-9b02-3371b3f331b9,Headlong (Hybrid demo remix),,0,Queen,"[""Queen""]",0,2021-07,[],音乐
-musicbrainz:09f14cc9-d417-4505-ad96-b7b7a7e67820,Death on Two Legs,,0,Queen,"[""Queen""]",0,1979-06-22,[],音乐
-musicbrainz:2be8fd00-059a-4f16-a520-d346a67e5ef8,"Simon Bates, Part 8 (April 1985, Freddie Mercury, Simon Bates)",,0,Queen,"[""Queen""]",0,2016-11-04,[],音乐
-musicbrainz:095e7792-b293-4a05-bbf4-a4cb77900539,Spread Your Wings,,0,Queen,"[""Queen""]",0,1979-06-22,[],音乐
-musicbrainz:bc4d870d-c3c7-4448-8680-6cb052a47167,Calling All Girls,,0,Queen,"[""Queen""]",0,1991,[],音乐
-musicbrainz:df124fff-1c3b-4ac4-a305-4540abdd907b,We Are the Champions,,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:4b3571ff-d345-4a7a-80d8-942bd79e4ec9,Good Old‐Fashioned Lover Boy,,0,Queen,"[""Queen""]",0,1984,[],音乐
-musicbrainz:fd8ff2eb-2123-45fb-aed9-b0fb5baa337f,Now I’m Here Reprise,,0,Queen,"[""Queen""]",0,2020,[],音乐
-musicbrainz:741ba8dd-2780-4087-9cef-737686ccd0e1,’39,,0,Queen,"[""Queen""]",0,1992,[],音乐
-musicbrainz:e014966a-0c64-4a17-9eb6-5ed3a0862eb2,Body Language,,0,Queen,"[""Queen""]",0,1992,[],音乐
-musicbrainz:5d3d6af1-8c4e-4fdb-a7e9-70e819d7b0db,Don’t Stop Me Now,,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:bf52a42b-aec6-4e48-bb33-5d19ab690b48,Headlong,,0,Queen,"[""Queen""]",0,1991-01-07,[],音乐
-musicbrainz:aa10b2b3-8a62-456b-a9b9-75548e68006e,Was It All Worth It,,0,Queen,"[""Queen""]",0,1989-05-22,[],音乐
-musicbrainz:f0508c5f-2ad7-427e-877b-f21f5e4ad746,The Show Must Go On,,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:7195cb18-aae1-4f17-b0bf-c249c1aeadfd,Brighton Rock,,0,Queen,"[""Queen""]",0,2018,[],音乐
-musicbrainz:3f9e63e4-e9ad-4dd8-88e1-b15c7541da9f,Intro.,,0,Queen,"[""Queen""]",0,2018,[],音乐
-musicbrainz:7cb72d02-4186-49ae-857c-3b8344755135,We Will Rock You (fast),,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:34ddc776-4ca2-4817-945a-bc64b9ace02f,God Save the Queen,,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:d06249ba-4e6a-4721-9233-1a543594d95a,Headlong,,0,Queen,"[""Queen""]",0,2021-07,[],音乐
-musicbrainz:f4d8f1c2-cbee-4b78-9406-1faf23b93f1e,I'm Going Slighty Mad,,0,Queen,"[""Queen""]",0,2021-07,[],音乐
-musicbrainz:75778bda-9aa3-47b4-a874-35ad67630ae5,Hello Mary Lou,,0,Queen,"[""Queen""]",0,,[],音乐
-musicbrainz:f4f03ceb-370b-4419-a0fe-26493a2a7f29,I Want to Break Free,,0,Queen,"[""Queen""]",0,2024-09-06,[],音乐
-musicbrainz:ff67553b-c5c7-404f-b0e2-c0e54f711138,Sexy Sadie,,0,The Beatles,"[""The Beatles""]",0,1995,[],音乐
-musicbrainz:44cbdf7e-b23f-4f5b-a0a8-8ebb5f8b8138,From Me to You (1982 stereo mix),,0,The Beatles,"[""The Beatles""]",0,1999,[],音乐
-musicbrainz:98d2da7e-901a-4d37-9a31-98e7ab4d501b,Thank You Girl,,0,The Beatles,"[""The Beatles""]",0,2000,[],音乐
-musicbrainz:3dff69de-1a51-4be1-8e28-14fd58d519f2,One After 909,,0,The Beatles,"[""The Beatles""]",0,2000,[],音乐
-musicbrainz:947f7d90-a3d6-48dd-b767-3cc63cc2439a,Till There Was You,,0,The Beatles,"[""The Beatles""]",0,1993,[],音乐
-musicbrainz:b901345b-e129-4286-bc78-375a3c38c2ea,Rishikesh No. 9,,0,The Beatles,"[""The Beatles""]",0,1995,[],音乐
-musicbrainz:e3586325-eb94-427c-85b1-97c67ed7aa18,One After 909,,0,The Beatles,"[""The Beatles""]",0,2000,[],音乐
-musicbrainz:17cc3148-e927-411d-b684-f9a571b6de00,I Should Have Known Better,,0,The Beatles,"[""The Beatles""]",0,1993,[],音乐
-musicbrainz:3caf03d6-3dcd-46a8-afd5-eb3dfce36f11,(Chat),,0,The Beatles,"[""The Beatles""]",0,1993,[],音乐
-musicbrainz:c1c5eec2-10cc-443a-a481-803bf22c8106,I’m a Loser,,0,The Beatles,"[""The Beatles""]",0,1980-11-03,[],音乐
-musicbrainz:b66c7244-02fd-4287-b058-2fa0e2258bad,Ticket to Ride,,0,The Beatles,"[""The Beatles""]",0,1993,[],音乐
-musicbrainz:20cb3493-f96c-4754-a8e8-f0f57483989b,"Here, There and Everywhere (alt mix)",,0,The Beatles,"[""The Beatles""]",0,1999,[],音乐
-musicbrainz:54147242-870c-44d0-8f2b-9a0522715493,Like Dreamers Do,,0,The Beatles,"[""The Beatles""]",0,,[],音乐
-musicbrainz:cba99178-6bfc-4dd2-80d0-fdc6060d50e3,"Here, There and Everywhere (take 14)",,0,The Beatles,"[""The Beatles""]",0,1999,[],音乐
-musicbrainz:ec5f5c3b-eb56-4333-af0a-baafbaaecec5,Do You Want to Know a Secret (take 8),,0,The Beatles,"[""The Beatles""]",0,1994,[],音乐
-musicbrainz:75a002f2-77a4-4ec9-84ff-9bcb5c7f077b,While My Guitar Gently Weeps,,0,The Beatles,"[""The Beatles""]",0,1995,[],音乐
-musicbrainz:5da5f2a5-dfc9-41d1-8bd0-cc9c6a9afaef,Maxwell’s Silver Hammer (take 12),,0,The Beatles,"[""The Beatles""]",0,2019-09-27,[],音乐
-musicbrainz:bb76ab41-7b04-484b-8fc5-bd2b54903af8,From Me to You,,0,The Beatles,"[""The Beatles""]",0,2000,[],音乐
-musicbrainz:eb414c3f-2421-45bb-82b9-bf5400b724dc,Strawberry Fields Forever,,0,The Beatles,"[""The Beatles""]",0,,[],音乐
-musicbrainz:d32897d5-8251-4085-bb5e-cd2ed7ebc526,Unfinished Mellotron Music,,0,The Beatles,"[""The Beatles""]",0,,[],音乐
-musicbrainz:c1d06be5-c40a-4cf8-8c92-9260c2da366f,I Saw Her Standing There (Stockholm),,0,The Beatles,"[""The Beatles""]",0,2019-04,[],音乐
-musicbrainz:dbf0d0fc-0696-42e0-ad4d-b009967ae1e5,You Know My Name,,0,The Beatles,"[""The Beatles""]",0,,[],音乐
-musicbrainz:e3959277-8e05-4ad9-ad0f-38bc59ee4acd,Something,,0,The Beatles,"[""The Beatles""]",0,2020-01,[],音乐
-musicbrainz:c65b6d74-960c-43c6-89bb-4a292d859053,If I Fell,,0,The Beatles,"[""The Beatles""]",0,1997,[],音乐
-musicbrainz:70600ed8-000e-4a7f-bd49-81c90b21eb95,I Just Don't Understand,,0,The Beatles,"[""The Beatles""]",0,2019-04,[],音乐
-musicbrainz:f7362381-6b4e-48d6-9fd1-d3f732ab01b7,Norwegian Wood,,0,The Beatles,"[""The Beatles""]",0,1993,[],音乐
-musicbrainz:c3a436d5-7777-45fd-84e1-83ba7d2b9d59,Boys (Hollywood Bowl),,0,The Beatles,"[""The Beatles""]",0,2019-04,[],音乐
-musicbrainz:b417f54c-a80e-4f66-828f-eca581a6f8ef,(Chat),,0,The Beatles,"[""The Beatles""]",0,1993,[],音乐
-musicbrainz:26257826-a3b0-4250-a2c6-1443866ba7d5,She’s a Woman,,0,The Beatles,"[""The Beatles""]",0,1999,[],音乐
-musicbrainz:7aaa7717-a1fe-49f7-8bda-c69052de5e8c,Cold Turkey,,0,The Beatles,"[""The Beatles""]",0,2019-04,[],音乐
-musicbrainz:8c84be1a-c352-49b3-98b9-af96dfe7378d,Just Fun (10),,0,The Beatles,"[""The Beatles""]",0,2019-04,[],音乐
-musicbrainz:7e7703c1-c174-4292-a996-54dcdc14ba1a,She Loves You,,0,The Beatles,"[""The Beatles""]",0,1999,[],音乐
-musicbrainz:5ebc5cc6-9aa5-4028-9a76-79ea34145878,Yes It Is,,0,The Beatles,"[""The Beatles""]",0,1992,[],音乐
-musicbrainz:fa2b2af5-3ba2-4155-b1d9-45066322edc5,Help!,,0,The Beatles,"[""The Beatles""]",0,1980-11-03,[],音乐
-musicbrainz:efa1ec75-f467-48cc-a792-1a4adbeac590,Let It Be,,0,The Beatles,"[""The Beatles""]",0,2015-11-06,[],音乐
-musicbrainz:cf09831a-42b7-40aa-bf64-25c4cbfb871b,You’re Going to Lose That Girl,,0,The Beatles,"[""The Beatles""]",0,1999,[],音乐
-musicbrainz:072b5015-43e5-46fb-a3bc-d41146742b4f,Norwegian Wood (This Bird Has Flown) (1982 stereo mix),,0,The Beatles,"[""The Beatles""]",0,1993,[],音乐
-musicbrainz:99d19703-3b17-44c8-ac0e-a5dec99a2076,I’m a Loser (take 3),,0,The Beatles,"[""The Beatles""]",0,1999,[],音乐
-musicbrainz:b7e45cb3-0828-40db-adc4-488f9f6edf7a,While My Guitar Gently Weeps,,0,The Beatles,"[""The Beatles""]",0,2020-01,[],音乐
-musicbrainz:b5a5448b-9cb4-4c40-9b66-3f3e14a81fa2,"I Feel Fine (takes 6, 7)",,0,The Beatles,"[""The Beatles""]",0,1989,[],音乐
-musicbrainz:9c6138af-732e-4586-8a28-72444089ad58,I Don't Need No Cigarette Boy (II),,0,The Beatles,"[""The Beatles""]",0,2019-04,[],音乐
-musicbrainz:c79cfaee-5822-4766-a9ba-0d01df60e9dd,I'll Be Back,,0,The Beatles,"[""The Beatles""]",0,2004-11-30,[],音乐
-musicbrainz:78801ce9-4f93-41f8-b5d7-2ea7d812ddd6,"Crying, Waiting, Hoping",,0,The Beatles,"[""The Beatles""]",0,1985,[],音乐
-musicbrainz:1e6d0d0b-fe68-40e8-9888-dc532760bcfc,Sure to Fall (In Love With You),,0,The Beatles,"[""The Beatles""]",0,1985,[],音乐
-musicbrainz:e3171ff0-527b-4b9a-85d4-791eddc1aed9,Till There Was You,,0,The Beatles,"[""The Beatles""]",0,2013-11-11,[],音乐
-musicbrainz:4f3a6797-760e-453c-b69a-71aaa0926641,"All Things Must Pass (demo, take 2, RM'82)",,0,The Beatles,"[""The Beatles""]",0,1999,[],音乐
-musicbrainz:4b5766f3-b6cc-4af4-9a85-28a64ae54626,A Hard Day’s Night (take 9),,0,The Beatles,"[""The Beatles""]",0,2011,[],音乐
-musicbrainz:827faa6d-a743-4855-849a-8ba0352e70c3,"Golden Slumbers / Carry That Weight (take 17, RS1 -mono)",,0,The Beatles,"[""The Beatles""]",0,1999,[],音乐
-musicbrainz:3fc40f6a-50bf-456c-9109-e119a55ca9ac,Ticket to Ride (take 2),,0,The Beatles,"[""The Beatles""]",0,2011,[],音乐
-musicbrainz:d53172be-7fc2-4090-a474-9224cfe42479,"Something (demo, take 1)",,0,The Beatles,"[""The Beatles""]",0,1999,[],音乐
-musicbrainz:f5e49377-6612-4e36-b582-42c717d6e07a,藉口,,0,周杰倫,"[""周杰倫""]",0,2004-12-03,[],音乐
-musicbrainz:ef0113b3-3eb2-4dd7-a06c-fe7d9f7facad,麥芽糖,,0,周杰倫,"[""周杰倫""]",0,2008-01-30,[],音乐
-musicbrainz:a1c64b91-698a-4a45-ab80-41012a89cf99,嘻哈空姐,,0,周杰倫,"[""周杰倫""]",0,2010-05-18,[],音乐
-musicbrainz:e9730c5c-3e58-4e2d-9454-39b6e5eac66a,湘倫小雨四手聯彈,,0,周杰倫,"[""周杰倫""]",0,2007-08-13,[],音乐
-musicbrainz:f5191875-11de-4027-9bff-e15d3f4757a5,以父之名,,0,周杰倫,"[""周杰倫""]",0,2003-07-31,[],音乐
-musicbrainz:9c9ac2ad-3836-41a0-be4b-d40e57683971,扯,,0,周杰倫,"[""周杰倫""]",0,2007-11-02,[],音乐
-musicbrainz:fa107734-baad-45af-b9a0-77549c272729,威廉古堡,,0,周杰倫,"[""周杰倫""]",0,,[],音乐
-musicbrainz:3a051e37-d26d-4611-8226-0a6413f09ce8,給我一首歌的時間 (特別來賓 蔡依林),,0,周杰倫,"[""周杰倫""]",0,2011-01-25,[],音乐
-musicbrainz:c793580d-09b4-42df-8481-d37bdea6c020,雨下一整晚,,0,周杰倫,"[""周杰倫""]",0,2011-01-12,[],音乐
-musicbrainz:eae1ce18-bbdd-495a-8c6c-2cbd7e597043,愛在西元前,,0,周杰倫,"[""周杰倫""]",0,,[],音乐
-musicbrainz:7f0d16b6-ba5f-488f-9ef7-e5363d63ca9a,简单爱,,0,周杰倫,"[""周杰倫""]",0,,[],音乐
-musicbrainz:4ff15ecb-0956-4a21-81ab-b679cb0054f8,聽爸爸的話,,0,周杰倫,"[""周杰倫""]",0,2014-12-26,[],音乐
-musicbrainz:bf245e2a-6848-42ab-bf5c-51bdc88d91c3,跨時代,,0,周杰倫,"[""周杰倫""]",0,2011-01-25,[],音乐
-musicbrainz:a4254387-330d-4a9d-9eb8-def5ce0a0dfc,說好的幸福呢＋淘汰＋青花瓷,,0,周杰倫,"[""周杰倫""]",0,2011-01-25,[],音乐
-musicbrainz:97a925e6-52c7-401e-a6f5-b0499c2e7a4a,Opening: 雙截棍 (變奏版),,0,周杰倫,"[""周杰倫""]",0,2002-10-25,[],音乐
-musicbrainz:f28ef132-6ef4-4584-ac1d-3e5b645da57d,龍捲風,,0,周杰倫,"[""周杰倫""]",0,2001,[],音乐
-musicbrainz:e1fbb734-9af6-44dd-9d5d-636bbbbfaff8,青花瓷 (Blue and White Porcelain),,0,周杰伦,"[""周杰伦""]",0,2019-11-01,[],音乐
-musicbrainz:3f5f73b4-92a9-4d06-9d23-d3d9b23cc053,黃金甲,,0,周杰倫,"[""周杰倫""]",0,2008-01-30,[],音乐
-musicbrainz:96c2b884-007a-41fd-9510-0d1d54a6ac77,雨下一整晚,,0,周杰倫,"[""周杰倫""]",0,2010-05-18,[],音乐
-musicbrainz:da557a80-7865-4da7-959a-a059c7581b1d,倒影,,0,周杰伦,"[""周杰伦""]",0,,[],音乐
-musicbrainz:00b9b91d-bc9f-4d78-a351-0735bce971f8,彩虹,,0,周杰倫,"[""周杰倫""]",0,,[],音乐
-musicbrainz:e0d8175e-f9a3-4c25-8581-c0b0a0cda458,紅塵客棧,,0,周杰倫,"[""周杰倫""]",0,2012-12-28,[],音乐
-musicbrainz:3fd4e705-7d82-471b-9c44-2a0b18479671,髮如雪,,0,周杰倫,"[""周杰倫""]",0,2008-01-30,[],音乐
-musicbrainz:b2f3df43-929a-41eb-8b3b-a6be3970f105,驚嘆號,,0,周杰倫,"[""周杰倫""]",0,2016-05-10,[],音乐
-musicbrainz:da7be06f-4053-4808-9701-fddb679c4d70,给我一首歌的时间,,0,周杰伦,"[""周杰伦""]",0,2008,[],音乐
-musicbrainz:d7b9275c-c083-47ee-822e-c7bbb435beba,開不了口,,0,周杰倫,"[""周杰倫""]",0,2024-04-03,[],音乐
-musicbrainz:d2ac8502-8fa3-4ce2-9d28-46cb691e63d8,Mine Mine,,0,周杰倫,"[""周杰倫""]",0,2016-05-10,[],音乐
-musicbrainz:484f5467-6f91-4773-84b7-cb3a6770ac70,最後的戰役,,0,周杰倫,"[""周杰倫""]",0,2016-05-10,[],音乐
-musicbrainz:2e3bcea1-57f5-45f2-9c4e-f82e63324a06,雙刀,,0,周杰倫,"[""周杰倫""]",0,2003-07-31,[],音乐
-musicbrainz:8ed89350-d58f-4175-adea-6e206d175289,牛仔很忙,,0,周杰倫,"[""周杰倫""]",0,2007-11-02,[],音乐
-musicbrainz:ca8fc221-1200-413d-a932-06972f552017,四面楚歌,,0,周杰倫,"[""周杰倫""]",0,2006-01-20,[],音乐
-musicbrainz:e01cd995-3c57-45b5-8df4-7d9fc74174cc,The One 籌備幕後秘辛,,0,周杰倫,"[""周杰倫""]",0,,[],音乐
-musicbrainz:09de6abe-9558-4445-9ef8-e68732f3c688,時光機,,0,周杰倫,"[""周杰倫""]",0,2011-01-25,[],音乐
-musicbrainz:d0d99e24-9f51-42e1-9312-6414b5189198,免費教學錄影帶,,0,周杰倫,"[""周杰倫""]",0,2011-01-25,[],音乐
-musicbrainz:195636c1-894c-4bb3-ad7f-0acf55e938f7,爺爺泡的茶,,0,周杰倫,"[""周杰倫""]",0,2009-06-02,[],音乐
-musicbrainz:70106631-d284-401e-aac3-ad9696772047,Mojito,,0,周杰倫,"[""周杰倫""]",0,2024-04-03,[],音乐
-musicbrainz:e71f9760-8902-42f5-9ce0-3b4d72e283a4,蒲公英的約定,,0,周杰倫,"[""周杰倫""]",0,2008-01-30,[],音乐
-musicbrainz:40111902-832c-4cfc-99da-ad84ed13a702,爷爷泡的茶,,0,周杰倫,"[""周杰倫""]",0,2002-07-18,[],音乐
-musicbrainz:1b5f40e1-3c54-4282-ae56-479f4295dc55,Mojito,,0,周杰倫,"[""周杰倫""]",0,,[],音乐
-musicbrainz:3b85b835-df3f-4bac-91fe-a7c195fac792,鬥牛,,0,周杰倫,"[""周杰倫""]",0,,[],音乐
-musicbrainz:6898da2b-27ac-4746-8b45-6060f9564197,夜曲,,0,周杰倫,"[""周杰倫""]",0,2005,[],音乐
-musicbrainz:99db2ee1-4b69-4a56-9807-1ceb07183ec6,時光機,,0,周杰倫,"[""周杰倫""]",0,2011-01-25,[],音乐
-musicbrainz:1a8d5246-8d89-4552-a0e2-1d50d1166381,擱淺,,0,周杰倫,"[""周杰倫""]",0,2024-04-03,[],音乐
-musicbrainz:f4609c99-2ddd-4521-b8ce-ab3de0ece37a,Mine Mine,,0,周杰倫,"[""周杰倫""]",0,,[],音乐
-musicbrainz:6e18b6c7-b411-42bc-b358-ba5b0cadd638,最长的电影,,0,周杰倫,"[""周杰倫""]",0,2007-11-02,[],音乐
-musicbrainz:cce8f025-7819-4ce8-adac-6a96ef0a5a33,嗆,,0,周杰倫,"[""周杰倫""]",0,2008-01-30,[],音乐
-musicbrainz:4825ea04-6c26-4fa2-91bb-094105f34ec4,妳聽得到,,0,周杰倫,"[""周杰倫""]",0,2005,[],音乐
-musicbrainz:10cd3bf5-a37e-4532-b914-c6a59a730781,稻香,,0,周杰倫,"[""周杰倫""]",0,2011-01-25,[],音乐
-musicbrainz:e0ec0fb0-2cb9-48bd-ab2b-39f78deda8e0,半獸人,,0,周杰倫,"[""周杰倫""]",0,,[],音乐
-musicbrainz:a22828cc-8582-4488-aab5-9412b6455f6d,樂手介紹,,0,周杰倫,"[""周杰倫""]",0,2005,[],音乐
+musicbrainz:0cd3344f-2bdd-44c2-b57a-e4bf154707f5,Soul Brother (B‐side of Under Pressure),,0,,"[""Queen""]",0,1994,[],音乐
+musicbrainz:14c1430c-ef29-43a8-8a0b-73cf617a5837,I Want to Break Free (12″ version),,0,,"[""Queen""]",0,1994,[],音乐
+musicbrainz:679ef4eb-0d13-4d50-b589-e1223e4a8bd5,Exercises in Free Love,,0,,"[""Queen""]",0,1999,[],音乐
+musicbrainz:d7ff0605-dc91-46ec-aad7-0a99723b2a4f,Son and Daughter,,0,,"[""Queen""]",0,1992,[],音乐
+musicbrainz:765f7fe3-f80d-44e1-a2fa-8f8077bbdd83,Great King Rat,,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:4c6153d9-5820-48fd-b800-adcf36c59e01,Stone Cold Crazy (re-produced by Trent Reznor),,0,,"[""Queen""]",0,1992,[],音乐
+musicbrainz:f411e84d-d988-4bbb-a4ff-c349ec8b2b3c,Time,,0,,"[""Queen""]",0,1999,[],音乐
+musicbrainz:e8a09de4-7ee3-42c5-a73b-f7c152f9310f,One Year of Love (extended version),,0,,"[""Queen""]",0,2002-04-16,[],音乐
+musicbrainz:19948961-6140-4a12-b73f-f3bb82b24307,You’re the Only One (piano demo),,0,,"[""Queen""]",0,2012,[],音乐
+musicbrainz:93de54dd-dd03-4e4f-b71f-2d936bdc9ee2,I’m in Love With My Car (1991 remix),,0,,"[""Queen""]",0,1991-09-03,[],音乐
+musicbrainz:fc6e1ed2-1deb-41f4-aa52-4b25c1ba6214,Big Spender,,0,,"[""Queen""]",0,2013,[],音乐
+musicbrainz:f2d433cd-0973-4138-be5c-8650d0b806a6,Death on Two Legs,,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:fde1b521-93aa-45ca-9f84-2ed52da1860d,Bye Bye Johnny,,0,,"[""Queen""]",0,2009,[],音乐
+musicbrainz:4d6f4007-651e-43be-9d6d-e1c70050b3c4,Impromptu,,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:a878bd1a-3dac-4ceb-b1c9-290fd093e28f,Innuendo (Final version without Floating Text),,0,,"[""Queen""]",0,2021-07,[],音乐
+musicbrainz:a961aee2-a35e-44b9-9803-af46c31ce53c,God Save the Queen,,0,,"[""Queen""]",0,1986-12-01,[],音乐
+musicbrainz:217f8c48-b9e8-4b55-9a92-d7df82362a66,Love of My Life,,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:4170b149-d912-40a8-99b5-554adf5a5450,Spread Your Wings (1977: BBC session),,0,,"[""Queen""]",0,1992,[],音乐
+musicbrainz:6331abf4-6967-4506-8c6c-911a3caf93d2,Now I’m Here,,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:05798d68-aa27-41ff-a3f0-210fafcbf61a,[talking],,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:174d9058-eb7b-4db0-9201-19d329cacf7d,Spread Your Wings (1977 Rock Show session),,0,,"[""Queen""]",0,1996,[],音乐
+musicbrainz:a688496d-ae95-4ce1-bbd3-bc57f4bd8cae,The Show Must Go On,,0,,"[""Queen""]",0,2003,[],音乐
+musicbrainz:7cc3299a-1733-4dd2-aa34-9f2b20c6f498,Dog With a Bone,,0,,"[""Queen""]",0,1996,[],音乐
+musicbrainz:47fb31d0-32b6-46f7-926b-74e574c24660,In the Lap of the Gods… Revisited,,0,,"[""Queen""]",0,2020-08,[],音乐
+musicbrainz:a97cd222-57c1-413c-9e8a-411a82dc4cb7,Hangman (live),,0,,"[""Queen""]",0,1991,[],音乐
+musicbrainz:b3ac41fd-ecb0-4bfc-a02b-bf26b365ef51,Crazy Little Thing Called Love,,0,,"[""Queen""]",0,2019,[],音乐
+musicbrainz:2adff3bf-75ad-40e1-aaa7-fdefbd6587c4,Too Much Love Will Kill You (Queen version),,0,,"[""Queen""]",0,1991,[],音乐
+musicbrainz:f69e2d1e-83a3-4af3-b015-d7a70a24487c,Face It Alone (outtake #1),,0,,"[""Queen""]",0,1991,[],音乐
+musicbrainz:1c520efd-03c6-4900-9b02-3371b3f331b9,Headlong (Hybrid demo remix),,0,,"[""Queen""]",0,2021-07,[],音乐
+musicbrainz:09f14cc9-d417-4505-ad96-b7b7a7e67820,Death on Two Legs,,0,,"[""Queen""]",0,1979-06-22,[],音乐
+musicbrainz:2be8fd00-059a-4f16-a520-d346a67e5ef8,"Simon Bates, Part 8 (April 1985, Freddie Mercury, Simon Bates)",,0,,"[""Queen""]",0,2016-11-04,[],音乐
+musicbrainz:095e7792-b293-4a05-bbf4-a4cb77900539,Spread Your Wings,,0,,"[""Queen""]",0,1979-06-22,[],音乐
+musicbrainz:bc4d870d-c3c7-4448-8680-6cb052a47167,Calling All Girls,,0,,"[""Queen""]",0,1991,[],音乐
+musicbrainz:df124fff-1c3b-4ac4-a305-4540abdd907b,We Are the Champions,,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:4b3571ff-d345-4a7a-80d8-942bd79e4ec9,Good Old‐Fashioned Lover Boy,,0,,"[""Queen""]",0,1984,[],音乐
+musicbrainz:fd8ff2eb-2123-45fb-aed9-b0fb5baa337f,Now I’m Here Reprise,,0,,"[""Queen""]",0,2020,[],音乐
+musicbrainz:741ba8dd-2780-4087-9cef-737686ccd0e1,’39,,0,,"[""Queen""]",0,1992,[],音乐
+musicbrainz:e014966a-0c64-4a17-9eb6-5ed3a0862eb2,Body Language,,0,,"[""Queen""]",0,1992,[],音乐
+musicbrainz:5d3d6af1-8c4e-4fdb-a7e9-70e819d7b0db,Don’t Stop Me Now,,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:bf52a42b-aec6-4e48-bb33-5d19ab690b48,Headlong,,0,,"[""Queen""]",0,1991-01-07,[],音乐
+musicbrainz:aa10b2b3-8a62-456b-a9b9-75548e68006e,Was It All Worth It,,0,,"[""Queen""]",0,1989-05-22,[],音乐
+musicbrainz:f0508c5f-2ad7-427e-877b-f21f5e4ad746,The Show Must Go On,,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:7195cb18-aae1-4f17-b0bf-c249c1aeadfd,Brighton Rock,,0,,"[""Queen""]",0,2018,[],音乐
+musicbrainz:3f9e63e4-e9ad-4dd8-88e1-b15c7541da9f,Intro.,,0,,"[""Queen""]",0,2018,[],音乐
+musicbrainz:7cb72d02-4186-49ae-857c-3b8344755135,We Will Rock You (fast),,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:34ddc776-4ca2-4817-945a-bc64b9ace02f,God Save the Queen,,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:d06249ba-4e6a-4721-9233-1a543594d95a,Headlong,,0,,"[""Queen""]",0,2021-07,[],音乐
+musicbrainz:f4d8f1c2-cbee-4b78-9406-1faf23b93f1e,I'm Going Slighty Mad,,0,,"[""Queen""]",0,2021-07,[],音乐
+musicbrainz:75778bda-9aa3-47b4-a874-35ad67630ae5,Hello Mary Lou,,0,,"[""Queen""]",0,,[],音乐
+musicbrainz:f4f03ceb-370b-4419-a0fe-26493a2a7f29,I Want to Break Free,,0,,"[""Queen""]",0,2024-09-06,[],音乐
+musicbrainz:ff67553b-c5c7-404f-b0e2-c0e54f711138,Sexy Sadie,,0,,"[""The Beatles""]",0,1995,[],音乐
+musicbrainz:44cbdf7e-b23f-4f5b-a0a8-8ebb5f8b8138,From Me to You (1982 stereo mix),,0,,"[""The Beatles""]",0,1999,[],音乐
+musicbrainz:98d2da7e-901a-4d37-9a31-98e7ab4d501b,Thank You Girl,,0,,"[""The Beatles""]",0,2000,[],音乐
+musicbrainz:3dff69de-1a51-4be1-8e28-14fd58d519f2,One After 909,,0,,"[""The Beatles""]",0,2000,[],音乐
+musicbrainz:947f7d90-a3d6-48dd-b767-3cc63cc2439a,Till There Was You,,0,,"[""The Beatles""]",0,1993,[],音乐
+musicbrainz:b901345b-e129-4286-bc78-375a3c38c2ea,Rishikesh No. 9,,0,,"[""The Beatles""]",0,1995,[],音乐
+musicbrainz:e3586325-eb94-427c-85b1-97c67ed7aa18,One After 909,,0,,"[""The Beatles""]",0,2000,[],音乐
+musicbrainz:17cc3148-e927-411d-b684-f9a571b6de00,I Should Have Known Better,,0,,"[""The Beatles""]",0,1993,[],音乐
+musicbrainz:3caf03d6-3dcd-46a8-afd5-eb3dfce36f11,(Chat),,0,,"[""The Beatles""]",0,1993,[],音乐
+musicbrainz:c1c5eec2-10cc-443a-a481-803bf22c8106,I’m a Loser,,0,,"[""The Beatles""]",0,1980-11-03,[],音乐
+musicbrainz:b66c7244-02fd-4287-b058-2fa0e2258bad,Ticket to Ride,,0,,"[""The Beatles""]",0,1993,[],音乐
+musicbrainz:20cb3493-f96c-4754-a8e8-f0f57483989b,"Here, There and Everywhere (alt mix)",,0,,"[""The Beatles""]",0,1999,[],音乐
+musicbrainz:54147242-870c-44d0-8f2b-9a0522715493,Like Dreamers Do,,0,,"[""The Beatles""]",0,,[],音乐
+musicbrainz:cba99178-6bfc-4dd2-80d0-fdc6060d50e3,"Here, There and Everywhere (take 14)",,0,,"[""The Beatles""]",0,1999,[],音乐
+musicbrainz:ec5f5c3b-eb56-4333-af0a-baafbaaecec5,Do You Want to Know a Secret (take 8),,0,,"[""The Beatles""]",0,1994,[],音乐
+musicbrainz:75a002f2-77a4-4ec9-84ff-9bcb5c7f077b,While My Guitar Gently Weeps,,0,,"[""The Beatles""]",0,1995,[],音乐
+musicbrainz:5da5f2a5-dfc9-41d1-8bd0-cc9c6a9afaef,Maxwell’s Silver Hammer (take 12),,0,,"[""The Beatles""]",0,2019-09-27,[],音乐
+musicbrainz:bb76ab41-7b04-484b-8fc5-bd2b54903af8,From Me to You,,0,,"[""The Beatles""]",0,2000,[],音乐
+musicbrainz:eb414c3f-2421-45bb-82b9-bf5400b724dc,Strawberry Fields Forever,,0,,"[""The Beatles""]",0,,[],音乐
+musicbrainz:d32897d5-8251-4085-bb5e-cd2ed7ebc526,Unfinished Mellotron Music,,0,,"[""The Beatles""]",0,,[],音乐
+musicbrainz:c1d06be5-c40a-4cf8-8c92-9260c2da366f,I Saw Her Standing There (Stockholm),,0,,"[""The Beatles""]",0,2019-04,[],音乐
+musicbrainz:dbf0d0fc-0696-42e0-ad4d-b009967ae1e5,You Know My Name,,0,,"[""The Beatles""]",0,,[],音乐
+musicbrainz:e3959277-8e05-4ad9-ad0f-38bc59ee4acd,Something,,0,,"[""The Beatles""]",0,2020-01,[],音乐
+musicbrainz:c65b6d74-960c-43c6-89bb-4a292d859053,If I Fell,,0,,"[""The Beatles""]",0,1997,[],音乐
+musicbrainz:70600ed8-000e-4a7f-bd49-81c90b21eb95,I Just Don't Understand,,0,,"[""The Beatles""]",0,2019-04,[],音乐
+musicbrainz:f7362381-6b4e-48d6-9fd1-d3f732ab01b7,Norwegian Wood,,0,,"[""The Beatles""]",0,1993,[],音乐
+musicbrainz:c3a436d5-7777-45fd-84e1-83ba7d2b9d59,Boys (Hollywood Bowl),,0,,"[""The Beatles""]",0,2019-04,[],音乐
+musicbrainz:b417f54c-a80e-4f66-828f-eca581a6f8ef,(Chat),,0,,"[""The Beatles""]",0,1993,[],音乐
+musicbrainz:26257826-a3b0-4250-a2c6-1443866ba7d5,She’s a Woman,,0,,"[""The Beatles""]",0,1999,[],音乐
+musicbrainz:7aaa7717-a1fe-49f7-8bda-c69052de5e8c,Cold Turkey,,0,,"[""The Beatles""]",0,2019-04,[],音乐
+musicbrainz:8c84be1a-c352-49b3-98b9-af96dfe7378d,Just Fun (10),,0,,"[""The Beatles""]",0,2019-04,[],音乐
+musicbrainz:7e7703c1-c174-4292-a996-54dcdc14ba1a,She Loves You,,0,,"[""The Beatles""]",0,1999,[],音乐
+musicbrainz:5ebc5cc6-9aa5-4028-9a76-79ea34145878,Yes It Is,,0,,"[""The Beatles""]",0,1992,[],音乐
+musicbrainz:fa2b2af5-3ba2-4155-b1d9-45066322edc5,Help!,,0,,"[""The Beatles""]",0,1980-11-03,[],音乐
+musicbrainz:efa1ec75-f467-48cc-a792-1a4adbeac590,Let It Be,,0,,"[""The Beatles""]",0,2015-11-06,[],音乐
+musicbrainz:cf09831a-42b7-40aa-bf64-25c4cbfb871b,You’re Going to Lose That Girl,,0,,"[""The Beatles""]",0,1999,[],音乐
+musicbrainz:072b5015-43e5-46fb-a3bc-d41146742b4f,Norwegian Wood (This Bird Has Flown) (1982 stereo mix),,0,,"[""The Beatles""]",0,1993,[],音乐
+musicbrainz:99d19703-3b17-44c8-ac0e-a5dec99a2076,I’m a Loser (take 3),,0,,"[""The Beatles""]",0,1999,[],音乐
+musicbrainz:b7e45cb3-0828-40db-adc4-488f9f6edf7a,While My Guitar Gently Weeps,,0,,"[""The Beatles""]",0,2020-01,[],音乐
+musicbrainz:b5a5448b-9cb4-4c40-9b66-3f3e14a81fa2,"I Feel Fine (takes 6, 7)",,0,,"[""The Beatles""]",0,1989,[],音乐
+musicbrainz:9c6138af-732e-4586-8a28-72444089ad58,I Don't Need No Cigarette Boy (II),,0,,"[""The Beatles""]",0,2019-04,[],音乐
+musicbrainz:c79cfaee-5822-4766-a9ba-0d01df60e9dd,I'll Be Back,,0,,"[""The Beatles""]",0,2004-11-30,[],音乐
+musicbrainz:78801ce9-4f93-41f8-b5d7-2ea7d812ddd6,"Crying, Waiting, Hoping",,0,,"[""The Beatles""]",0,1985,[],音乐
+musicbrainz:1e6d0d0b-fe68-40e8-9888-dc532760bcfc,Sure to Fall (In Love With You),,0,,"[""The Beatles""]",0,1985,[],音乐
+musicbrainz:e3171ff0-527b-4b9a-85d4-791eddc1aed9,Till There Was You,,0,,"[""The Beatles""]",0,2013-11-11,[],音乐
+musicbrainz:4f3a6797-760e-453c-b69a-71aaa0926641,"All Things Must Pass (demo, take 2, RM'82)",,0,,"[""The Beatles""]",0,1999,[],音乐
+musicbrainz:4b5766f3-b6cc-4af4-9a85-28a64ae54626,A Hard Day’s Night (take 9),,0,,"[""The Beatles""]",0,2011,[],音乐
+musicbrainz:827faa6d-a743-4855-849a-8ba0352e70c3,"Golden Slumbers / Carry That Weight (take 17, RS1 -mono)",,0,,"[""The Beatles""]",0,1999,[],音乐
+musicbrainz:3fc40f6a-50bf-456c-9109-e119a55ca9ac,Ticket to Ride (take 2),,0,,"[""The Beatles""]",0,2011,[],音乐
+musicbrainz:d53172be-7fc2-4090-a474-9224cfe42479,"Something (demo, take 1)",,0,,"[""The Beatles""]",0,1999,[],音乐
+musicbrainz:f5e49377-6612-4e36-b582-42c717d6e07a,藉口,,0,,"[""周杰倫""]",0,2004-12-03,[],音乐
+musicbrainz:ef0113b3-3eb2-4dd7-a06c-fe7d9f7facad,麥芽糖,,0,,"[""周杰倫""]",0,2008-01-30,[],音乐
+musicbrainz:a1c64b91-698a-4a45-ab80-41012a89cf99,嘻哈空姐,,0,,"[""周杰倫""]",0,2010-05-18,[],音乐
+musicbrainz:e9730c5c-3e58-4e2d-9454-39b6e5eac66a,湘倫小雨四手聯彈,,0,,"[""周杰倫""]",0,2007-08-13,[],音乐
+musicbrainz:f5191875-11de-4027-9bff-e15d3f4757a5,以父之名,,0,,"[""周杰倫""]",0,2003-07-31,[],音乐
+musicbrainz:9c9ac2ad-3836-41a0-be4b-d40e57683971,扯,,0,,"[""周杰倫""]",0,2007-11-02,[],音乐
+musicbrainz:fa107734-baad-45af-b9a0-77549c272729,威廉古堡,,0,,"[""周杰倫""]",0,,[],音乐
+musicbrainz:3a051e37-d26d-4611-8226-0a6413f09ce8,給我一首歌的時間 (特別來賓 蔡依林),,0,,"[""周杰倫""]",0,2011-01-25,[],音乐
+musicbrainz:c793580d-09b4-42df-8481-d37bdea6c020,雨下一整晚,,0,,"[""周杰倫""]",0,2011-01-12,[],音乐
+musicbrainz:eae1ce18-bbdd-495a-8c6c-2cbd7e597043,愛在西元前,,0,,"[""周杰倫""]",0,,[],音乐
+musicbrainz:7f0d16b6-ba5f-488f-9ef7-e5363d63ca9a,简单爱,,0,,"[""周杰倫""]",0,,[],音乐
+musicbrainz:4ff15ecb-0956-4a21-81ab-b679cb0054f8,聽爸爸的話,,0,,"[""周杰倫""]",0,2014-12-26,[],音乐
+musicbrainz:bf245e2a-6848-42ab-bf5c-51bdc88d91c3,跨時代,,0,,"[""周杰倫""]",0,2011-01-25,[],音乐
+musicbrainz:a4254387-330d-4a9d-9eb8-def5ce0a0dfc,說好的幸福呢＋淘汰＋青花瓷,,0,,"[""周杰倫""]",0,2011-01-25,[],音乐
+musicbrainz:97a925e6-52c7-401e-a6f5-b0499c2e7a4a,Opening: 雙截棍 (變奏版),,0,,"[""周杰倫""]",0,2002-10-25,[],音乐
+musicbrainz:f28ef132-6ef4-4584-ac1d-3e5b645da57d,龍捲風,,0,,"[""周杰倫""]",0,2001,[],音乐
+musicbrainz:e1fbb734-9af6-44dd-9d5d-636bbbbfaff8,青花瓷 (Blue and White Porcelain),,0,,"[""周杰伦""]",0,2019-11-01,[],音乐
+musicbrainz:3f5f73b4-92a9-4d06-9d23-d3d9b23cc053,黃金甲,,0,,"[""周杰倫""]",0,2008-01-30,[],音乐
+musicbrainz:96c2b884-007a-41fd-9510-0d1d54a6ac77,雨下一整晚,,0,,"[""周杰倫""]",0,2010-05-18,[],音乐
+musicbrainz:da557a80-7865-4da7-959a-a059c7581b1d,倒影,,0,,"[""周杰伦""]",0,,[],音乐
+musicbrainz:00b9b91d-bc9f-4d78-a351-0735bce971f8,彩虹,,0,,"[""周杰倫""]",0,,[],音乐
+musicbrainz:e0d8175e-f9a3-4c25-8581-c0b0a0cda458,紅塵客棧,,0,,"[""周杰倫""]",0,2012-12-28,[],音乐
+musicbrainz:3fd4e705-7d82-471b-9c44-2a0b18479671,髮如雪,,0,,"[""周杰倫""]",0,2008-01-30,[],音乐
+musicbrainz:b2f3df43-929a-41eb-8b3b-a6be3970f105,驚嘆號,,0,,"[""周杰倫""]",0,2016-05-10,[],音乐
+musicbrainz:da7be06f-4053-4808-9701-fddb679c4d70,给我一首歌的时间,,0,,"[""周杰伦""]",0,2008,[],音乐
+musicbrainz:d7b9275c-c083-47ee-822e-c7bbb435beba,開不了口,,0,,"[""周杰倫""]",0,2024-04-03,[],音乐
+musicbrainz:d2ac8502-8fa3-4ce2-9d28-46cb691e63d8,Mine Mine,,0,,"[""周杰倫""]",0,2016-05-10,[],音乐
+musicbrainz:484f5467-6f91-4773-84b7-cb3a6770ac70,最後的戰役,,0,,"[""周杰倫""]",0,2016-05-10,[],音乐
+musicbrainz:2e3bcea1-57f5-45f2-9c4e-f82e63324a06,雙刀,,0,,"[""周杰倫""]",0,2003-07-31,[],音乐
+musicbrainz:8ed89350-d58f-4175-adea-6e206d175289,牛仔很忙,,0,,"[""周杰倫""]",0,2007-11-02,[],音乐
+musicbrainz:ca8fc221-1200-413d-a932-06972f552017,四面楚歌,,0,,"[""周杰倫""]",0,2006-01-20,[],音乐
+musicbrainz:e01cd995-3c57-45b5-8df4-7d9fc74174cc,The One 籌備幕後秘辛,,0,,"[""周杰倫""]",0,,[],音乐
+musicbrainz:09de6abe-9558-4445-9ef8-e68732f3c688,時光機,,0,,"[""周杰倫""]",0,2011-01-25,[],音乐
+musicbrainz:d0d99e24-9f51-42e1-9312-6414b5189198,免費教學錄影帶,,0,,"[""周杰倫""]",0,2011-01-25,[],音乐
+musicbrainz:195636c1-894c-4bb3-ad7f-0acf55e938f7,爺爺泡的茶,,0,,"[""周杰倫""]",0,2009-06-02,[],音乐
+musicbrainz:70106631-d284-401e-aac3-ad9696772047,Mojito,,0,,"[""周杰倫""]",0,2024-04-03,[],音乐
+musicbrainz:e71f9760-8902-42f5-9ce0-3b4d72e283a4,蒲公英的約定,,0,,"[""周杰倫""]",0,2008-01-30,[],音乐
+musicbrainz:40111902-832c-4cfc-99da-ad84ed13a702,爷爷泡的茶,,0,,"[""周杰倫""]",0,2002-07-18,[],音乐
+musicbrainz:1b5f40e1-3c54-4282-ae56-479f4295dc55,Mojito,,0,,"[""周杰倫""]",0,,[],音乐
+musicbrainz:3b85b835-df3f-4bac-91fe-a7c195fac792,鬥牛,,0,,"[""周杰倫""]",0,,[],音乐
+musicbrainz:6898da2b-27ac-4746-8b45-6060f9564197,夜曲,,0,,"[""周杰倫""]",0,2005,[],音乐
+musicbrainz:99db2ee1-4b69-4a56-9807-1ceb07183ec6,時光機,,0,,"[""周杰倫""]",0,2011-01-25,[],音乐
+musicbrainz:1a8d5246-8d89-4552-a0e2-1d50d1166381,擱淺,,0,,"[""周杰倫""]",0,2024-04-03,[],音乐
+musicbrainz:f4609c99-2ddd-4521-b8ce-ab3de0ece37a,Mine Mine,,0,,"[""周杰倫""]",0,,[],音乐
+musicbrainz:6e18b6c7-b411-42bc-b358-ba5b0cadd638,最长的电影,,0,,"[""周杰倫""]",0,2007-11-02,[],音乐
+musicbrainz:cce8f025-7819-4ce8-adac-6a96ef0a5a33,嗆,,0,,"[""周杰倫""]",0,2008-01-30,[],音乐
+musicbrainz:4825ea04-6c26-4fa2-91bb-094105f34ec4,妳聽得到,,0,,"[""周杰倫""]",0,2005,[],音乐
+musicbrainz:10cd3bf5-a37e-4532-b914-c6a59a730781,稻香,,0,,"[""周杰倫""]",0,2011-01-25,[],音乐
+musicbrainz:e0ec0fb0-2cb9-48bd-ab2b-39f78deda8e0,半獸人,,0,,"[""周杰倫""]",0,,[],音乐
+musicbrainz:a22828cc-8582-4488-aab5-9412b6455f6d,樂手介紹,,0,,"[""周杰倫""]",0,2005,[],音乐

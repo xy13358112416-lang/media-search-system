@@ -109,7 +109,7 @@ WarehousePage::WarehousePage(WarehouseService& service,
     publicSearch_ = new QLineEdit;
     publicSearch_->setObjectName(QStringLiteral("warehousePublicSearch"));
     publicSearch_->setAccessibleName(QStringLiteral("当前公开仓库的作品关键字"));
-    publicSearch_->setPlaceholderText(QStringLiteral("片名、类别、创作者或演员"));
+    publicSearch_->setPlaceholderText(QStringLiteral("片名、类别、导演或演员"));
     publicSearch_->setMaxLength(care_contract::MaxQueryUnits);
     submitSearch_ = new QPushButton(QStringLiteral("搜索当前公开仓库"));
     submitSearch_->setToolTip(QStringLiteral("搜索历史和公开热榜贡献遵循当前服务器账号的参与设置。"));
@@ -464,8 +464,8 @@ void WarehousePage::refreshDetail()
         for (const auto& item : items_) {
             const auto& media = item.media;
             auto* row = new QListWidgetItem(itemLabel(media), itemList_);
-            row->setToolTip(QStringLiteral("<b>%1</b><br>创作者：%2<br>演员：%3<br>发行日期：%4")
-                .arg(media.fileName.toHtmlEscaped(), media.creator.toHtmlEscaped(),
+            row->setToolTip(QStringLiteral("<b>%1</b><br>导演：%2<br>演员：%3<br>发行日期：%4")
+                .arg(media.fileName.toHtmlEscaped(), media.director.toHtmlEscaped(),
                      media.actors.join(QStringLiteral("、")).toHtmlEscaped(),
                      mediaReleaseText(media)));
         }
@@ -504,7 +504,7 @@ void WarehousePage::applyPublicSearch()
             return value.contains(activeSearch_, Qt::CaseInsensitive);
         };
         const bool visible = activeSearch_.isEmpty() || matches(media.fileName) ||
-            matches(media.category) || matches(media.creator) ||
+            matches(media.category) || matches(media.director) ||
             std::any_of(media.actors.cbegin(), media.actors.cend(), matches);
         itemList_->item(row)->setHidden(!visible);
         if (visible)

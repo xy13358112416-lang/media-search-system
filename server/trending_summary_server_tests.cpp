@@ -119,7 +119,7 @@ struct Fixture {
         });
         if(!warehouse.value) return {};
         MediaRecord media;media.id="local-only-id";media.fileName="Public music.mp4";
-        media.fileType="MP4";media.releaseDate=QDate(2024,1,1);media.creator="private-metadata-sentinel";
+        media.fileType="MP4";media.releaseDate=QDate(2024,1,1);media.director="private-metadata-sentinel";
         const auto item=waitResult<warehouse_contract::WarehouseItem>([&](auto cb){alice.addItem(warehouse.value->warehouseId,media,cb);});
         if(!item.value) return {};
         const auto work=waitResult<ResourceSummary>([&](auto cb){alice.getResource({warehouse.value->warehouseId,item.value->itemId},cb);});

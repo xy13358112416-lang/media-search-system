@@ -53,7 +53,7 @@ private slots:
         QFETCH(QString, query); QFETCH(QString, title); QFETCH(QString, director); QFETCH(QStringList, actors);
         Request request; request.context = query;
         request.candidates = {candidate("a:hot", "Other", "Other", 100)};
-        auto target = candidate("z:target", title, "Target"); target.media.creator = director; target.media.actors = actors;
+        auto target = candidate("z:target", title, "Target"); target.media.director = director; target.media.actors = actors;
         request.candidates.append(target);
         QCOMPARE(selectCandidates(request, 1).first().key, QStringLiteral("z:target"));
     }
