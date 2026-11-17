@@ -1214,9 +1214,8 @@ int main(int argc, char* argv[])
     QApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("MediaSearch"));
     QCoreApplication::setApplicationName(QStringLiteral("MediaSearchClient"));
-    app.setStyle(QStringLiteral("Fusion"));
     app.setFont(QFont(QStringLiteral("Microsoft YaHei UI")));
-    app.setStyleSheet(libraryStyle());
+    applyLibraryStyle(app);
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("多媒体文件管理及检索系统"));
     parser.addHelpOption();

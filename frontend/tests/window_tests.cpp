@@ -3,6 +3,8 @@
 #include "window_test_support.h"
 
 #include <QCheckBox>
+#include <QDateEdit>
+#include <QListWidget>
 #include <QPropertyAnimation>
 #include <QSettings>
 #include <QtTest>
@@ -16,8 +18,40 @@ private slots:
     void initTestCase() {
         QVERIFY(settingsDir_.isValid());
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settingsDir_.path());
-        qApp->setStyle(QStringLiteral("Fusion"));
-        qApp->setStyleSheet(libraryStyle());
+        QPalette dark;
+        dark.setColor(QPalette::Window, QColor(QStringLiteral("#484848")));
+        dark.setColor(QPalette::Base, QColor(QStringLiteral("#2c2c2c")));
+        dark.setColor(QPalette::Text, Qt::white);
+        qApp->setPalette(dark);
+        applyLibraryStyle(*qApp);
+    }
+
+    void darkPaletteCannotBleedIntoCareTabsAndViews() {
+        QTabWidget tabs;
+        auto* page = new QWidget;
+        auto* layout = new QVBoxLayout(page);
+        auto* table = new QTableWidget(2, 2);
+        auto* list = new QListWidget;
+        auto* dates = new QDateEdit;
+        dates->setCalendarPopup(true);
+        layout->addWidget(table);
+        layout->addWidget(list);
+        layout->addWidget(dates);
+        tabs.addTab(page, QStringLiteral("个人足迹"));
+        tabs.resize(480, 400);
+        tabs.show();
+        QCoreApplication::processEvents();
+
+        const QColor surface(QStringLiteral("#f1f5fb"));
+        const auto rendered = tabs.grab().toImage();
+        const auto point = page->mapTo(&tabs, QPoint(4, 20));
+        QCOMPARE(rendered.pixelColor((QPointF(point) * rendered.devicePixelRatio()).toPoint()), surface);
+        for (const auto* view : {static_cast<QAbstractItemView*>(table), static_cast<QAbstractItemView*>(list)}) {
+            const auto pixels = view->viewport()->grab().toImage();
+            QCOMPARE(pixels.pixelColor(pixels.width() / 2, pixels.height() - 10), QColor(Qt::white));
+        }
+        QCOMPARE(dates->palette().color(QPalette::Base), QColor(Qt::white));
+        QCOMPARE(dates->palette().color(QPalette::Disabled, QPalette::Text), QColor(QStringLiteral("#536680")));
     }
 
     void sameSizeRefreshHasBoundedLayoutWork_data() {

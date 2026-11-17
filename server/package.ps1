@@ -40,14 +40,14 @@ if (!$SodiumDll) {
 $SodiumDll = (Resolve-Path -LiteralPath $SodiumDll).Path
 $cache = Join-Path $build 'CMakeCache.txt'
 $compilerLine = if (Test-Path -LiteralPath $cache) {
-    (Select-String -LiteralPath $cache -Pattern '^CMAKE_CXX_COMPILER:FILEPATH=' |
+    (Select-String -LiteralPath $cache -Pattern '^CMAKE_CXX_COMPILER:(FILEPATH|STRING|UNINITIALIZED)=' |
         Select-Object -First 1).Line
 } else { $null }
 $compilerPath = if ($compilerLine) { $compilerLine.Substring($compilerLine.IndexOf('=') + 1) } else { $null }
 $runtimeBin = if ($compilerPath -and (Test-Path -LiteralPath $compilerPath)) {
     Split-Path -Parent $compilerPath
 } else {
-    $compiler = Get-Command g++.exe -CommandType Application -ErrorAction SilentlyContinue
+    $compiler = Get-Command g++.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if (!$compiler) { throw "Cannot locate the C++ runtime directory." }
     Split-Path -Parent $compiler.Source
 }

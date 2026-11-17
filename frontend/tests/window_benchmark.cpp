@@ -6,8 +6,7 @@ using namespace UiTest;
 
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
-    app.setStyle(QStringLiteral("Fusion"));
-    app.setStyleSheet(libraryStyle());
+    applyLibraryStyle(app);
     if (argc < 2 || argc > 3) return 2;
     Fixture f(QString::fromLocal8Bit(argv[1]));
     QFile log;

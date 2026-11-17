@@ -588,10 +588,13 @@ void WarehousePage::addMedia(const MediaRecord& record)
     service_.addItem(warehouse->warehouseId, record, inSession([this](Result<WarehouseItem> result) {
         writing_ = false;
         updateControls();
-        if (result.status.ok())
+        if (result.status.ok()) {
             refreshDetail();
-        else
+            if (itemsChanged_)
+                itemsChanged_();
+        } else {
             displayStatus(result.status);
+        }
     }));
 }
 
@@ -612,10 +615,13 @@ void WarehousePage::removeItem()
     service_.removeItem(warehouse->warehouseId, item.itemId, inSession([this](Status status) {
         writing_ = false;
         updateControls();
-        if (status.ok())
+        if (status.ok()) {
             refreshDetail();
-        else
+            if (itemsChanged_)
+                itemsChanged_();
+        } else {
             displayStatus(status);
+        }
     }));
 }
 
