@@ -6,6 +6,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTabWidget>
+#include <QTableWidget>
 #include <QtTest>
 #include <memory>
 
@@ -94,8 +95,8 @@ private slots:
     void deleteRefreshesCatalogAndSearch() {
         FakeService service;
         std::unique_ptr<QWidget> window(createOnlineWindow(service,service,{7,"reader"},[]{}));
-        auto* media=window->findChild<QListWidget*>("onlineMediaList");
-        QTRY_COMPARE(media->count(),2);
+        auto* media=window->findChild<QTableWidget*>("onlineMediaList");
+        QTRY_COMPARE(media->rowCount(),2);
         auto* tabs=window->findChild<QTabWidget*>("onlineTabs");
         tabs->setCurrentIndex(3);
         auto* items=window->findChild<QListWidget*>("onlineWarehouseItems");
@@ -112,11 +113,11 @@ private slots:
         QVERIFY(service.removed);
         QCOMPARE(items->count(),0);
         tabs->setCurrentIndex(0);
-        QTRY_COMPARE(media->count(),1);
+        QTRY_COMPARE(media->rowCount(),1);
         tabs->setCurrentIndex(1);
         window->findChild<QLineEdit*>("onlineSearchTitle")->setText("Private movie");
         window->findChild<QPushButton*>("onlineSearchSubmit")->click();
-        QCOMPARE(window->findChild<QListWidget*>("onlineSearchList")->count(),0);
+        QCOMPARE(window->findChild<QTableWidget*>("onlineSearchList")->rowCount(),0);
     }
     void adoptedSessionDoesNotReconnectAndClearsOldRows() {
         FakeService service;
@@ -139,13 +140,18 @@ private slots:
         std::unique_ptr<QWidget> window(createOnlineWindow(service,service,{7,"reader"},[]{}));
         window->show();
         auto* tabs=window->findChild<QTabWidget*>("onlineTabs");
-        auto* catalog=window->findChild<QListWidget*>("onlineMediaList");
-        QTRY_COMPARE(catalog->count(),2);
+        auto* catalog=window->findChild<QTableWidget*>("onlineMediaList");
+        QTRY_COMPARE(catalog->rowCount(),2);
         QCOMPARE(tabs->count(),8);
         QVERIFY(service.events.isEmpty());
         tabs->setCurrentIndex(1); tabs->setCurrentIndex(0);
         QVERIFY(service.events.isEmpty());
-        catalog->itemClicked(catalog->item(0));
+        QVERIFY(!window->findChild<QLabel*>("onlineMediaDetail"));
+        QCOMPARE(catalog->columnCount(),5);
+        QCOMPARE(catalog->item(0, 4)->text(),QStringLiteral("—"));
+        catalog->setCurrentCell(0, 0);
+        QVERIFY(service.events.isEmpty());
+        catalog->cellClicked(0, 2);
         QCOMPARE(service.opened.size(),1);
         QCOMPARE(service.opened.front().warehouseId,2);
         QCOMPARE(service.opened.front().itemId,11);
@@ -158,18 +164,18 @@ private slots:
         QCOMPARE(service.events.back().action,BehaviorAction::Search);
         QVERIFY(!service.events.back().resource);
         QVERIFY(!service.events.back().eventId.isEmpty());
-        QCOMPARE(window->findChild<QListWidget*>("onlineSearchList")->count(),2);
+        QCOMPARE(window->findChild<QTableWidget*>("onlineSearchList")->rowCount(),2);
         QCOMPARE(service.opened.size(),1);
     }
     void permissionFailuresDoNotEnterTheIndex() {
         FakeService service; service.denyPublic=true;
         std::unique_ptr<QWidget> window(createOnlineWindow(service,service,{7,"reader"},[]{}));
-        auto* catalog=window->findChild<QListWidget*>("onlineMediaList");
-        QTRY_COMPARE(catalog->count(),1);
-        QVERIFY(catalog->item(0)->text().contains("Private movie"));
+        auto* catalog=window->findChild<QTableWidget*>("onlineMediaList");
+        QTRY_COMPARE(catalog->rowCount(),1);
+        QVERIFY(catalog->item(0, 0)->text().contains("Private movie"));
         window->findChild<QLineEdit*>("onlineSearchDirector")->setText("Director");
         window->findChild<QPushButton*>("onlineSearchSubmit")->click();
-        QCOMPARE(window->findChild<QListWidget*>("onlineSearchList")->count(),1);
+        QCOMPARE(window->findChild<QTableWidget*>("onlineSearchList")->rowCount(),1);
     }
     void todayRevalidatesAndLogoutIsSingleAndCancelsPendingWork() {
         FakeService service;
@@ -184,7 +190,7 @@ private slots:
         window->findChild<QPushButton*>("onlineLogout")->click();
         window->close();
         QCOMPARE(logouts,1);
-        QCOMPARE(window->findChild<QListWidget*>("onlineMediaList")->count(),0);
+        QCOMPARE(window->findChild<QTableWidget*>("onlineMediaList")->rowCount(),0);
         FakeService pending; pending.deferTemporal=true;
         std::unique_ptr<QWidget> other(createOnlineWindow(pending,pending,{9,"second"},[]{}));
         other->findChild<QTabWidget*>("onlineTabs")->setCurrentIndex(2);

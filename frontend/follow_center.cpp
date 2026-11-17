@@ -137,7 +137,9 @@ private:
                 people_->addItem(QStringLiteral("%1 · %2").arg(person.name, roles.join(QStringLiteral("、"))));
             }
             more_->setEnabled(next_.has_value());
-            status->setText(entries_.isEmpty() ? QStringLiteral("没有找到人物。") : QString());
+            status->setText(entries_.isEmpty()
+                ? QStringLiteral("没有找到匹配的人物。可尝试全名或别名，关注中心使用服务器已导入的人物资料。")
+                : QString());
             if (people_->currentRow() < 0 && !entries_.isEmpty())
                 people_->setCurrentRow(0);
         });
