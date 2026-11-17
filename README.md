@@ -20,7 +20,9 @@
 - [network/](network/) 封装 TCP 请求、登录会话和客户端接口。[server/](server/) 保存网络用户、仓库、行为、关注与资讯缓存，入口为 `media_server.exe`。
 - [include/](include/) 定义共享接口。[sample-data/](sample-data/) 提供作品样例和自动测试用的模拟数据。
 
-**本机账号和服务器账号分别登录。** Qt 首次启动时创建的是该电脑的本机管理员，账户保存在本机 `accounts.sqlite`；「资源仓库」使用服务器管理员创建的网络账号。联网数据都保存到服务端启动时指定的 SQLite 文件。同一份本机 CSV 无需在两台电脑之间同步。
+**默认只登录一次服务器账号。** 双击客户端后，先自动连接配置好的服务器，输入网络账号即可进入。媒体库、检索、今日推荐、仓库、足迹、热榜及关注共用这一连接和身份，在线浏览记录写入服务端。原来的本机账户、角色和 CSV 功能保留在显式的 `media_library_qt.exe --local` 模式。
+
+客户端默认预设本次热点地址 `192.168.43.8:8765`；可以修改 EXE 旁的 `media-client.ini`，也可以在登录页点击「更改服务器」。成功登录后保存地址、端口及用户名，不保存密码。服务器地址改变时需要重新配置，不能将热点 IP 当成永久地址。
 
 ## 两台电脑怎么联调
 
@@ -57,7 +59,7 @@ $ServerIp = Read-Host '电脑 A 的局域网 IPv4'
 Test-NetConnection $ServerIp -Port 8765
 ~~~
 
-在两台电脑上分别双击各自 `frontend` 目录里的 `media_library_qt.exe`。首次打开时按界面提示创建并登录本机账号。进入主窗口后，在「资源仓库」填写下面的信息并点击「连接并登录」。
+在两台电脑上分别双击各自 `frontend` 目录里的 `media_library_qt.exe`。客户端自动连接预设服务器；若连接失败，点击「更改服务器」核对地址。直接登录管理员创建的服务器账号，无需创建本机账号或在仓库页二次登录。
 
 - 服务器地址填电脑 A 的局域网 IPv4，端口填 `8765`。电脑 A 上的 Qt 同样填这个地址。
 - 电脑 A 用 `alice`，电脑 B 用 `bob`。密码用刚才建网络账号时输入的值。
@@ -99,7 +101,9 @@ ctest --test-dir build --output-on-failure
 .\build\frontend\media_library_qt.exe
 ~~~
 
-命令行启动的客户端默认使用 EXE 同目录的 `media_records_sample.csv`，首次启动会生成可编辑的 `media_records.csv`。可用 `--csv "C:\path\media_records.csv"` 指定自备文件。使用源码构建联机时，按前面的流程操作，将服务端 EXE 换成仓库根目录下的 `.\build\server\media_server.exe`。
+默认联网启动不打开本机 CSV 或账户库。单机启动使用 `media_library_qt.exe --local`，该模式首次将 EXE 旁的 `media_records_sample.csv` 复制成可编辑的 `media_records.csv`；可加 `--csv "C:\path\media_records.csv"` 指定文件。使用源码构建联机时，将服务端 EXE 换成 `.\build\server\media_server.exe`。
+
+发布包服务端可提前配置 `media-server.ini` 中的 `listen`、`port`、`database`，之后直接双击 `start-server.cmd`，不必每次输入命令。数据库相对路径以配置文件所在目录为准；配置缺失或目标库不存在时直接报错，避免误开空库。仍支持显式命令行参数覆盖配置。服务器监听 `0.0.0.0` 时客户端填写服务器的实际 IP，不能填写 `0.0.0.0`。
 
 自动端到端检查可验证服务器在本机是否正常运行。
 
@@ -107,7 +111,7 @@ ctest --test-dir build --output-on-failure
 python sample-data/simulation/demo_end_to_end_check.py . build
 ~~~
 
-这个脚本使用临时库和本机端口验证两个模拟账号的足迹。若想在 Qt 里手动查看历史，可按 [模拟数据说明](sample-data/simulation/README.md#快速创建演示数据库) 生成并导入独立演示库，再用 `sim_user_01` 和 `sim_user_20` 登录。默认数据覆盖北京时间 2026-08-17 至 2026-11-15 零点，足迹页面请选择「自选区间」覆盖这段时间。
+这个脚本使用临时库和本机端口验证模拟账号的足迹及推荐；可添加 `--users 200 --end-date 2026-11-17` 验证 200 人场景及公开热榜。若想在 Qt 里手动查看历史，可按 [模拟数据说明](sample-data/simulation/README.md#快速创建演示数据库) 生成并导入独立演示库，再用 `sim_user_01` 等网络账号登录。日期参数表示北京时间当天零点的排他终点；导入截至昨天的数据时，热榜请选择「本周」，今天的空榜不代表导入失败。
 
 ## 可选的 DeepSeek 配置
 

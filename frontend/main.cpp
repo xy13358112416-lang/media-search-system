@@ -12,6 +12,8 @@
 #include "avatar_button.h"
 #include "assistant_dialog.h"
 #include "account_frontend.h"
+#include "online_startup.h"
+#include "online_window.h"
 #include "account_history_service.h"
 #include "personalrecommendation_service.h"
 #include "todayrecommendation_service.h"
@@ -34,6 +36,7 @@
 #include <QLineEdit>
 #include <QLocale>
 #include <QMessageBox>
+#include <QTimer>
 #include <QPushButton>
 #include <QProgressBar>
 #include <QGridLayout>
@@ -1209,6 +1212,8 @@ int runAccountFrontend(QApplication& app, MediaLibrary& library,
 int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
+    QCoreApplication::setOrganizationName(QStringLiteral("MediaSearch"));
+    QCoreApplication::setApplicationName(QStringLiteral("MediaSearchClient"));
     app.setStyle(QStringLiteral("Fusion"));
     app.setFont(QFont(QStringLiteral("Microsoft YaHei UI")));
     app.setStyleSheet(libraryStyle());
@@ -1218,7 +1223,48 @@ int main(int argc, char* argv[])
     const QCommandLineOption csvOption(QStringLiteral("csv"), QStringLiteral("媒体 CSV 文件路径"),
                                        QStringLiteral("path"));
     parser.addOption(csvOption);
+    const QCommandLineOption localOption(QStringLiteral("local"), QStringLiteral("显式使用旧单机账户与 CSV 模式"));
+    const QCommandLineOption configOption(QStringLiteral("config"), QStringLiteral("服务器连接配置文件"), QStringLiteral("path"));
+    parser.addOption(localOption);
+    parser.addOption(configOption);
     parser.process(app);
+
+    if (!parser.isSet(localOption)) {
+        // One authenticated connection for the entire online application. No local
+        // account database or CSV is opened before (or after) online sign-in.
+        app.setQuitOnLastWindowClosed(false);
+        OnlineCareClient client;
+        warehouse_contract::UserInfo user;
+        while (online_ui::signIn(client, user, nullptr, parser.value(configOption))) {
+            bool returnToLogin = false;
+            QDialog session;
+            session.setWindowTitle(QStringLiteral("多媒体文件管理及检索系统"));
+            session.resize(1200, 780);
+            auto* layout = new QVBoxLayout(&session);
+            layout->setContentsMargins(0, 0, 0, 0);
+            const auto disconnected = client.onDisconnected(&session, [&] {
+                returnToLogin = true;
+                session.accept();
+            });
+            auto* window = createOnlineWindow(client, user, [&] {
+                returnToLogin = true;
+                session.accept();
+            }, &session);
+            layout->addWidget(window);
+            // Login can complete just before a disconnect in the same received
+            // frame batch. Do not enter a new modal loop with an expired session.
+            if (!returnToLogin && client.isAuthenticated())
+                session.exec();
+            else
+                returnToLogin = true;
+            QObject::disconnect(disconnected);
+            // Destroy all pages before disconnecting/cancelling their callbacks.
+            delete window;
+            client.disconnectFromServer();
+            if (!returnToLogin) break;
+        }
+        return 0;
+    }
 
     const QDir appDir(QCoreApplication::applicationDirPath());
     const bool useDefaultCsv = !parser.isSet(csvOption);
