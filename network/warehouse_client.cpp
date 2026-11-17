@@ -182,7 +182,8 @@ QString WarehouseClient::request(const QString& type, const QJsonObject& payload
     if (socket_.write(frame) < 0) {
         auto p = pending_.take(id); p.callback(fail(ErrorCode::NotConnected, socket_.errorString()), {}); return {};
     }
-    const int timeout = cancelOnServer ? recommendationTimeoutMs_ : TimeoutMs;
+    const int timeout = type == "search_person_web" ? 35000
+        : cancelOnServer ? recommendationTimeoutMs_ : TimeoutMs;
     QTimer::singleShot(timeout, this, [this, id] {
         if (!pending_.contains(id)) return;
         auto p = pending_.take(id);

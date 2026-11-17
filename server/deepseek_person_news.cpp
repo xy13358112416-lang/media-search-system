@@ -248,6 +248,59 @@ private:
 };
 } // namespace
 
+void findPeople(QNetworkAccessManager& network, const QString& name, const QByteArray& apiKey,
+                Callback<QList<PersonWebSource>> done)
+{
+    const auto term = normalized(name);
+    const auto query = QStringLiteral("\"%1\" site:catalog.afi.com OR site:musicbrainz.org OR site:tvmaze.com").arg(term);
+    if (!queryTerm(term) || query.toUcs4().size() > 128) {
+        done({{ErrorCode::InvalidArgument, QStringLiteral("请输入较短的人物姓名。")}, {}});
+        return;
+    }
+    const auto key = apiKey.trimmed();
+    if (key.isEmpty() || key.size() > 4096 || key.contains('\n') || key.contains('\r') || key.contains('\0')) {
+        done({failure(QStringLiteral("服务器尚未配置 DeepSeek 联网搜索。")), {}});
+        return;
+    }
+    postJson(network, SearchUrl, key, {{"query", query}, {"count", 8}, {"need_content", false}},
+        [&network, key, term, done = std::move(done)](std::optional<QJsonObject> reply) {
+            if (!reply || !reply->value("results").isArray()) {
+                done({failure(QStringLiteral("DeepSeek 人物搜索暂时失败，请重试。")), {}});
+                return;
+            }
+            const auto rows = reply->value("results").toArray();
+            for (const auto& row : rows) {
+                const QUrl url(row.toObject().value("url").toString(), QUrl::StrictMode);
+                if (!url.isValid() || url.scheme() != "https" || !url.userInfo().isEmpty() ||
+                    url.port() != -1 || url.toEncoded().size() > 2048)
+                    continue;
+                const auto host = url.host();
+                const auto path = url.path();
+                if (!((host == "catalog.afi.com" && path.startsWith("/Catalog/PersonDetails/", Qt::CaseInsensitive)) ||
+                      (host == "musicbrainz.org" && path.startsWith("/artist/")) ||
+                      ((host == "www.tvmaze.com" || host == "tvmaze.com") && path.startsWith("/people/"))))
+                    continue;
+                const auto source = url.adjusted(QUrl::RemoveFragment | QUrl::RemoveQuery);
+                postJson(network, FetchUrl, key, {{"url", source.toString(QUrl::FullyEncoded)}},
+                    [source, term, done = std::move(done)](std::optional<QJsonObject> page) {
+                        if (!page || !page->value("content").isString()) {
+                            done({failure(QStringLiteral("网页原文暂时无法读取，请重试。")), {}});
+                            return;
+                        }
+                        const auto content = normalized(page->value("content").toString());
+                        QList<PersonWebSource> sources;
+                        if (content.contains(term, Qt::CaseInsensitive)) {
+                            const auto title = normalized(page->value("title").toString()).left(200);
+                            sources.append({title.isEmpty() ? term : title, source});
+                        }
+                        done({{}, std::move(sources)});
+                    });
+                return;
+            }
+            done({{}, QList<PersonWebSource>{}});
+        });
+}
+
 Result<QUrl> cacheSource(const Request& request)
 {
     const auto plan = prepare(request);

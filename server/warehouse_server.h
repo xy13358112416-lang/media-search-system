@@ -15,6 +15,7 @@
 #include <utility>
 
 class QTcpSocket;
+class QNetworkAccessManager;
 namespace person_store { class SqliteStore; }
 
 struct StoredBehavior {
@@ -55,6 +56,7 @@ private:
         struct SummaryPending { quint64 modelId = 0; QString token; qint64 userId = 0; };
         QHash<QString, SummaryPending> summaries;
         QHash<QString, SummaryPending> scenes;
+        QString personLookup;
     };
     QJsonObject dispatch(Session& session, const QJsonObject& request);
     std::optional<care_contract::Result<QJsonObject>> dispatchPersonQuery(
@@ -74,6 +76,9 @@ private:
     care_contract::Result<care_contract::TrendingResult> currentTrending(const care_contract::TrendingRequest& input);
     void startTrendingSummary(QTcpSocket* socket, const std::shared_ptr<Session>& session, const QJsonObject& request);
     void startSceneRecommendation(QTcpSocket* socket, const std::shared_ptr<Session>& session, const QJsonObject& request);
+    void startPersonLookup(QTcpSocket* socket, const std::shared_ptr<Session>& session, const QJsonObject& request);
+    QNetworkAccessManager* personLookupNetwork_;
+    int personLookupsInFlight_ = 0;
     llm_recommendation::Client recommender_;
     llm_trend_summary::Client trendSummarizer_;
     llm_scene::Client sceneRecommender_;

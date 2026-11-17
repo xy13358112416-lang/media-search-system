@@ -28,3 +28,14 @@ HTTPS 地址只记录核验依据，不代表工具自动证明了内容真实�
 程序接口见 `person_credit_import.h`。调用方提供数据库连接，必须在连接所属线程执行；内部使用 SAVEPOINT，因此失败不会回滚调用方早先的其他工作，成功也不会提交调用方外层事务。批次最大 8 MiB JSON、10000 人物及 10000 条关联；每作品已确认人物最多 256 个。
 
 仓储在下次读取资源时即可使用已导入关联；新的主动浏览保存当时人物快照。旧历史保持原样，不能用新目录补造过去的认识。资讯 feed 与本文的身份/作品证据地址是不同用途，导入不修改 `person_sources` 或资讯缓存。
+
+## 给现有演示库添加已核验的人物
+
+停服并备份后，用实际演示库生成映射，再调用导入工具。以下命令在仓库根目录运行。
+
+```powershell
+python sample-data/person/prepare_demo_person_mapping.py build/media-demo-200.sqlite build/demo-person-credits.json
+.\build\server\media_person_import.exe build/media-demo-200.sqlite build/demo-person-credits.json
+```
+
+生成器读取当前库实际分配的作品标识，收录 AFI Catalog 已核验的 Alan Alda 以及三部作品的演员、导演关联。重新启动服务器后可在关注中心搜索 Alan Alda。

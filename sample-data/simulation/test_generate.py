@@ -32,10 +32,10 @@ class FixtureTests(unittest.TestCase):
             self.assertEqual(manifest["user_count"], 20)
             self.assertEqual(manifest["event_count"], 6420)
             # JSON text writing follows the platform newline convention. Compare
-            # the original fixture content without making this test Windows-only.
+            # the fixture content without making this test Windows-only.
             normalized = (a / "algorithm_fixture.json").read_bytes().replace(b"\r\n", b"\n")
             self.assertEqual(hashlib.sha256(normalized).hexdigest(),
-                             "f9ab74b6c2ab4900d9dc131c400908c1f149abddcbb0806db80969fcb063b481")
+                             "aa6da1ff810c46501d84fa9e3309027c97216919639c189cd6aeabb0275f631e")
             self.assertEqual(manifest["sha256"]["events.csv"],
                              "eb813c5b7d4e8848b04561c3513d607aeaf0266be0edbfc2f8b4df4fc1c08c92")
             fixture = json.loads((a / "algorithm_fixture.json").read_text(encoding="utf-8"))

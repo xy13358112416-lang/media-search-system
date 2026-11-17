@@ -60,9 +60,10 @@ bool parseNumber(const QString& value, quint64& result) {
 bool validRecord(const MediaRecord& r) {
     if (r.id.isEmpty() || r.id != r.id.trimmed() || r.fileName.trimmed().isEmpty() ||
         (!r.fileType.isEmpty() && !CsvMediaRepository::supportedFileTypes().contains(r.fileType))) return false;
-    // 类型为空表示仅有作品元数据，没有已知本地文件；发行日允许未知。
+    if (!r.releasePeriod.isEmpty() && (!r.releaseDate.isNull() || !validReleasePeriod(r.releasePeriod)))
+        return false;
     if (!r.releaseDate.isValid()) {
-        if (!r.fileType.isEmpty() || !r.releaseDate.isNull()) return false;
+        if (!r.releaseDate.isNull()) return false;
     } else {
         // ISO 日期必须能以四位年格式往返，否则写入后无法重新加载。
         const QString dateText = r.releaseDate.toString(Qt::ISODate);
@@ -165,11 +166,10 @@ RepositoryResult CsvMediaRepository::load(QList<MediaRecord>& records) {
     for (const auto& row : rows) {
         if (row.size() != columns.size()) return fail(QStringLiteral("CSV 列数不匹配"));
         MediaRecord r; r.id=row[0]; r.fileName=row[1]; r.fileType=row[2]; r.director=row[4];
-        r.releaseDate=QDate::fromString(row[7], Qt::ISODate);
         if (!legacy) r.category=row[9];
         if (!parseNumber(row[3], r.fileSize) || !parseNumber(row[6], r.viewCount) ||
             !parseList(row[5], r.actors) || !parseList(row[8], r.awards) ||
-            !validRecord(r) || r.releaseDate.toString(Qt::ISODate) != row[7] || ids.contains(r.id))
+            !parseMediaRelease(row[7], r) || !validRecord(r) || ids.contains(r.id))
             return fail(QStringLiteral("CSV 包含无效记录或重复 ID：") + r.id);
         ids.insert(r.id); next.append(r);
     }
@@ -182,7 +182,7 @@ RepositoryResult CsvMediaRepository::save(const QList<MediaRecord>& records) {
     QByteArray output = header.join(',').toUtf8() + '\n';
     for (const auto& r : records) {
         QStringList values{r.id, r.fileName, r.fileType, QString::number(r.fileSize), r.director,
-                           listJson(r.actors), QString::number(r.viewCount), r.releaseDate.toString(Qt::ISODate),
+                           listJson(r.actors), QString::number(r.viewCount), mediaReleaseText(r),
                            listJson(r.awards), r.category};
         for (auto& value : values) value = quoted(value);
         output += values.join(',').toUtf8() + '\n';

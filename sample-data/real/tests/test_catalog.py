@@ -37,8 +37,10 @@ class CatalogTests(unittest.TestCase):
             self.assertEqual(row["release_date"], item["release_date"])
             self.assertEqual((row["file_type"], row["file_size"], row["view_count"],
                               json.loads(row["awards"])), ("", "0", "0", []))
-            if len(item["release_raw"]) != 10:
-                self.assertEqual(row["release_date"], "")
+            if row["release_date"]:
+                self.assertEqual(row["release_date"], item["release_raw"])
+                self.assertIn(len(row["release_date"]), (4, 7, 10))
+        self.assertEqual(sum(bool(row["release_date"]) for row in self.records), 474)
 
     def test_source_ids_and_titles_match_snapshots(self):
         provenance = {r["uci_key"]: r for r in csv_rows(SAMPLES / "expanded" / "provenance.csv")

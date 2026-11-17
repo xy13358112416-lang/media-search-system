@@ -104,6 +104,46 @@ protected:
 class PersonImportServerTests : public QObject {
     Q_OBJECT
 private slots:
+    void webPersonSearchFetchesOnlyApprovedProfiles()
+    {
+        NewsNetwork network;
+        network.searchBody = {{"results", QJsonArray{
+            QJsonObject{{"url", "https://example.invalid/people/123"}},
+            QJsonObject{{"url", "https://catalog.afi.com/Film/56615-THE-FOUR-SEASONS"}},
+            QJsonObject{{"url", "https://catalog.afi.com/Catalog/PersonDetails/8664?from=search"}},
+        }}};
+        network.fetchBody = {{"title", "Alan Alda"}, {"content", "# Alan Alda\nFilmography"}};
+        bool done = false;
+        Result<QList<PersonWebSource>> result;
+        const auto lookup = [&] {
+            done = false;
+            deepseek_person_news::findPeople(network, "Alan Alda", "test-key", [&](auto value) {
+                result = std::move(value);
+                done = true;
+            });
+        };
+        lookup();
+        QTRY_VERIFY(done);
+        QVERIFY(result.status.ok() && result.value);
+        QCOMPARE(result.value->size(), 1);
+        QCOMPARE(result.value->front().title, QString("Alan Alda"));
+        QCOMPARE(network.requests.size(), 2);
+        QCOMPARE(network.requests.at(0).url().path(), QString("/v1/tools/search"));
+        QCOMPARE(network.requests.at(1).url().path(), QString("/v1/tools/fetch"));
+        QCOMPARE(network.payloads.at(1).value("url").toString(),
+                 QString("https://catalog.afi.com/Catalog/PersonDetails/8664"));
+
+        network.fetchBody = {{"title", "Another person"}, {"content", "# Another person"}};
+        lookup();
+        QTRY_VERIFY(done);
+        QVERIFY(result.status.ok() && result.value && result.value->isEmpty());
+
+        network.fetchStatus = 503;
+        lookup();
+        QTRY_VERIFY(done);
+        QVERIFY(!result.status.ok());
+    }
+
     void importedPeopleReachResourceHistoryFootprintAndFollowRecommendation() {
         QTemporaryDir dir;
         const auto path = dir.filePath("server.sqlite");
