@@ -15,8 +15,9 @@ namespace {
 
 class TemporalPage final : public CarePage {
 public:
-    TemporalPage(CareService& service, std::function<BrowseScene()> scene)
-        : CarePage(QStringLiteral("动态推荐")), service_(service), scene_(std::move(scene))
+    TemporalPage(CareService& service, std::function<BrowseScene()> scene,
+                 std::function<void(const WarehouseItemRef&)> open)
+        : CarePage(QStringLiteral("动态推荐")), service_(service), scene_(std::move(scene)), open_(std::move(open))
     {
         auto* options = new QHBoxLayout;
         addChoices(category_, QStringLiteral("偏好类别"),
@@ -47,6 +48,11 @@ public:
             status->setText(QStringLiteral("已停止等待推荐。"));
         });
         connect(list_, &QListWidget::currentRowChanged, this, [this] { updateSelection(); });
+        connect(list_, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
+            const int row = list_->row(item);
+            if (open_ && !blocked_->isChecked() && row >= 0 && row < entries_.size())
+                open_(entries_.at(row).work.resource.source);
+        });
         connect(blocked_, &QPushButton::toggled, this, [this] { reloadView(); });
         connect(feedback_, &QPushButton::clicked, this, [this] { updateFeedback(); });
         blocked_->setCheckable(true);
@@ -231,6 +237,7 @@ private:
 
     CareService& service_;
     std::function<BrowseScene()> scene_;
+    std::function<void(const WarehouseItemRef&)> open_;
     QComboBox* category_ = new QComboBox;
     QComboBox* type_ = new QComboBox;
     QListWidget* list_ = new QListWidget;
@@ -248,7 +255,8 @@ private:
 
 } // namespace
 
-CarePage* createTemporalPage(CareService& service, std::function<BrowseScene()> scene)
+CarePage* createTemporalPage(CareService& service, std::function<BrowseScene()> scene,
+    std::function<void(const WarehouseItemRef&)> open)
 {
-    return new TemporalPage(service, std::move(scene));
+    return new TemporalPage(service, std::move(scene), std::move(open));
 }

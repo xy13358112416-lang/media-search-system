@@ -8,6 +8,10 @@
 class OnlineCareClient final : public WarehouseClient, public care_contract::CareService {
 public:
     using WarehouseClient::WarehouseClient;
+    bool isAuthenticated() const
+    {
+        return socket_.state() == QAbstractSocket::ConnectedState && !token_.isEmpty();
+    }
     QMetaObject::Connection onDisconnected(QObject* context, std::function<void()> callback)
     {
         return connect(&socket_, &QTcpSocket::disconnected, context, std::move(callback));

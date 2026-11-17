@@ -32,7 +32,7 @@ bool decimal(const QJsonValue& value, qint64& number) {
 }
 bool loadFixture(const QString& path, Fixture& output, QString& error) {
     QFile file(path);
-    if (!file.open(QIODevice::ReadOnly) || file.size() > 20 * 1024 * 1024) { error = QStringLiteral("无法读取模拟数据文件，或文件过大。"); return false; }
+    if (!file.open(QIODevice::ReadOnly) || file.size() > 64 * 1024 * 1024) { error = QStringLiteral("无法读取模拟数据文件，或文件过大。"); return false; }
     const QByteArray bytes = file.readAll();
     QJsonParseError parse; const auto doc = QJsonDocument::fromJson(bytes, &parse);
     if (parse.error != QJsonParseError::NoError || !doc.isObject()) { error = QStringLiteral("模拟数据 JSON 无效。"); return false; }
@@ -42,8 +42,8 @@ bool loadFixture(const QString& path, Fixture& output, QString& error) {
         error = QStringLiteral("模拟数据结构或标记无效。"); return false;
     }
     const auto users = root.value("users").toArray(), works = root.value("works").toArray(), events = root.value("events").toArray();
-    if (users.size() != 20 || works.isEmpty() || works.size() > 5000 || events.size() > 100000) { error = QStringLiteral("模拟数据数量无效。"); return false; }
-    static const QRegularExpression userFormat(QStringLiteral("\\Asim_user_(?:0[1-9]|1[0-9]|20)\\z"));
+    if (users.isEmpty() || users.size() > 200 || works.isEmpty() || works.size() > 5000 || events.size() > 100000) { error = QStringLiteral("模拟数据数量无效。"); return false; }
+    static const QRegularExpression userFormat(QStringLiteral("\\Asim_user_(?:0[1-9]|[1-9][0-9]|1[0-9]{2}|200)\\z"));
     QSet<QString> userIds, workIds, eventIds;
     for (const auto& value : users) {
         const auto o = value.toObject(); const QString id = o.value("user_ref").toString();

@@ -147,6 +147,44 @@ public:
 class CarePagesTests final : public QObject {
     Q_OBJECT
 private slots:
+    void onlineRowClicksKeepServerSourcesAndDoNotCountSelection()
+    {
+        FakeCareService service;
+        QList<WarehouseItemRef> opened;
+        auto open = [&](const WarehouseItemRef& source) { opened.append(source); };
+        std::unique_ptr<CarePage> trend(createTrendingPage(service, open));
+        trend->activate();
+        TrendingResult board;
+        ResourceSummary resource;
+        resource.resource = {"server-work", {72, 91}};
+        resource.media.fileName = "Fixture.mp4";
+        board.items.append({resource, {}, 3, 3});
+        auto done = std::move(service.trendingCalls.last().done);
+        done(success(board));
+        auto* table = trend->findChild<QTableWidget*>("careTrendingTable");
+        table->setCurrentCell(0, 0);
+        QVERIFY(opened.isEmpty());
+        table->cellClicked(0, 1);
+        QCOMPARE(opened.size(), 1);
+        QCOMPARE(opened.last().warehouseId, 72);
+        QCOMPARE(opened.last().itemId, 91);
+        trend->deactivate();
+        table->cellClicked(0, 1);
+        QCOMPARE(opened.size(), 1);
+
+        std::unique_ptr<CarePage> temporal(createTemporalPage(service, [] { return BrowseScene::Neutral; }, open));
+        temporal->activate();
+        TemporalRecommendationResult result;
+        result.items.append({resource, "Fixture reason"});
+        service.recommendationDone(success(result));
+        auto* list = temporal->findChild<QListWidget*>("careTemporalList");
+        list->setCurrentRow(0);
+        QCOMPARE(opened.size(), 1);
+        list->itemClicked(list->item(0));
+        QCOMPARE(opened.size(), 2);
+        QCOMPARE(opened.last().itemId, 91);
+    }
+
     void trendingOrdinaryActionsOnlyRequestRules()
     {
         FakeCareService service;

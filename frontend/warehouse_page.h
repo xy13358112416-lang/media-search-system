@@ -17,6 +17,8 @@ public:
     WarehousePage(warehouse_contract::WarehouseService& service,
                   std::function<QList<MediaRecord>()> localRecords, QWidget* parent = nullptr);
     ~WarehousePage() override;
+    // Adopt the connection's authenticated account; never reconnect or authenticate here.
+    void adoptSession(const warehouse_contract::UserInfo& user);
     void suspend();
     void connectionLost();
     void recordMediaView(const care_contract::WarehouseItemRef& source,
@@ -74,6 +76,8 @@ private:
     bool recommending_ = false;
     bool writing_ = false;
     bool writeOutcomeUnknown_ = false;
+    bool adoptedSession_ = false;
+    QWidget* connectionBar_ = nullptr;
 
     QLineEdit* host_;
     QSpinBox* port_;

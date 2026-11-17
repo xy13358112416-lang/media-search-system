@@ -2,7 +2,10 @@
 #include "media_json.h"
 #include "person_json.h"
 #include <QJsonArray>
+#include <QNetworkProxy>
+#include <QNetworkInterface>
 #include <QPointer>
+#include <QScopeGuard>
 #include <QTcpServer>
 #include <QtTest>
 #include <memory>
@@ -60,10 +63,10 @@ QJsonObject updatesResponse(QJsonArray items)
     return {{"page", QJsonObject{{"items", items}}}};
 }
 
-bool signIn(PersonFakeServer& fake, OnlineCareClient& client)
+bool signIn(PersonFakeServer& fake, OnlineCareClient& client, const QString& host = QStringLiteral("127.0.0.1"))
 {
     std::optional<Status> connection;
-    client.connectToServer("127.0.0.1", fake.server.serverPort(), [&](auto status) {
+    client.connectToServer(host, fake.server.serverPort(), [&](auto status) {
         connection = std::move(status);
     });
     if (!QTest::qWaitFor([&] { return connection.has_value(); }) || !connection->ok()) {
@@ -83,6 +86,43 @@ bool signIn(PersonFakeServer& fake, OnlineCareClient& client)
 class PersonClientTests : public QObject {
     Q_OBJECT
 private slots:
+    void warehouseConnectionBypassesApplicationProxy() {
+        QString host;
+        for (const auto& address : QNetworkInterface::allAddresses()) {
+            if (address.protocol() == QAbstractSocket::IPv4Protocol && !address.isLoopback()) {
+                host = address.toString();
+                break;
+            }
+        }
+        if (host.isEmpty()) QSKIP("A LAN IPv4 adapter is needed; Qt implicitly bypasses proxies for loopback.");
+        PersonFakeServer fake; QVERIFY(fake.server.listen(QHostAddress::AnyIPv4));
+        const auto previous = QNetworkProxy::applicationProxy();
+        const auto restore = qScopeGuard([&] { QNetworkProxy::setApplicationProxy(previous); });
+        // An HTTP caching proxy cannot carry the warehouse's raw TCP protocol.
+        const QNetworkProxy proxy(QNetworkProxy::HttpCachingProxy, QStringLiteral("127.0.0.1"), 1);
+        QNetworkProxy::setApplicationProxy(proxy);
+        OnlineCareClient client;
+        QVERIFY2(signIn(fake, client, host), "Warehouse login must bypass the application proxy");
+        QVERIFY(client.isAuthenticated());
+        // Only the warehouse socket should bypass it, not DeepSeek HTTP traffic.
+        QCOMPARE(QNetworkProxy::applicationProxy().type(), proxy.type());
+        QCOMPARE(QNetworkProxy::applicationProxy().port(), proxy.port());
+    }
+    void authenticatedStateFollowsConnectionAndLogout() {
+        PersonFakeServer fake; QVERIFY(fake.server.listen(QHostAddress::LocalHost));
+        OnlineCareClient client;
+        QVERIFY(!client.isAuthenticated());
+        QVERIFY(signIn(fake, client));
+        QVERIFY(client.isAuthenticated());
+        bool done = false;
+        client.logout([&](Status status) { QVERIFY(status.ok()); done = true; });
+        QTRY_VERIFY(done);
+        QVERIFY(!client.isAuthenticated());
+        QVERIFY(signIn(fake, client));
+        QVERIFY(client.isAuthenticated());
+        client.disconnectFromServer();
+        QVERIFY(!client.isAuthenticated());
+    }
     void matchesOutOfOrderPagesAndWorks() {
         PersonFakeServer fake; QVERIFY(fake.server.listen(QHostAddress::LocalHost));
         OnlineCareClient client; bool done = false; Status status;

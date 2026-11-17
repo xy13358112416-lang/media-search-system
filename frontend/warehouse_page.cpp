@@ -76,7 +76,9 @@ WarehousePage::WarehousePage(WarehouseService& service,
     status_->setWordWrap(true);
     identity_->setTextFormat(Qt::PlainText);
 
-    auto* connection = new QHBoxLayout;
+    connectionBar_ = new QWidget;
+    auto* connection = new QHBoxLayout(connectionBar_);
+    connection->setContentsMargins(0, 0, 0, 0);
     connection->addWidget(new QLabel(QStringLiteral("服务器")));
     connection->addWidget(host_, 2);
     connection->addWidget(port_);
@@ -84,7 +86,7 @@ WarehousePage::WarehousePage(WarehouseService& service,
     connection->addWidget(password_, 1);
     connection->addWidget(login_);
     connection->addWidget(logout_);
-    layout->addLayout(connection);
+    layout->addWidget(connectionBar_);
     layout->addWidget(identity_);
     layout->addWidget(status_);
 
@@ -202,7 +204,21 @@ WarehousePage::~WarehousePage()
 {
     ++sessionEpoch_;
     user_.reset();
-    service_.disconnectFromServer();
+    if (!adoptedSession_)
+        service_.disconnectFromServer();
+}
+
+void WarehousePage::adoptSession(const UserInfo& user)
+{
+    resetSession(false);
+    adoptedSession_ = true;
+    connectionBar_->hide();
+    // Explicitly hide inputs too, so credentials cannot be exposed by a new layout.
+    for (auto* widget : QList<QWidget*>{host_, port_, username_, password_, login_, logout_})
+        widget->hide();
+    user_ = user;
+    updateControls();
+    refresh();
 }
 
 std::optional<WarehouseSummary> WarehousePage::selection() const

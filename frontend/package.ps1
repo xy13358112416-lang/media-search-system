@@ -36,12 +36,18 @@ $out = (New-Item -ItemType Directory -Path $OutputDirectory).FullName
 foreach ($file in $files) {
     Copy-Item -LiteralPath (Join-Path $frontend $file) -Destination $out
 }
-& $deploy --release --no-translations --dir $out (Join-Path $out 'media_library_qt.exe')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'media-client.ini') -Destination $out
+& $deploy --qtpaths (Join-Path $qt 'qtpaths.exe') --release --no-translations --dir $out (Join-Path $out 'media_library_qt.exe')
 if ($LASTEXITCODE -ne 0) {
     throw "windeployqt failed with exit code $LASTEXITCODE"
 }
 
-Copy-Item -LiteralPath $SodiumDll -Destination (Join-Path $out 'libsodium.dll')
+# Preserve the imported DLL name (for example libsodium-26.dll), as well as
+# the unversioned name used by some supported toolchains.
+Copy-Item -LiteralPath $SodiumDll -Destination (Join-Path $out (Split-Path -Leaf $SodiumDll))
+if ((Split-Path -Leaf $SodiumDll) -ne 'libsodium.dll') {
+    Copy-Item -LiteralPath $SodiumDll -Destination (Join-Path $out 'libsodium.dll')
+}
 if (!(Test-Path -LiteralPath (Join-Path $out 'sqldrivers/qsqlite.dll') -PathType Leaf)) {
     throw "Missing Qt SQLite driver in the package."
 }
@@ -50,13 +56,13 @@ $help = @'
 多媒体文件管理及检索系统 · Windows 演示
 
 1. 把整个压缩包解压到可写目录，双击 media_library_qt.exe。
-2. 首次启动创建管理员，之后用用户名和密码登录。登录页可以注册普通用户。
-3. 媒体库默认打开 500 条作品元数据，不包含音视频文件。增删会保存到同目录的 media_records.csv。
+2. 程序会自动连接 media-client.ini 配置的服务器，输入服务器用户名和密码后进入；所有页面共用本次登录。
+3. 在线媒体库读取本人和公开仓库，浏览和检索记录保存在服务器。无账号请联系服务器管理员。
 4. 检索样例作品时请选择文件类型「不限」，因为样例的实际文件格式未知。
-5. 推荐页可选类别与类型。检索页的「性能对照」展示 10 万条合成数据的已记录实验。
-6. 登录后点击右上角「媒体助手」，按片名或想看的氛围检索本地内容。可切换放松、专注、探索，也可恢复默认或关闭动效。氛围标签目前覆盖部分样例。
-7. 资源仓库页使用服务器地址、端口和独立的网络账号。请由服务器管理员创建演示账号。智能推荐需服务器接通推荐服务。
+5. 动态推荐页可选类别与类型。单机模式的检索页「性能对照」展示 10 万条合成数据的已记录实验。
+6. 服务器换地址时，在登录页点击「更改服务器」；成功登录后记住地址和用户名，不记住密码。
+7. 需要原来的单机功能时，用 media_library_qt.exe --local 启动，单机账户、CSV 和历史与服务器分开。
 
-账户和浏览历史存放在应用本地数据目录的 accounts.sqlite。开始新一轮演示前如需恢复样例，请在关闭程序后备份或移走 media_records.csv。
+默认服务器地址 192.168.43.8:8765。服务器必须先启动；客户端启动不负责启动远端电脑的服务器。
 '@
 Set-Content -LiteralPath (Join-Path $out '使用说明.txt') -Value $help -Encoding UTF8

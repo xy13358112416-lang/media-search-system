@@ -93,6 +93,58 @@ class DemoImportTests(unittest.TestCase):
         self.assertNotEqual(self.run_import(db, path).returncode, 0)
         self.assertFalse(db.exists())
 
+    def test_supported_user_bounds_pass_validation_before_password_check(self):
+        # Stop at password validation: parser coverage must not spend 200 Argon2
+        # hashes or create a database. The integration smoke test imports all 200.
+        for count in (1, 200):
+            with self.subTest(count=count):
+                data = json.loads(self.fixture.read_text(encoding="utf-8"))
+                data["users"] = [{"user_ref": f"sim_user_{i:02d}"} for i in range(1, count + 1)]
+                data["events"] = [dict(e, user_ref=f"sim_user_{count:02d}") for e in data["events"]
+                                  if e["user_ref"] == "sim_user_01"]
+                path = self.root / f"accepted-{count}.json"
+                path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+                db = self.root / f"password-stop-{count}.sqlite"
+                result = subprocess.run([IMPORTER, "--demo-db", str(db), "--fixture", str(path),
+                                         "--demo-password-stdin"], input="\n", text=True,
+                                        capture_output=True, timeout=20, encoding="utf-8", errors="replace")
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("Invalid demo password", result.stderr)
+                self.assertFalse(db.exists())
+
+    def test_unsupported_user_counts_and_noncanonical_refs_do_not_create_db(self):
+        original = json.loads(self.fixture.read_text(encoding="utf-8"))
+        cases = [([], "empty"),
+                 ([{"user_ref": f"sim_user_{i:02d}"} for i in range(1, 202)], "201")]
+        for index, ref in enumerate(("sim_user_00", "sim_user_1", "sim_user_001", "sim_user_020",
+                                     "sim_user_201", "sim_user_200 ", "real_user_01", "sim_user_02")):
+            users = [dict(u) for u in original["users"]]
+            users[0]["user_ref"] = ref
+            cases.append((users, f"ref-{index}"))
+        for users, label in cases:
+            with self.subTest(label=label):
+                data = dict(original, users=users, events=[])
+                path = self.root / f"invalid-{label}.json"
+                path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+                db = self.root / f"invalid-{label}.sqlite"
+                self.assertNotEqual(self.run_import(db, path).returncode, 0)
+                self.assertFalse(db.exists())
+
+    def test_missing_user_reference_and_oversize_file_do_not_create_db(self):
+        data = json.loads(self.fixture.read_text(encoding="utf-8"))
+        data["events"][0]["user_ref"] = "sim_user_200"
+        path = self.root / "missing-user.json"
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        db = self.root / "missing-user.sqlite"
+        self.assertNotEqual(self.run_import(db, path).returncode, 0)
+        self.assertFalse(db.exists())
+        large = self.root / "oversize.json"
+        with large.open("wb") as stream:
+            stream.truncate(64 * 1024 * 1024 + 1)
+        db = self.root / "oversize.sqlite"
+        self.assertNotEqual(self.run_import(db, large).returncode, 0)
+        self.assertFalse(db.exists())
+
     def assert_demo_login(self, db):
         with socket.socket() as probe:
             probe.bind(("127.0.0.1", 0))

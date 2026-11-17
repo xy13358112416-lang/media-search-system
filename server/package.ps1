@@ -56,6 +56,9 @@ $out = (New-Item -ItemType Directory -Path $OutputDirectory).FullName
 foreach ($exe in $exeNames) {
     Copy-Item -LiteralPath (Join-Path $serverBuild $exe) -Destination $out
 }
+foreach ($file in @('media-server.ini', 'start-server.cmd')) {
+    Copy-Item -LiteralPath (Join-Path $source $file) -Destination $out
+}
 $sodiumName = Split-Path -Leaf $SodiumDll
 Copy-Item -LiteralPath $SodiumDll -Destination (Join-Path $out $sodiumName)
 if ($sodiumName -ne 'libsodium.dll') {
@@ -69,7 +72,7 @@ foreach ($runtimeDll in @('libgcc_s_seh-1.dll', 'libstdc++-6.dll', 'libwinpthrea
     Copy-Item -LiteralPath $runtimePath -Destination $out
 }
 
-& $deploy --release --no-translations --no-system-d3d-compiler --no-opengl-sw `
+& $deploy --qtpaths (Join-Path $qt 'qtpaths.exe') --release --no-translations --no-system-d3d-compiler --no-opengl-sw `
     --compiler-runtime --dir $out (Join-Path $out 'media_server.exe')
 if ($LASTEXITCODE -ne 0) {
     throw "windeployqt failed with exit code $LASTEXITCODE"

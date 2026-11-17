@@ -1,6 +1,7 @@
 #include "warehouse_client.h"
 #include "media_json.h"
 #include <QJsonArray>
+#include <QNetworkProxy>
 #include <QRegularExpression>
 #include <QTimer>
 #include <QUuid>
@@ -57,6 +58,9 @@ ErrorCode errorCode(const QString& code) {
 WarehouseClient::WarehouseClient(QObject* parent, int recommendationTimeoutMs)
     : QObject(parent), handlePrefix_(QUuid::createUuid().toString(QUuid::WithoutBraces) + QLatin1Char(':')),
       recommendationTimeoutMs_(qMax(1, recommendationTimeoutMs)) {
+    // The warehouse uses a direct TCP protocol, not an HTTP proxy transport.
+    // Keep HTTP/model traffic's application proxy configuration untouched.
+    socket_.setProxy(QNetworkProxy::NoProxy);
     connect(&socket_, &QTcpSocket::connected, this, [this] { finishConnect({}); });
     connect(&socket_, &QTcpSocket::readyRead, this, [this] { receive(); });
     connect(&socket_, &QTcpSocket::disconnected, this, [this] {

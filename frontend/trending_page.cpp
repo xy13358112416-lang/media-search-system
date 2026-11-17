@@ -12,7 +12,8 @@ namespace {
 
 class TrendingPage final : public CarePage {
 public:
-    explicit TrendingPage(CareService& service) : CarePage(QStringLiteral("全站热榜")), service_(service)
+    TrendingPage(CareService& service, std::function<void(const WarehouseItemRef&)> open)
+        : CarePage(QStringLiteral("全站热榜")), service_(service), open_(std::move(open))
     {
         auto* filters = new QHBoxLayout;
         period_->addItems({QStringLiteral("今日"), QStringLiteral("本周")});
@@ -40,6 +41,10 @@ public:
         table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
         table_->setAlternatingRowColors(true);
         layout->addWidget(table_, 1);
+        connect(table_, &QTableWidget::cellClicked, this, [this](int row, int) {
+            if (active_ && open_ && row >= 0 && row < entries_.size() && entries_.at(row).work)
+                open_(entries_.at(row).work->resource.source);
+        });
         connect(refresh, &QPushButton::clicked, this, [this] { activate(); });
         connect(period_, &QComboBox::currentIndexChanged, this, [this] { activate(); });
         connect(kind_, &QComboBox::currentIndexChanged, this, [this] { activate(); });
@@ -83,6 +88,7 @@ private:
                     return;
                 }
                 const auto& data = *result.value;
+                entries_ = data.items;
                 const auto period = QStringLiteral("%1 至 %2")
                     .arg(care_ui::localTime(data.range.beginUtc).date().toString(Qt::ISODate),
                          care_ui::localTime(data.range.endUtc - 1).date().toString(Qt::ISODate));
@@ -107,10 +113,13 @@ private:
     void clear()
     {
         table_->setRowCount(0);
+        entries_.clear();
         summary_->clear();
     }
 
     CareService& service_;
+    std::function<void(const WarehouseItemRef&)> open_;
+    QList<TrendingItem> entries_;
     bool active_ = false;
     QPushButton* modelSummary_ = new QPushButton(QStringLiteral("生成 AI 摘要"));
     QComboBox* period_ = new QComboBox;
@@ -121,4 +130,5 @@ private:
 
 } // namespace
 
-CarePage* createTrendingPage(CareService& service) { return new TrendingPage(service); }
+CarePage* createTrendingPage(CareService& service, std::function<void(const WarehouseItemRef&)> open)
+{ return new TrendingPage(service, std::move(open)); }
