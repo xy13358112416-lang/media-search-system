@@ -3,6 +3,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(SODIUM REQUIRED IMPORTED_TARGET libsodium)
 
 add_library(warehouse_server STATIC warehouse_server.cpp recommendation_router.cpp person_schema.cpp person_snapshot_json.cpp)
+target_sources(warehouse_server PRIVATE scene_recommendation_router.cpp ../network/llm_scene.cpp)
 target_sources(warehouse_server PRIVATE person_store_sqlite.cpp)
 target_sources(warehouse_server PRIVATE person_credit_import.cpp)
 target_sources(warehouse_server PRIVATE person_source_config.cpp person_query_router.cpp person_feed_refresh.cpp deepseek_person_news.cpp)
@@ -30,6 +31,10 @@ target_compile_options(media_demo_import PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-
 
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
+    add_executable(scene_recommendation_tests scene_recommendation_tests.cpp)
+    set_target_properties(scene_recommendation_tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(scene_recommendation_tests PRIVATE warehouse_server warehouse_client Qt6::Test)
+    add_test(NAME scene_recommendation_tests COMMAND scene_recommendation_tests)
     add_executable(person_source_config_tests person_source_config_tests.cpp person_source_config_tests.h)
     set_target_properties(person_source_config_tests PROPERTIES AUTOMOC ON)
     target_link_libraries(person_source_config_tests PRIVATE warehouse_server Qt6::Test)

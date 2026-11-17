@@ -176,7 +176,7 @@ QString WarehouseClient::request(const QString& type, const QJsonObject& payload
     const bool mutation = type == "create_warehouse" || type == "add_item" || type == "remove_item" ||
                           type == "record_behavior" || type == "set_participation_settings" || type == "clear_history" ||
                           type == "set_work_feedback" || type == "set_follow";
-    const bool cancelOnServer = type == "recommend_resources" ||
+    const bool cancelOnServer = type == "recommend_resources" || type == "recommend_temporal" ||
         (type == "get_trending" && payload.value("summary_mode") == "model");
     pending_.insert(id, {type + QStringLiteral("_resp"), std::move(callback), mutation, cancelOnServer});
     if (socket_.write(frame) < 0) {
@@ -398,7 +398,7 @@ bool WarehouseClient::cancelRecommendation(const RecommendationHandle& handle) {
     const auto it = pending_.constFind(id);
     if (id.isEmpty() || it == pending_.cend() || (it->responseType != "recommend_resources_resp" && it->responseType != "recommend_temporal_resp")) return false;
     auto p = pending_.take(id);
-    if (p.responseType == "recommend_resources_resp") sendCancellation(id);
+    sendCancellation(id);
     p.callback(fail(ErrorCode::Cancelled, QStringLiteral("推荐请求已取消")), {});
     return true;
 }

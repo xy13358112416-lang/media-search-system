@@ -61,11 +61,17 @@ public:
         top->addWidget(identity);
         top->addStretch();
         auto* scene = new QComboBox;
+        scene->setObjectName("onlineScene");
         scene->addItems({QStringLiteral("默认"),QStringLiteral("放松"),QStringLiteral("专注"),QStringLiteral("探索")});
         top->addWidget(scene);
         connect(scene,qOverload<int>(&QComboBox::currentIndexChanged),this,[this](int index) {
             warmScene_ = static_cast<warm_mode::Scene>(index);
             scene_ = warm_mode::browseScene(warmScene_);
+            clearToday();
+            if (tabs_->currentIndex()==2) loadToday();
+            if (tabs_->currentIndex()==6 && activeCare_) {
+                activeCare_->deactivate(); activeCare_->activate();
+            }
         });
         auto* assistant = new QPushButton(QStringLiteral("媒体小助手"));
         auto* settings = new QPushButton(QStringLiteral("参与设置"));
@@ -287,10 +293,10 @@ private:
         const auto date=care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
         todayLoading_=true;
         const auto todayGeneration=++todayGeneration_;
-        todayStatus_->setText(QStringLiteral("正在加载今日候选…"));
-        TemporalRecommendationRequest request; request.limit=30; request.scene=scene_;
-        // Temporal is the server rules engine; this does not request DeepSeek.
-        const auto handle=care_.recommendTemporal(request,[self=QPointer<OnlineWindow>(this),date,todayGeneration](Result<TemporalRecommendationResult> result) {
+        const bool liveScene=scene_!=BrowseScene::Neutral;
+        todayStatus_->setText(liveScene?QStringLiteral("正在实时查询场景推荐…"):QStringLiteral("正在加载今日候选…"));
+        TemporalRecommendationRequest request; request.limit=liveScene?6:30; request.scene=scene_;
+        const auto handle=care_.recommendTemporal(request,[self=QPointer<OnlineWindow>(this),date,todayGeneration,liveScene](Result<TemporalRecommendationResult> result) {
             if (!self || self->finished_ || self->todayGeneration_!=todayGeneration) return;
             self->todayLoading_=false;
             self->todayHandle_.clear();
@@ -301,9 +307,10 @@ private:
                 if (!key.isEmpty() && !pool.contains(key)) { keys.append(key); pool.insert(key,item); }
             }
             self->daily_.clear(); self->todayList_->clear();
-            for (const auto& key:dailyPick(keys,static_cast<quint64>(date.toJulianDay()),6)) {
+            const auto picked=liveScene?keys.mid(0,6):dailyPick(keys,static_cast<quint64>(date.toJulianDay()),6);
+            for (const auto& key:picked) {
                 const auto item=pool.value(key); self->daily_.append(item);
-                new QListWidgetItem(item.work.media.fileName+QStringLiteral("\n")+item.reason,self->todayList_);
+                new QListWidgetItem(item.work.media.fileName,self->todayList_);
             }
             self->dailyDate_=date;
             self->todayStatus_->setText(result.value->message.isEmpty()?QStringLiteral("今日推荐已更新，点击作品查看详情。"):result.value->message);
