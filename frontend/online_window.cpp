@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜在线界面与检索/今日推荐对接
+// 阅读路线：读可用仓库 → 建检索索引 → 提交条件 → 今日候选与洗牌
+// 联调关系：Qt负责控件与生命周期；检索/推荐服务返回数据，资源权限仍由服务器核验。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "online_window.h"
 #include "online_care_client.h"
 #include "warehouse_page.h"
@@ -298,6 +303,10 @@ private:
             }));
         }));
     }
+    // >>> DEFENSE-NOTE | loadNext = 汇总仓库详情并建立在线检索索引
+    // 读取服务器允许的公共仓库和本人仓库；每项用“仓库/条目”构造来源key。
+    // 全部加载后将媒体副本id设为key并rebuild；不是从浏览次数猜权限。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void loadNext(quint64 generation) {
         if (finished_ || generation!=generation_) return;
         if (pendingPosition_>=pending_.size()) {
@@ -338,6 +347,10 @@ private:
             QTimer::singleShot(0,this,[this,generation] { loadNext(generation); });
         }));
     }
+    // >>> DEFENSE-NOTE | submitSearch = 把输入交给索引并展示
+    // 导演/演员/格式先交MediaSearch，标题/助手类别与情绪在候选结果上继续过滤。
+    // 搜索行为通过服务接口另存；行为保存失败不等于已经显示的检索计算失败。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void submitSearch(bool fromAssistant=false) {
         if (finished_) return;
         if (!catalogReady_) {
@@ -384,6 +397,11 @@ private:
             if (!status.ok()) searchStatus_->setText(QStringLiteral("搜索记录未保存：%1").arg(status.message));
         }));
     }
+    // >>> DEFENSE-NOTE | loadToday = 在线今日推荐的总入口
+    // 先请求最多30个时序/场景候选，结果按workId去重，再按北京时间日期种子dailyPick最多6个。
+    // 不是直接从全库随机抽六条；新版非默认场景可能走服务端实时模型，需以返回状态判断是否回退。
+    // QPointer和todayGeneration_防页面销毁、换号或旧请求覆盖新结果。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void loadToday() {
         if (finished_ || todayLoading_) return;
         const auto date=care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
@@ -424,6 +442,9 @@ private:
         });
         if (todayLoading_ && todayGeneration_==todayGeneration) todayHandle_=handle;
     }
+    // >>> DEFENSE-NOTE | clearToday = 清除每日结果并取消在途请求
+    // 先增加代次，使旧回调失效，再清结果和句柄并调用取消；切号后不应串用上一用户的推荐。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void clearToday() {
         ++todayGeneration_; todayLoading_=false; dailyDate_=QDate(); daily_.clear();
         if (todayList_) todayList_->clear();

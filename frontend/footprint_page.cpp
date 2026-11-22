@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜个人足迹页面
+// 阅读路线：选日期 → 请求个人报告 → 统计/日期/类别显示 → 比较期与清历史
+// 联调关系：算法buildFootprint提供统计，服务端确认本人身份；页面不根据界面列表自行伪造总数。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "footprint_page.h"
 
 #include <QComboBox>
@@ -104,6 +109,9 @@ public:
         connect(fetch_, &QPushButton::clicked, this, [this] { activate(); });
     }
 
+    // >>> DEFENSE-NOTE | activate = 加载足迹与比较期
+    // 请求由北京时间自然日控件转换的时间范围，清理旧图表；返回报告包含历史覆盖与模拟标记。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void activate() override
     {
         active_ = true;
@@ -194,6 +202,9 @@ public:
     }
 
 private:
+    // >>> DEFENSE-NOTE | clearHistory = 主动清除本人历史
+    // 由服务端执行清理，页面清旧报告并显示结果；不能将清空界面误当数据库删除成功。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void clearHistory()
     {
         if (QMessageBox::question(this, QStringLiteral("清理浏览和搜索历史"),

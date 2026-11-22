@@ -1,3 +1,7 @@
+// >>> DEFENSE-NOTE | 头文件导读｜人物Search/Fetch接口
+// Request由可信人物配置构造，approvedSite是精确域名，identityClue是公开消歧线索；Key只从服务端调用参数传入。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #pragma once
 
 #include "care_contract.h"

@@ -1,0 +1,682 @@
+收到。这次只调整**代码讲解页的拆分和负责人**：原有模块顺序、流程页内容、视觉风格和讲解主线都保留。一个代码讲解页只安排一位组员；原来一页出现多个代码文件的地方拆成多页。每张代码页最多三个 bullet。
+
+## 全局版式约束
+
+- **画布与留白**：16:9，1920×1080；四周留白约 6%，正文不贴边。
+- **配色**：暖白底 `#F7F8F6`；深蓝标题 `#18324A`；蓝绿色流程 `#3F7777`；橙色只标用户主动操作或模型调用；正文深灰 `#29343D`。
+- **字体字号**：中文微软雅黑，代码 Consolas；封面标题 42 pt，页标题 32 pt，正文和 bullet 22 pt，流程节点 18 pt，代码 17–18 pt，图注不低于 14 pt。
+- **流程页**：中间横向流程图；底部三个 bullet，分别说输入、处理、输出。
+- **代码页**：标题用一个具体问题；左侧 60% 放一个流程节点和对应单个文件的 6–10 行代码，右侧 40% 放最多三个 bullet。
+- **代码展示**：只截关键方法，不缩小字号硬塞完整函数。
+
+## 开场与架构
+
+### 第 1 页：懂用户的多媒体管理系统
+
+视觉：暖白留白封面；右侧用“媒体 → 行为 → 服务”线性图形。
+
+- ① 管理作品信息
+- ② 记录主动行为
+- ③ 提供足迹、热榜和推荐
+
+**负责讲解：你（主持）。**
+
+### 第 2 页：我们在原题基础上增加了什么？
+
+视觉：左右两组卡片：原题要求 / 项目扩展。
+
+- ① 原题：分类、排序、增删、检索和规则推荐
+- ② 扩展：在线账户、行为分析、人物关注
+- ③ 核心变化：从管理作品扩展到理解兴趣
+
+**负责讲解：你（主持）。**
+
+### 第 3 页：一次用户操作怎样变成系统结果？
+
+视觉：卡片式架构图，只画**一个本次实机客户端**：Qt 客户端 → TCP 服务端 → SQLite 与算法；DeepSeek 作为服务端旁的虚线可选卡片。
+
+- ① Qt 发起操作并展示结果
+- ② 服务端验证身份和权限
+- ③ 数据库与算法返回结果
+
+**负责讲解：你（主持）。**
+
+## 模块一：在线登录与会话
+
+### 流程页：用户如何进入在线系统？
+
+视觉：`启动 → 读取服务器地址 → TCP 连接 → 账号验证 → 共用登录会话`，五个卡片横向排列。
+
+- ① 默认读取预设服务器地址
+- ② 服务端验证网络账号
+- ③ 登录后的页面共用同一个客户端会话
+
+**负责讲解：Qt 同学。**
+
+### 代码页：服务器地址从哪里来？
+
+代码：`frontend/online_startup.cpp` 的 `loadConnectionSettings`。
+
+- `ConnectionSettings.host` 是 `QString`，`port` 是 `quint16`
+- 地址读取顺序为默认值、INI 配置、上次成功连接地址
+- 配置保存地址和用户名，不保存密码
+
+**负责讲解：Qt 同学。**
+
+### 代码页：客户端怎样建立 TCP 连接？
+
+代码：`network/warehouse_client.cpp` 的 `connectToServer`。
+
+- `QTcpSocket` 承载仓库 TCP 协议
+- `connectAttempt_` 用 `quint64` 标识连接代次，避免旧回调覆盖新连接
+- `TimeoutMs` 限制等待时间，超时返回 `ErrorCode::Timeout`
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：服务端怎样处理登录请求？
+
+代码：`server/warehouse_server.cpp` 的登录请求处理。
+
+- 服务端从登录请求读取用户名和密码
+- 用户记录从网络用户表读取并验证密码哈希
+- 验证成功后建立服务端会话并返回登录结果
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：登录身份怎样传给所有页面？
+
+代码：`frontend/main.cpp`。
+
+- `main.cpp` 持有在线客户端对象
+- 登录成功后将该客户端和用户信息交给在线窗口
+- 退出时销毁窗口并断开会话
+
+**负责讲解：Qt 同学。**
+
+### 代码页：客户端怎样保存认证状态？
+
+代码：`network/warehouse_client.cpp`。
+
+- `token_` 保存在客户端会话中
+- `UserInfo` 使用 `qint64 userId` 和 `QString username`
+- 断线或登出时清除 token，并处理待完成请求
+
+**负责讲解：主逻辑同学。**
+
+## 模块二：媒体记录与仓库管理
+
+### 流程页：一条媒体记录怎样被保存并展示？
+
+视觉：`填写信息 → MediaRecord → 服务端权限检查 → SQLite 保存 → Qt 展示`。
+
+- ① 界面收集作品字段
+- ② 服务端按当前会话和仓库权限处理
+- ③ 保存结果回到客户端展示
+
+**负责讲解：Qt 同学。**
+
+### 代码页：系统怎样表示一条媒体记录？
+
+代码：`include/mediarecord.h` 的 `MediaRecord`。
+
+- `QString id/fileName/fileType` 表示标识、文件名和类型
+- `QStringList actors/awards` 表示多演员和多奖项字段
+- `quint64 fileSize/viewCount` 与 `QDate releaseDate` 表示大小、次数和日期
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：仓库条目怎样被授权和保存？
+
+代码：`server/warehouse_server.cpp` 的仓库读写处理。
+
+- `WarehouseItem` 由 `qint64 itemId` 和 `MediaRecord media` 组成
+- `WarehouseSummary.visibility` 使用 `Public/Private` 枚举标识可见范围
+- 服务端依据会话用户、仓库所有者和可见性决定读写权限
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：仓库操作怎样呈现在界面？
+
+代码：`frontend/warehouse_page.cpp`。
+
+- 页面把媒体字段组织成表单和列表
+- 新增、删除操作通过仓库服务接口提交
+- 返回的 `WarehouseItem` 更新页面显示
+
+**负责讲解：Qt 同学。**
+
+## 模块三：检索与索引
+
+### 流程页：组合检索怎样从条件得到结果？
+
+视觉：`加载记录建索引 → 规范化查询 → 查倒排列表 → 求交集 → 返回 ID`。
+
+- ① 导演、演员和类型分别建立索引
+- ② 多个非空条件按 AND 组合
+- ③ 结果按稳定 ID 顺序返回
+
+**负责讲解：你。**
+
+### 代码页：系统保存哪些检索索引？
+
+代码：`include/mediasearch.h`。
+
+- `records_` 是 `QHash<QString,MediaRecord>`，以 ID 查记录
+- `directors_ / actors_ / fileTypes_` 是字段到有序 ID 列表的倒排索引
+- `SearchStrategy` 区分线性扫描、固定顺序和短列表优先
+
+**负责讲解：你。**
+
+### 代码页：索引怎样从媒体记录建立？
+
+代码：`retrieval/mediasearch.cpp` 的 `MediaSearch::rebuild/indexRecord`。
+
+- 重建先校验 ID 非空且唯一
+- 导演、演员和类型字段分别写入 posting list
+- 全部构建成功后才替换现有索引
+
+**负责讲解：你。**
+
+### 代码页：查询字段怎样规范化？
+
+代码：`retrieval/mediasearch.cpp` 的 `normalizedQuery`。
+
+- 导演和演员使用 `trimmed()` 去首尾空白
+- 文件类型统一转大写，与建索引时的规范一致
+- `SearchQuery` 的三个非空条件按 AND 关系匹配
+
+**负责讲解：你。**
+
+### 代码页：姓名怎样进行精确匹配？
+
+代码：`retrieval/mediasearch.cpp` 的线性扫描匹配部分。
+
+- 导演字段使用完整字符串相等判断
+- 演员字段在 `QStringList` 中按完整姓名查找
+- 文件类型比较规范化后的类型值
+
+**负责讲解：你。**
+
+### 代码页：短列表优先怎样减少交集计算？
+
+代码：`retrieval/mediasearch.cpp` 的 `SmallestListFirst` 与 `set_intersection`。
+
+- 倒排列表按 ID 排序，可使用 `std::set_intersection`
+- 先从 posting 数量最少的条件建立候选集
+- 每个输入条件仍需查索引，但后续交集处理的候选数通常更少
+
+**负责讲解：你。**
+
+### 代码页：新增和删除怎样维护索引？
+
+代码：`retrieval/mediasearch.cpp` 的 `MediaSearch::addRecord/removeRecord`。
+
+- 新增时同步更新 `records_` 和各字段 posting list
+- `lower_bound` 找到有序 ID 列表的插入位置
+- 删除时根据原记录字段移除 ID，并清理空索引桶
+
+**负责讲解：你。**
+
+## 模块四：基础规则推荐
+
+### 流程页：用户设定偏好后怎样得到推荐？
+
+视觉：`偏好输入 → 候选媒体 → 规则打分 → 稳定排序 → 推荐 ID`。
+
+- ① 类别和文件类型作为用户偏好
+- ② 浏览次数形成热度信号
+- ③ 返回有限条数的排序结果
+
+**负责讲解：你。**
+
+### 代码页：推荐请求怎样表达偏好？
+
+代码：`include/mediarecommendation.h` 的 `RecommendationOptions`。
+
+- `preferredCategory/preferredFileType` 是 `QString`，空值表示不限
+- `limit` 是 `int`，控制最多返回多少条
+- 类型忽略大小写，类别去首尾空白后精确匹配
+
+**负责讲解：你。**
+
+### 代码页：基础推荐怎样计算分数？
+
+代码：`retrieval/mediarecommendation.cpp` 的 `recommendMedia`。
+
+- 类别匹配加 2 分，类型匹配加 1 分
+- 热度用 `viewCount / 全表最大浏览次数` 归一化
+- 最大浏览次数为零时热度为零；同分按 ID 升序
+
+**负责讲解：你。**
+
+## 模块五：行为采集与隐私设置
+
+### 流程页：哪些用户操作会进入行为数据？
+
+视觉：主动点击/搜索的实线进入记录流程；自动选中/切页连到灰色“不记录”。
+
+- ① 主动点击或提交搜索才生成事件
+- ② Qt 将事件发送给服务端
+- ③ 用户设置控制个人历史和公共贡献
+
+**负责讲解：Qt 同学讲主动操作；主逻辑同学讲服务端处理。**
+
+### 代码页：Qt 怎样区分主动点击和自动选中？
+
+代码：`frontend/online_window.cpp` 的列表点击处理。
+
+- 只有用户主动点击条目时才调用行为回调
+- 回调使用真实仓库和条目 ID 定位来源
+- 自动选中、刷新和切页不触发浏览事件
+
+**负责讲解：Qt 同学。**
+
+### 代码页：客户端怎样表达浏览或搜索？
+
+代码：`include/behavior_contract.h` 的 `BehaviorEvent`。
+
+- `eventId` 是 `QString`，同一事件重试时保持不变
+- `action` 是 `View/Search` 枚举，浏览带 `resource`，搜索带 `query`
+- DTO 不包含 `userId/time/synthetic`，这些值不能由客户端伪造
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：服务端怎样校验并保存行为？
+
+代码：`server/warehouse_server.cpp` 的 `record_behavior` 处理。
+
+- `BehaviorRecord` 保存服务端生成的 `occurredAtUtc` 和合成标记
+- `(user_id,event_id)` 唯一约束使重复请求不会重复计数
+- 服务端依据当前会话和作品来源检查记录资格
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：用户怎样控制历史和公共贡献？
+
+代码：`include/behavior_contract.h` 的 `ParticipationSettings`。
+
+- `historyEnabled` 控制个人历史记录
+- `personalizationEnabled` 控制推荐是否使用历史
+- `contributePublicTrends` 单独控制公共热榜贡献
+
+**负责讲解：主逻辑同学。**
+
+## 模块六：个人媒体足迹
+
+### 流程页：行为数据怎样变成个人足迹？
+
+视觉：`时间区间 → 本人事件 → 北京时间分日 → 指标聚合 → Qt 展示`。
+
+- ① 查询限定当前账号和指定区间
+- ② 按北京时间自然日归档
+- ③ 返回总量、类别、人物和逐日统计
+
+**负责讲解：主逻辑同学讲数据读取；你讲聚合算法；Qt 同学讲展示。**
+
+### 代码页：统计区间怎样划分日期？
+
+代码：`retrieval/care_footprint.cpp` 的 `calendarWindow`。
+
+- `TimeRange.beginUtc/endUtc` 是 UTC Unix 秒，区间为 `[begin,end)`
+- `QTimeZone("Asia/Shanghai")` 将事件映射到北京时间日期
+- `MaxReportDays` 限定日期桶规模，避免超长区间
+
+**负责讲解：你。**
+
+### 代码页：事件怎样聚合成足迹指标？
+
+代码：`retrieval/care_footprint.cpp` 的 `summarize`。
+
+- `QSet<QString> uniqueWorks` 去重计算看过的作品数
+- `QMap<QString,qint64>` 汇总类别，`QMap<QPair<QString,int>,PersonCount>` 汇总人物角色
+- `(personId,role)` 每个作品只计一次，避免重复演员条目多计
+
+**负责讲解：你。**
+
+### 代码页：足迹报告包含哪些字段？
+
+代码：`include/care_contract.h` 的 `PeriodFootprint/FootprintReport`。
+
+- `views/searches/uniqueWorks/activeDays` 是区间统计值
+- `categories/people/days` 分别保存类别、人物和逐日列表
+- `coverageStartUtc` 表示实际历史起点，避免把不存在的历史说成零行为
+
+**负责讲解：你讲结果结构；Qt 同学讲页面展示。**
+
+## 模块七：全站热榜
+
+### 流程页：怎样避免把重复点击误当成全站热度？
+
+视觉：`公开资格过滤 → 用户/条目/日期去重 → 三用户门槛 → 排序 → 返回`。
+
+- ① 用户可以选择是否贡献公开趋势
+- ② 同用户同条目每天最多计一次
+- ③ 至少三位不同用户才公开展示
+
+**负责讲解：主逻辑同学讲公开资格；你讲算法。**
+
+### 代码页：哪些事件有资格进入热榜？
+
+代码：`server/warehouse_server.cpp` 的热榜查询处理。
+
+- 当前会话和用户设置决定哪些行为可贡献
+- 作品榜只统计仍有公开来源的作品
+- 时间范围和行为类型在服务端查询阶段过滤
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：公开热榜快照有哪些字段？
+
+代码：`retrieval/care_algorithm_types.h` 的 `PublicSnapshot/ObservedBehavior`。
+
+- `userKey` 来自服务端身份，不从请求体取得
+- `publicEligible` 标明服务端确认的公开资格
+- `events/publicWorks` 分别保存行为与当前公开作品
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：如何实现用户和日期去重？
+
+代码：`retrieval/care_trending.cpp` 的 `Contributions::add`。
+
+- `QMap<QString,QSet<qint64>> daysByUser` 保存用户参与日期
+- 日期由事件时间转换为 Asia/Shanghai 的 Julian day
+- 已存在日期不再增加 `effectiveEvents`
+
+**负责讲解：你。**
+
+### 代码页：热榜怎样筛选和排序？
+
+代码：`retrieval/care_trending.cpp` 的 `buildTrending`。
+
+- `daysByUser.size() < 3` 的条目不进入结果
+- 排名依次比较 `distinctUsers`、`effectiveEvents`
+- 并列时按稳定键排序；`containsSyntheticData` 标识合成来源
+
+**负责讲解：你。**
+
+## 模块八：人物关联与关注
+
+### 流程页：作品怎样关联可信人物并支持关注？
+
+视觉：`稳定人物 ID → 作品/角色映射 → 搜索 → 关注/取关 → 读取缓存`。
+
+- ① 人物用稳定 ID 而非姓名作为主键
+- ② 用户的关注关系独立保存
+- ③ 资讯从服务端缓存读取
+
+**负责讲解：主逻辑同学讲数据和权限；Qt 同学讲页面交互。**
+
+### 代码页：数据库怎样表示人物和作品关联？
+
+代码：`server/person_schema.cpp`。
+
+- `person_catalog.person_id` 是人物稳定 ID
+- `person_credits` 组合主键是 `(person_id,work_id,role)`
+- `role` 受 CHECK 限制，只能是 actor/director/musician
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：关注关系怎样按用户隔离？
+
+代码：`server/person_store_sqlite.cpp` 的关注/取关方法。
+
+- `person_follows` 组合主键 `(user_id,person_id)` 防止重复关系
+- `user_id` 由服务端会话确定，不信任客户端传值
+- `known_name/known_roles_json` 保存关联时的展示快照
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：资讯源和文章链接怎样区分？
+
+代码：`server/person_schema.cpp` 的来源和资讯表结构。
+
+- `person_sources.source_url` 标识 feed
+- 文章链接字段属于 `person_updates.source_url`
+- `refresh_generation/stale` 分别标识刷新代次和缓存过期状态
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：人物资讯刷新怎样更新缓存？
+
+代码：`server/person_store_sqlite.cpp` 的刷新/合并方法。
+
+- `beginUpdatesRefresh` 取得当前 `refresh_generation`
+- `mergeUpdates` 只接受对应代次的刷新结果
+- 失败时保留旧资讯并标记 `stale`
+
+**负责讲解：主逻辑同学。**
+
+## 模块九：时序感知推荐
+
+### 流程页：推荐怎样结合长期与近期兴趣？
+
+视觉：`用户历史快照 → 兴趣画像 → 候选评分 → 多样性排序 → 推荐理由`。
+
+- ① 使用当前用户历史和当前可读作品
+- ② 长期、近期信号采用不同衰减
+- ③ 结合热度、新鲜度和显式偏好
+
+**负责讲解：主逻辑同学讲快照准备；你讲评分算法；Qt 同学讲结果页。**
+
+### 代码页：算法从哪些数据构造推荐快照？
+
+代码：`retrieval/care_algorithm_types.h` 的 `PersonalSnapshot`。
+
+- `events` 保存当前用户行为快照
+- `readableWorks` 只包含当前有权访问的候选
+- `followedPeople/notInterestedWorkIds/publicHeat` 分别表示关注、排除和热度
+
+**负责讲解：主逻辑同学。**
+
+### 代码页：长期和近期兴趣怎样计算？
+
+代码：`retrieval/care_temporal.cpp` 的 `Profile/addView`。
+
+- `QMap<QString,double>` 累加类别和人物权重
+- 浏览时间权重使用 `exp2(-age / halfLifeDays)`
+- 长期和近期半衰期不同，使近期行为影响近期画像更强
+
+**负责讲解：你。**
+
+### 代码页：候选作品总分由什么组成？
+
+代码：`retrieval/care_temporal.cpp` 的 `ScoredWork` 与总分计算。
+
+- `longScore/recentScore/heat/freshness` 保存基础评分分量
+- 热度使用 `log1p(workHeat) / log1p(maxHeat)` 归一化
+- 类别、类型、关注信号可加分；不感兴趣作品在评分前排除
+
+**负责讲解：你。**
+
+### 代码页：如何保证排序稳定并增加多样性？
+
+代码：`retrieval/care_temporal.cpp` 的排序与类别选择逻辑。
+
+- 先按 `total` 降序，再按 `workId/warehouseId/itemId` 稳定排序
+- 同类别连续达到限制时，从后续候选寻找其他类别
+- `reason` 包含分项得分和权重，便于解释结果
+
+**负责讲解：你。**
+
+## DeepSeek 模块一：仓库智能推荐
+
+### 流程页：DeepSeek 怎样只推荐用户有权访问的作品？
+
+视觉：`服务端授权候选 → 词面召回 → DeepSeek 选择 → ID 校验 → 展示/回退`。
+
+- ① 模型候选先由服务端确定
+- ② 模型只负责语义筛选和理由
+- ③ 失败时可以回到规则推荐
+
+**负责讲解：你。**
+
+### 代码页：候选集怎样由服务端授权？
+
+代码：`server/recommendation_router.cpp`。
+
+- 当前会话的 `userId` 用于读取可读仓库
+- `Candidate.key` 使用服务端的稳定候选键
+- 候选集只包含当前用户有权访问的作品
+
+**负责讲解：你。**
+
+### 代码页：词面召回怎样控制候选规模？
+
+代码：`network/llm_candidate_recall.cpp` 的 `selectCandidates`。
+
+- `CandidateBudget` 将模型候选限制在 30 条
+- 标题、人物和类别命中优先
+- 候选不足时再补充多样性与热度资源
+
+**负责讲解：你。**
+
+### 代码页：模型响应怎样校验和回退？
+
+代码：`network/llm_recommendation.cpp`。
+
+- `Request` 包含 `context/candidates/limit`
+- 返回的 `Item.key` 必须属于本次候选集合
+- `fallback=true` 标记规则回退；有效空列表可表示没有足够相关候选
+
+**负责讲解：你。**
+
+## DeepSeek 模块二：热榜 AI 摘要
+
+### 流程页：模型会不会改变热榜排名？
+
+视觉：榜单数据卡 → DeepSeek 摘要卡，榜单计数旁加锁，表示只读输入。
+
+- ① 普通切页不调用模型
+- ② 用户主动操作触发摘要请求
+- ③ 模型不修改榜单条目或计数
+
+**负责讲解：你。**
+
+### 代码页：哪些榜单字段会交给模型？
+
+代码：`network/llm_trend_summary.cpp`。
+
+- 输入是已通过门槛的 `TrendingItem` 聚合结果
+- `distinctUsers/effectiveEvents` 是已有计数，不由模型重算
+- `summaryFromModel` 区分模型文本与规则摘要
+
+**负责讲解：你。**
+
+### 代码页：用户怎样主动触发摘要？
+
+代码：`frontend/trending_page.cpp`。
+
+- `summaryMode` 区分规则摘要与模型摘要
+- 普通刷新和切页使用规则模式
+- 点击按钮时才请求 `Model` 模式
+
+**负责讲解：你。**
+
+### 代码页：怎样避免旧摘要套到新榜单？
+
+代码：`server/trending_summary_router.cpp`。
+
+- 响应前重新聚合并比较条目、计数和公开资格
+- 模型请求使用独立 request ID，避免与仓库推荐任务冲突
+- 榜单发生变化时丢弃模型文本，返回当前规则摘要
+
+**负责讲解：你。**
+
+## DeepSeek 模块三：人物资讯 Search & Fetch
+
+### 流程页：搜索结果怎样变成可信缓存？
+
+视觉：`核验线索 → Search → URL 过滤 → Fetch → 内容核验 → 缓存`。
+
+- ① 运维人员给出人物、网站和线索
+- ② 搜索结果只作为文章候选
+- ③ 原文通过校验后才进入缓存
+
+**负责讲解：你。**
+
+### 代码页：Search 请求怎样限定目标？
+
+代码：`server/deepseek_person_news.h` 的 `Request`。
+
+- `personId/displayName` 指定数据库人物
+- `approvedSite/identityClue` 分别限定发布者和消歧信息
+- Key 只从服务器环境读取，不由 Qt 传入
+
+**负责讲解：你。**
+
+### 代码页：服务器怎样发起 Search 请求？
+
+代码：`server/deepseek_person_news.cpp` 的 Search 请求方法。
+
+- Search URL 固定为 DeepSeek Search 服务地址
+- 请求数量受 `SearchLimit` 限制
+- 每次 HTTP 请求设置超时和响应大小上限
+
+**负责讲解：你。**
+
+### 代码页：Fetch 候选怎样过滤？
+
+代码：`server/deepseek_person_news.cpp` 的 `collectCandidates/fetchNext/saveVerified`。
+
+- 候选 URL 必须为 HTTPS 且主机匹配 `approvedSite`
+- Fetch 数量和请求时间受上限约束
+- 原文标题/正文必须包含人物名和线索才保留
+
+**负责讲解：你。**
+
+### 代码页：缓存记录怎样生成稳定身份？
+
+代码：`server/deepseek_person_news.cpp` 的资讯 ID 生成与 `mergeUpdates` 调用。
+
+- `updateId` 由文章 URL 的 SHA-256 生成
+- 未知发布日期和发行日期保持空值，不填造日期
+- 成功时合并缓存；失败时标记过期并保留原内容
+
+**负责讲解：你。**
+
+## 模块十：温暖模式
+
+### 流程页：用户怎样主动选择交互场景？
+
+视觉：两个相同页面的简洁状态对照，展示普通模式与用户选择的场景模式。
+
+- ① `BrowseScene` 是 `Neutral/Relax/Focus/Explore` 枚举
+- ② 用户选择驱动界面样式和提示变化
+- ③ 场景不改变账户权限或数据归属
+
+**负责讲解：Qt 同学。**
+
+### 代码页：场景枚举怎样定义？
+
+代码：`frontend/media_mood.h`。
+
+- `BrowseScene` 使用 `enum class` 表示互斥场景
+- `Neutral/Relax/Focus/Explore` 是明确的场景值
+- 场景由用户选择，不代表系统推断用户情绪
+
+**负责讲解：Qt 同学。**
+
+### 代码页：温暖模式怎样改变页面呈现？
+
+代码：`frontend/warm_mode.h`。
+
+- 页面根据场景值选择视觉状态
+- 样式变化不修改媒体数据或仓库权限
+- 用户切换场景只影响交互呈现
+
+**负责讲解：Qt 同学。**
+
+## 收尾页
+
+### 从媒体管理到理解用户
+
+视觉：重用架构卡片，强调“作品 → 行为 → 足迹/热榜 → 推荐”。右侧放一个实机客户端截图。
+
+- ① 原题功能完成媒体信息管理、检索和基础推荐
+- ② 扩展模块利用行为数据形成足迹、热榜和时序推荐
+- ③ DeepSeek 辅助筛选或表达，权限与数据校验仍由系统负责
+
+**负责讲解：你（主持）。**
+
+DeepSeek 自动测试使用模拟模型服务；真实 API、人物来源和实体电脑联调按现场实际验收情况说明。

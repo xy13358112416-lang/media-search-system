@@ -1,3 +1,7 @@
+// >>> DEFENSE-NOTE | 头文件导读｜人物查询与关注建议算法声明
+// 只查询当前可见可信人物；角色可多值、同名可不同ID；写关注与数据库由服务端负责。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #pragma once
 #include "care_algorithm_types.h"
 

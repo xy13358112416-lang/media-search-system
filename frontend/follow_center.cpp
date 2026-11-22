@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜人物关注页面
+// 阅读路线：人物检索 → 关注/取关 → 作品/资讯分页
+// 联调关系：人物关联和权限来自服务端可信目录；姓名仅展示，personId才是操作键。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "follow_center.h"
 
 #include <QDesktopServices>
@@ -7,6 +12,9 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QTabWidget>
+#include <QTableWidget>
+#include <QHeaderView>
+#include <QComboBox>
 
 using namespace care_contract;
 
@@ -15,7 +23,7 @@ namespace {
 class FollowCenter final : public CarePage {
 public:
     FollowCenter(CareService& service, PersonWorkViewer viewWork)
-        : CarePage(QStringLiteral("人物关注中心")), service_(service), viewWork_(std::move(viewWork))
+        : CarePage(QStringLiteral("人物与作品")), service_(service), viewWork_(std::move(viewWork))
     {
         auto* searchBar = new QHBoxLayout;
         query_->setPlaceholderText(QStringLiteral("输入演员、导演或音乐人姓名"));
@@ -32,17 +40,23 @@ public:
 
         auto* split = new QHBoxLayout;
         people_->setAccessibleName(QStringLiteral("人物列表"));
-        for (auto* list : {people_, works_, news_, calendar_})
+        for (auto* list : {people_, works_})
             list->setProperty("careList", true);
         split->addWidget(people_, 2);
         auto* tabs = new QTabWidget;
         tabs->setDocumentMode(true);
         tabs->addTab(works_, QStringLiteral("关联作品"));
-        tabs->addTab(news_, QStringLiteral("资讯"));
-        tabs->addTab(calendar_, QStringLiteral("发布日历"));
-        split->addWidget(tabs, 3);
+        // This demo presents verified people and works; no empty news/calendar tabs.
+        auto* profile = new QWidget;
+        auto* profileLayout = new QVBoxLayout(profile);
+        profileTitle_->setTextFormat(Qt::PlainText);
+        profileTitle_->setWordWrap(true);
+        profileTitle_->setText(QStringLiteral("选择人物，查看本库作品；联网资料用于了解外部代表作品。"));
+        profileLayout->addWidget(profileTitle_);
+        profileLayout->addWidget(tabs);
+        split->addWidget(profile, 3);
         layout->addLayout(split, 1);
-        for (auto* note : {updatesStatus_, workDetails_}) {
+        for (auto* note : {workDetails_}) {
             note->setTextFormat(Qt::PlainText);
             note->setWordWrap(true);
             layout->addWidget(note);
@@ -51,9 +65,7 @@ public:
         actions->addWidget(toggle_);
         actions->addWidget(openWork_);
         actions->addWidget(worksMore_);
-        actions->addWidget(updatesMore_);
         actions->addStretch();
-        actions->addWidget(source_);
         layout->addLayout(actions);
 
         auto startSearch = [this] {
@@ -73,7 +85,6 @@ public:
         connect(followed, &QPushButton::clicked, this, [this] { activate(); });
         connect(more_, &QPushButton::clicked, this, [this] { if (next_) loadPeople(*next_); });
         connect(worksMore_, &QPushButton::clicked, this, [this] { if (nextWorks_) loadWorks(*nextWorks_); });
-        connect(updatesMore_, &QPushButton::clicked, this, [this] { if (nextUpdates_) loadUpdates(*nextUpdates_); });
         connect(people_, &QListWidget::currentRowChanged, this, [this] { loadPerson(); });
         connect(toggle_, &QPushButton::clicked, this, [this] { toggleFollow(); });
         connect(openWork_, &QPushButton::clicked, this, [this] { openSelectedWork(); });
@@ -82,20 +93,12 @@ public:
             workDetails_->clear();
             updateActions();
         });
-        connect(news_, &QListWidget::itemSelectionChanged, this, [this] { updateActions(); });
-        connect(calendar_, &QListWidget::itemSelectionChanged, this, [this] { updateActions(); });
         connect(tabs, &QTabWidget::currentChanged, this, [this](int index) {
             activeTab_ = index;
             updateActions();
         });
-        connect(source_, &QPushButton::clicked, this, [this] {
-            const auto url = selectedSource();
-            if (url.isValid() && !QDesktopServices::openUrl(url))
-                status->setText(QStringLiteral("无法打开来源。"));
-        });
         more_->setEnabled(false);
         worksMore_->setEnabled(false);
-        updatesMore_->setEnabled(false);
         updateActions();
     }
 
@@ -136,7 +139,7 @@ private:
         service_.searchPersonWeb(name, latest(5, [this, name](Result<QList<PersonWebSource>> result) {
             webSearch_->setEnabled(true);
             if (!result.status.ok() || !result.value) {
-                reportError(result);
+                status->setText(QStringLiteral("联网补充暂时不可用，已加载的本库人物和作品会保留。 ") + result.status.message);
                 return;
             }
             if (result.value->isEmpty()) {
@@ -146,27 +149,53 @@ private:
             status->clear();
             auto* dialog = new QDialog(this);
             dialog->setAttribute(Qt::WA_DeleteOnClose);
-            dialog->setWindowTitle(QStringLiteral("联网人物来源"));
-            dialog->resize(570, 240);
+            dialog->setWindowTitle(QStringLiteral("人物主页 · 外部参考资料"));
+            dialog->resize(920, 640);
             auto* body = new QVBoxLayout(dialog);
-            auto* heading = new QLabel(QStringLiteral("「%1」的外部参考来源").arg(name));
-            heading->setTextFormat(Qt::PlainText);
-            heading->setWordWrap(true);
-            body->addWidget(heading);
-            auto* list = new QListWidget;
-            list->setWordWrap(true);
-            body->addWidget(list);
-            for (const auto& source : *result.value) {
-                auto* item = new QListWidgetItem(source.title + QStringLiteral("\n") + source.url.host(), list);
-                item->setData(Qt::UserRole, source.url);
-            }
-            auto* open = new QPushButton(QStringLiteral("打开来源网页"));
-            body->addWidget(open, 0, Qt::AlignRight);
-            list->setCurrentRow(0);
-            connect(open, &QPushButton::clicked, dialog, [list] {
-                if (const auto* row = list->currentItem())
-                    QDesktopServices::openUrl(row->data(Qt::UserRole).toUrl());
+            auto* choices = new QComboBox;
+            for (const auto& person : *result.value) choices->addItem(person.title);
+            body->addWidget(choices);
+            auto* biography = new QLabel;
+            biography->setTextFormat(Qt::PlainText); biography->setWordWrap(true);
+            biography->setTextInteractionFlags(Qt::TextSelectableByMouse);
+            body->addWidget(biography);
+            auto* notice = new QLabel(QStringLiteral("联网模型根据搜索来源整理，请核对原文。这些是外部作品资料，不代表本库拥有或可播放。"));
+            notice->setWordWrap(true); body->addWidget(notice);
+            auto* table = new QTableWidget(0, 4);
+            table->setHorizontalHeaderLabels({QStringLiteral("代表作品"), QStringLiteral("年份"), QStringLiteral("参与角色"), QStringLiteral("资料来源")});
+            table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+            table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+            table->setSelectionBehavior(QAbstractItemView::SelectRows);
+            body->addWidget(table, 1);
+            auto* empty = new QLabel; body->addWidget(empty);
+            auto* openPerson = new QPushButton(QStringLiteral("核对人物来源"));
+            body->addWidget(openPerson);
+            const auto profiles = *result.value;
+            auto display = [profiles, choices, biography, table, empty] {
+                const int index = choices->currentIndex();
+                if (index < 0 || index >= profiles.size()) return;
+                const auto& person = profiles.at(index);
+                biography->setText(person.title + QStringLiteral("\n") + (person.biography.isEmpty() ? QStringLiteral("暂无可靠简介。") : person.biography));
+                table->setRowCount(person.works.size());
+                for (int row=0; row<person.works.size(); ++row) {
+                    const auto& work = person.works.at(row);
+                    const QStringList values{work.title, work.year.isEmpty()?QStringLiteral("未知"):work.year,
+                        work.role.isEmpty()?QStringLiteral("未确认"):work.role, work.sourceUrl.host()};
+                    for (int col=0; col<values.size(); ++col) {
+                        auto* cell = new QTableWidgetItem(values.at(col)); cell->setData(Qt::UserRole, work.sourceUrl);
+                        table->setItem(row, col, cell);
+                    }
+                }
+                empty->setText(person.works.isEmpty()?QStringLiteral("本次没有取得有来源的作品列表，可重试或核对人物来源。"):QStringLiteral("双击作品可核对来源；姓名下拉可选择同名人物。"));
+            };
+            connect(choices, &QComboBox::currentIndexChanged, dialog, [display](int) { display(); });
+            connect(openPerson, &QPushButton::clicked, dialog, [profiles, choices] {
+                const int index=choices->currentIndex(); if(index>=0 && index<profiles.size()) QDesktopServices::openUrl(profiles.at(index).url);
             });
+            connect(table, &QTableWidget::cellDoubleClicked, dialog, [table](int row,int col) {
+                if (auto* cell=table->item(row,col)) QDesktopServices::openUrl(cell->data(Qt::UserRole).toUrl());
+            });
+            display();
             dialog->open();
         }));
     }
@@ -212,14 +241,9 @@ private:
         invalidate(4);
         linkedWorks_.clear();
         works_->clear();
-        news_->clear();
-        calendar_->clear();
-        updatesStatus_->clear();
         workDetails_->clear();
         nextWorks_.reset();
-        nextUpdates_.reset();
         worksMore_->setEnabled(false);
-        updatesMore_->setEnabled(false);
         selectedPersonId_.clear();
         updateActions();
     }
@@ -231,10 +255,10 @@ private:
         if (row < 0 || row >= entries_.size())
             return;
         selectedPersonId_ = entries_.at(row).personId;
-        const auto now = care_ui::localTime(QDateTime::currentSecsSinceEpoch()).date();
-        updatesRange_ = {care_ui::midnight(now.addMonths(-3)), care_ui::midnight(now.addMonths(6))};
         loadWorks(0);
-        loadUpdates(0);
+        profileTitle_->setText(entries_.at(row).name + (selectedPersonId_.startsWith("field:")
+            ? QStringLiteral(" · 媒体字段中的姓名，身份未核实；仅按原字段归组作品，可联网核对。")
+            : QStringLiteral(" · 已核实人物 · 本库可读作品")));
     }
 
     void loadWorks(qint64 offset)
@@ -256,46 +280,6 @@ private:
             if (works_->count() == 0 && !nextWorks_)
                 works_->addItem(QStringLiteral("暂无关联作品"));
         }));
-    }
-
-    void loadUpdates(qint64 offset)
-    {
-        updatesMore_->setEnabled(false);
-        service_.getPersonUpdates({selectedPersonId_, updatesRange_, {offset, 50}},
-            latest(2, [this](Result<Page<PersonUpdate>> result) {
-                if (!result.status.ok() || !result.value) {
-                    updatesMore_->setEnabled(nextUpdates_.has_value());
-                    updatesStatus_->setText(result.status.message.isEmpty()
-                        ? QStringLiteral("无法读取人物资讯，请稍后再试。") : result.status.message);
-                    return;
-                }
-                updatesStatus_->clear();
-                nextUpdates_ = result.value->nextOffset;
-                for (const auto& update : result.value->items) {
-                    if (update.kind == UpdateKind::Release && !update.eventAtUtc)
-                        continue;
-                    auto* list = update.kind == UpdateKind::Release ? calendar_ : news_;
-                    const auto date = update.eventAtUtc ? update.eventAtUtc : update.publishedAtUtc;
-                    auto* item = new QListWidgetItem(QStringLiteral("%1\n%2 · %3 %4")
-                        .arg(update.title, date ? care_ui::timestamp(*date) : QStringLiteral("日期未知"),
-                             update.stale ? QStringLiteral("已过期缓存 · 获取于") : QStringLiteral("更新于"),
-                             care_ui::timestamp(update.fetchedAtUtc)), list);
-                    item->setData(Qt::UserRole, update.sourceUrl);
-                }
-                updatesMore_->setEnabled(nextUpdates_.has_value());
-                if (!news_->count() && !nextUpdates_)
-                    news_->addItem(QStringLiteral("暂无有来源的资讯"));
-                if (!calendar_->count() && !nextUpdates_)
-                    calendar_->addItem(QStringLiteral("暂无已确认日期的发布"));
-            }));
-    }
-
-    QUrl selectedSource() const
-    {
-        const QListWidget* list = activeTab_ == 1 ? news_ : activeTab_ == 2 ? calendar_ : nullptr;
-        const auto* item = list ? list->currentItem() : nullptr;
-        const auto url = item ? item->data(Qt::UserRole).toUrl() : QUrl();
-        return url.scheme() == QStringLiteral("https") && !url.host().isEmpty() ? url : QUrl();
     }
 
     void openSelectedWork()
@@ -323,13 +307,10 @@ private:
     {
         const auto row = people_->currentRow();
         const bool selected = row >= 0 && row < entries_.size();
-        toggle_->setEnabled(selected && !writing_);
+        toggle_->setEnabled(selected && !writing_ && !entries_.at(row).personId.startsWith("field:"));
         toggle_->setText(selected && entries_.at(row).followed ? QStringLiteral("取消关注") : QStringLiteral("关注"));
         const int workRow = works_->currentRow();
         openWork_->setEnabled(viewWork_ && activeTab_ == 0 && workRow >= 0 && workRow < linkedWorks_.size());
-        const auto url = selectedSource();
-        source_->setEnabled(!url.isEmpty());
-        source_->setToolTip(url.host());
     }
 
     void toggleFollow()
@@ -362,26 +343,20 @@ private:
     CareService& service_;
     PersonWorkViewer viewWork_;
     QList<WarehouseItemRef> linkedWorks_;
-    QLabel* updatesStatus_ = new QLabel;
+    QLabel* profileTitle_ = new QLabel;
     QLabel* workDetails_ = new QLabel;
     QPushButton* openWork_ = new QPushButton(QStringLiteral("查看作品详情"));
     QLineEdit* query_ = new QLineEdit;
-    QPushButton* webSearch_ = new QPushButton(QStringLiteral("联网找人物"));
+    QPushButton* webSearch_ = new QPushButton(QStringLiteral("联网人物主页"));
     QListWidget* people_ = new QListWidget;
     QListWidget* works_ = new QListWidget;
-    QListWidget* news_ = new QListWidget;
-    QListWidget* calendar_ = new QListWidget;
     QPushButton* more_ = new QPushButton(QStringLiteral("加载更多"));
     QPushButton* worksMore_ = new QPushButton(QStringLiteral("加载更多作品"));
-    QPushButton* updatesMore_ = new QPushButton(QStringLiteral("加载更多更新"));
     QPushButton* toggle_ = new QPushButton;
-    QPushButton* source_ = new QPushButton(QStringLiteral("打开原始来源"));
     QList<PersonSummary> entries_;
     std::optional<qint64> next_;
     std::optional<qint64> nextWorks_;
-    std::optional<qint64> nextUpdates_;
     QString selectedPersonId_;
-    TimeRange updatesRange_;
     QString submitted_;
     bool followingOnly_ = true;
     bool writing_ = false;

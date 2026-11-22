@@ -1,3 +1,7 @@
+// >>> DEFENSE-NOTE | 头文件导读｜可信人物上下文适配声明
+// 将服务端确认的作品来源三元组关联到人物，不从演员字符串猜真实身份；历史快照不被当前目录覆写。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #pragma once
 #include "care_algorithm_types.h"
 

@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜仓库模型推荐的服务端接线
+// 阅读路线：核对会话 → 授权候选 → 登记请求 → 异步模型 → 会话/权限复核 → 返回
+// 联调关系：Qt使用网络业务请求；模型任务编号与客户端req_id独立映射。主逻辑的readableCandidates提供权限边界。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "warehouse_server.h"
 #include "llm_warehouse_adapter.h"
 #include "media_json.h"
@@ -8,6 +13,10 @@
 
 using namespace warehouse_contract;
 
+// >>> DEFENSE-NOTE | cancelPending = 取消会话中所有模型类任务
+// 摘要、推荐及当前版本新增的场景任务分别保存并取消；断线/退出时调用。
+// notify决定是否向仍在线客户端发送取消错误，不是自动再次请求模型。
+// <<< DEFENSE-NOTE | 本段讲解结束
 void WarehouseServer::cancelPending(Session& session, QTcpSocket* socket, bool notify)
 {
     const auto scenes = std::exchange(session.scenes, {});
@@ -32,6 +41,9 @@ void WarehouseServer::cancelPending(Session& session, QTcpSocket* socket, bool n
     }
 }
 
+// >>> DEFENSE-NOTE | startRecommendation = 处理仓库推荐请求
+// 验证payload、当前socket会话token、query长度和limit；可选目标仓库也必须在当前可读集合里。
+// <<< DEFENSE-NOTE | 本段讲解结束
 void WarehouseServer::startRecommendation(QTcpSocket* socket, const std::shared_ptr<Session>& session,
                                           const QJsonObject& request)
 {
@@ -98,6 +110,9 @@ void WarehouseServer::startRecommendation(QTcpSocket* socket, const std::shared_
         }
         target = number;
     }
+    // >>> DEFENSE-NOTE | 接线步骤 01｜服务器决定候选权限
+    // 使用session里的userId，而不是让客户端自报任意身份。读取失败与候选过大均报错。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     const auto readable = readableCandidates(session->userId);
     if (!readable) { fail("ServerError", QStringLiteral("读取候选失败，或候选超过数量或大小上限。")); return; }
     if (target) {
@@ -108,6 +123,9 @@ void WarehouseServer::startRecommendation(QTcpSocket* socket, const std::shared_
     }
     const WarehouseRecommendationRequest spec{query.toString(), target, static_cast<int>(limitNumber)};
     auto modelRequest = llm_recommendation::fromWarehouses(spec, *readable);
+    // >>> DEFENSE-NOTE | 接线步骤 02｜保存请求的用户、会话、目标和候选键
+    // 模型异步执行期间数据与权限可能变化；保存这些字段是为了回来时核对，不是隔离数据库事务。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     Session::Pending pending;
     pending.userId = session->userId;
     pending.token = session->token;
@@ -115,6 +133,9 @@ void WarehouseServer::startRecommendation(QTcpSocket* socket, const std::shared_
     for (const auto& candidate : modelRequest.candidates) pending.candidateKeys.insert(candidate.key);
     session->pending.insert(id, pending);
     QPointer<QTcpSocket> guardedSocket(socket);
+    // >>> DEFENSE-NOTE | 接线步骤 03｜异步模型完成后再查当前权限
+    // QPointer避免向已销毁连接写入；比对用户/token，确认还是原会话；重新读当前可读目录。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     const quint64 modelId = recommender_.recommend(std::move(modelRequest), [this, guardedSocket, session, id](llm_recommendation::Result result) {
         auto it = session->pending.find(id);
         if (it == session->pending.end()) return;
@@ -136,6 +157,9 @@ void WarehouseServer::startRecommendation(QTcpSocket* socket, const std::shared_
                                             {"message", QStringLiteral("目标仓库已不可访问。")}}); return;
             }
         }
+        // >>> DEFENSE-NOTE | 接线步骤 04｜原候选和当前可读集合双重约束
+        // 先剔除不在发出时候选中的key，再通过adapter过滤当前已撤权/删除条目；转换为客户端作品结果。
+        // <<< DEFENSE-NOTE | 本段讲解结束
         for (auto item = result.items.begin(); item != result.items.end(); )
             if (!pending.candidateKeys.contains(item->key)) item = result.items.erase(item); else ++item;
         const auto converted = llm_recommendation::toRecommendationResult(result, *current);

@@ -104,44 +104,32 @@ protected:
 class PersonImportServerTests : public QObject {
     Q_OBJECT
 private slots:
-    void webPersonSearchFetchesOnlyApprovedProfiles()
+    void webPersonSearchReturnsSourcedProfileInsteadOfOneLink()
     {
         NewsNetwork network;
-        network.searchBody = {{"results", QJsonArray{
-            QJsonObject{{"url", "https://example.invalid/people/123"}},
-            QJsonObject{{"url", "https://catalog.afi.com/Film/56615-THE-FOUR-SEASONS"}},
-            QJsonObject{{"url", "https://catalog.afi.com/Catalog/PersonDetails/8664?from=search"}},
-        }}};
-        network.fetchBody = {{"title", "Alan Alda"}, {"content", "# Alan Alda\nFilmography"}};
-        bool done = false;
-        Result<QList<PersonWebSource>> result;
-        const auto lookup = [&] {
-            done = false;
-            deepseek_person_news::findPeople(network, "Alan Alda", "test-key", [&](auto value) {
-                result = std::move(value);
-                done = true;
-            });
+        auto response=[](QJsonArray people) {
+            const auto content=QString::fromUtf8(QJsonDocument(QJsonObject{{"people",people}}).toJson());
+            QJsonObject message{{"content",content},{"server_tool_calls",QJsonArray{QJsonObject{{"calls",QJsonArray{QJsonObject{
+                {"type","deepseek_web_search"},{"kind","search"},{"status","completed"},
+                {"sources",QJsonArray{QJsonObject{{"url","https://catalog.afi.com/Catalog/PersonDetails/8664"}}}}}}}}}}};
+            return QJsonObject{{"choices",QJsonArray{QJsonObject{{"finish_reason","stop"},{"message",message}}}}};
         };
-        lookup();
-        QTRY_VERIFY(done);
-        QVERIFY(result.status.ok() && result.value);
-        QCOMPARE(result.value->size(), 1);
-        QCOMPARE(result.value->front().title, QString("Alan Alda"));
-        QCOMPARE(network.requests.size(), 2);
-        QCOMPARE(network.requests.at(0).url().path(), QString("/v1/tools/search"));
-        QCOMPARE(network.requests.at(1).url().path(), QString("/v1/tools/fetch"));
-        QCOMPARE(network.payloads.at(1).value("url").toString(),
-                 QString("https://catalog.afi.com/Catalog/PersonDetails/8664"));
-
-        network.fetchBody = {{"title", "Another person"}, {"content", "# Another person"}};
-        lookup();
-        QTRY_VERIFY(done);
+        network.fetchBody=response({QJsonObject{{"name","Alan Alda"},{"biography","Actor and director"},
+            {"source_url","https://catalog.afi.com/Catalog/PersonDetails/8664"},{"works",QJsonArray{}}}});
+        bool done=false;
+        Result<QList<PersonWebSource>> result;
+        auto lookup=[&] {done=false;deepseek_person_news::findPeople(network,"Alan Alda","fake-test-only",[&](auto value) {
+            result=std::move(value);done=true;
+        });};
+        lookup(); QTRY_VERIFY(done);
+        QVERIFY(result.status.ok() && result.value); QCOMPARE(result.value->size(),1);
+        QCOMPARE(result.value->first().biography,QString("Actor and director"));
+        QCOMPARE(network.requests.size(),1);
+        QCOMPARE(network.requests.first().url().path(),QString("/chat/completions"));
+        QCOMPARE(network.payloads.first().value("tools").toArray().first().toObject().value("type").toString(),QString("deepseek_web_search"));
+        network.fetchBody=response({});lookup();QTRY_VERIFY(done);
         QVERIFY(result.status.ok() && result.value && result.value->isEmpty());
-
-        network.fetchStatus = 503;
-        lookup();
-        QTRY_VERIFY(done);
-        QVERIFY(!result.status.ok());
+        network.fetchStatus=503;lookup();QTRY_VERIFY(done);QVERIFY(!result.status.ok());
     }
 
     void importedPeopleReachResourceHistoryFootprintAndFollowRecommendation() {

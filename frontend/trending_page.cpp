@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜热榜页面的规则与模型模式
+// 阅读路线：选择窗口/榜单 → 普通规则请求 → 显式AI按钮 → 纯文本摘要
+// 联调关系：服务器聚合精确统计并管理模型生命周期；页面只发模式和展示结果。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "trending_page.h"
 
 #include <QComboBox>
@@ -69,6 +74,9 @@ public:
         status->clear();
     }
 private:
+    // >>> DEFENSE-NOTE | load = 根据用户意图选择规则或模型摘要
+    // 普通刷新和筛选使用Rules；AI按钮显式Model。禁用重复请求并让失效页面忽略旧回复。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void load(TrendingSummaryMode mode)
     {
         modelSummary_->setEnabled(mode != TrendingSummaryMode::Model);

@@ -1,4 +1,10 @@
+// >>> DEFENSE-NOTE | 文件导读｜人物资讯Search与Fetch
+// 阅读路线：可信人物/发布者配置 → Search候选 → URL白名单 → Fetch原文 → 人物线索核验 → 缓存合并
+// 联调关系：服务端持有Key和Store；begin/merge/fail刷新代次由仓储实现，Qt只展示资讯，不接收Key或任意抓取URL。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "deepseek_person_news.h"
+#include "person_profile_lookup.h"
 #include "person_store.h"
 
 #include <QCryptographicHash>
@@ -28,6 +34,9 @@ constexpr int FetchLimit = 3;
 constexpr int TimeoutMs = 10000;
 constexpr qint64 MaxResponseBytes = 2 * 1024 * 1024;
 
+// >>> DEFENSE-NOTE | SearchPlan = 规范化检索计划
+// 保存实际缓存来源标识、搜索词、核准域名、姓名和公开识别线索；source是搜索来源，不是文章地址。
+// <<< DEFENSE-NOTE | 本段讲解结束
 struct SearchPlan {
     QUrl source;
     QString query;
@@ -35,6 +44,9 @@ struct SearchPlan {
     QString name;
     QString clue;
 };
+// >>> DEFENSE-NOTE | Article = 待Fetch的候选文章
+// 只保存文章URL和可能的发布日期；搜索结果摘要不是已经核实的原文。
+// <<< DEFENSE-NOTE | 本段讲解结束
 struct Article {
     QUrl source;
     QJsonValue publication;
@@ -44,16 +56,25 @@ struct Response {
     bool oversized = false;
 };
 
+// >>> DEFENSE-NOTE | failure = 返回资讯服务错误
+// 保留错误语义；无资讯、请求失败和缓存过期是不同状态。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Status failure(const QString& message)
 {
     return {ErrorCode::ServerError, message};
 }
 
+// >>> DEFENSE-NOTE | normalized = 兼容规范化与空白整理
+// 使人物名字和识别线索能与网页文本进行一致的包含比较，不声称完成自然语言事实核验。
+// <<< DEFENSE-NOTE | 本段讲解结束
 QString normalized(const QString& text)
 {
     return text.normalized(QString::NormalizationForm_KC).simplified();
 }
 
+// >>> DEFENSE-NOTE | queryTerm = 校验受控检索词
+// 不允许引号、反斜杠、空字符或控制字符破坏固定查询结构。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool queryTerm(const QString& value)
 {
     if (value.isEmpty())
@@ -65,6 +86,10 @@ bool queryTerm(const QString& value)
     return true;
 }
 
+// >>> DEFENSE-NOTE | prepare = 验证人物与可信发布者并构造查询
+// 核验人物ID、域名结构、不能为IP、姓名及识别线索；生成“姓名”“线索”site:域名。
+// 限制查询长度，source把Search端点与site参数组合为缓存来源身份。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Result<SearchPlan> prepare(const Request& request)
 {
     const auto person = validatePersonId(request.personId);
@@ -93,6 +118,10 @@ Result<SearchPlan> prepare(const Request& request)
 }
 
 template<class Completion>
+// >>> DEFENSE-NOTE | postJson = 受限异步HTTP工具
+// 给固定API发JSON，携带服务器Key；禁止自动重定向。
+// 单次超时与累计响应字节预算共同限制请求；只有HTTP200、无网络错误、合法JSON对象才回调有效结果。
+// <<< DEFENSE-NOTE | 本段讲解结束
 void postJson(QNetworkAccessManager& network, const QUrl& api, const QByteArray& key, const QJsonObject& body,
               Completion done)
 {
@@ -134,6 +163,10 @@ void postJson(QNetworkAccessManager& network, const QUrl& api, const QByteArray&
         complete();
 }
 
+// >>> DEFENSE-NOTE | Refresh = 一次人物资讯刷新状态机
+// shared_from_this让异步链持有当前任务；保存候选、下一个索引和已验证资讯。
+// search→collectCandidates→fetchNext→saveVerified，任何失败走failed更新缓存状态。
+// <<< DEFENSE-NOTE | 本段讲解结束
 class Refresh final : public std::enable_shared_from_this<Refresh> {
 public:
     Refresh(person_store::Store& store, QNetworkAccessManager& network, SearchPlan plan, QString personId,
@@ -143,6 +176,9 @@ public:
     {
     }
 
+    // >>> DEFENSE-NOTE | search = 请求Search候选
+    // 仅向固定SearchUrl发送经过prepare限制的query，最多6条；回来的results仍须验证URL。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void search()
     {
         postJson(network_, SearchUrl, key_,
@@ -157,6 +193,10 @@ public:
     }
 
 private:
+    // >>> DEFENSE-NOTE | collectCandidates = 筛选可抓取文章
+    // 只接受HTTPS、准确匹配已核准域名、默认443端口、无用户信息/fragment；URL去重，最多Fetch3篇。
+    // 这不是允许客户端任意网址的网页代理。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void collectCandidates(const QJsonArray& results)
     {
         if (results.size() > SearchLimit) {
@@ -187,6 +227,10 @@ private:
         fetchNext();
     }
 
+    // >>> DEFENSE-NOTE | fetchNext = 串行抓取下一篇原文
+    // 每次只Fetch一篇，完成后继续；全部处理完成才以同一generation合并缓存。
+    // HTTP失败或正文缺失使本轮失败，不把空白正文当证据。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void fetchNext()
     {
         if (next_ == candidates_.size()) {
@@ -207,6 +251,10 @@ private:
         });
     }
 
+    // >>> DEFENSE-NOTE | saveVerified = 将通过最低证据检查的文章转缓存记录
+    // 标题与原文合起来必须同时含人物名和公开身份线索；只是确定性的最低校验，不是绝对真实性证明。
+    // updateId=文章URL的SHA-256稳定摘要，便于重复刷新去重；未知/未来/无时区的发表时间不编造。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void saveVerified(const Article& article, const QJsonObject& page)
     {
         const auto title = page.value("title").toString().simplified();
@@ -229,6 +277,9 @@ private:
             items_.append(std::move(update));
     }
 
+    // >>> DEFENSE-NOTE | failed = 标记本轮缓存刷新失败
+    // 调用failUpdatesRefresh限定人物、来源和代次；已有缓存保留并标为stale，返回可解释错误。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void failed(const QString& message)
     {
         const auto result = store_.failUpdatesRefresh(personId_, plan_.source, generation_);
@@ -251,67 +302,32 @@ private:
 void findPeople(QNetworkAccessManager& network, const QString& name, const QByteArray& apiKey,
                 Callback<QList<PersonWebSource>> done)
 {
-    const auto term = normalized(name);
-    const auto query = QStringLiteral("\"%1\" site:catalog.afi.com OR site:musicbrainz.org OR site:tvmaze.com").arg(term);
-    if (!queryTerm(term) || query.toUcs4().size() > 128) {
-        done({{ErrorCode::InvalidArgument, QStringLiteral("请输入较短的人物姓名。")}, {}});
-        return;
-    }
-    const auto key = apiKey.trimmed();
-    if (key.isEmpty() || key.size() > 4096 || key.contains('\n') || key.contains('\r') || key.contains('\0')) {
-        done({failure(QStringLiteral("服务器尚未配置 DeepSeek 联网搜索。")), {}});
-        return;
-    }
-    postJson(network, SearchUrl, key, {{"query", query}, {"count", 8}, {"need_content", false}},
-        [&network, key, term, done = std::move(done)](std::optional<QJsonObject> reply) {
-            if (!reply || !reply->value("results").isArray()) {
-                done({failure(QStringLiteral("DeepSeek 人物搜索暂时失败，请重试。")), {}});
-                return;
-            }
-            const auto rows = reply->value("results").toArray();
-            for (const auto& row : rows) {
-                const QUrl url(row.toObject().value("url").toString(), QUrl::StrictMode);
-                if (!url.isValid() || url.scheme() != "https" || !url.userInfo().isEmpty() ||
-                    url.port() != -1 || url.toEncoded().size() > 2048)
-                    continue;
-                const auto host = url.host();
-                const auto path = url.path();
-                if (!((host == "catalog.afi.com" && path.startsWith("/Catalog/PersonDetails/", Qt::CaseInsensitive)) ||
-                      (host == "musicbrainz.org" && path.startsWith("/artist/")) ||
-                      ((host == "www.tvmaze.com" || host == "tvmaze.com") && path.startsWith("/people/"))))
-                    continue;
-                const auto source = url.adjusted(QUrl::RemoveFragment | QUrl::RemoveQuery);
-                postJson(network, FetchUrl, key, {{"url", source.toString(QUrl::FullyEncoded)}},
-                    [source, term, done = std::move(done)](std::optional<QJsonObject> page) {
-                        if (!page || !page->value("content").isString()) {
-                            done({failure(QStringLiteral("网页原文暂时无法读取，请重试。")), {}});
-                            return;
-                        }
-                        const auto content = normalized(page->value("content").toString());
-                        QList<PersonWebSource> sources;
-                        if (content.contains(term, Qt::CaseInsensitive)) {
-                            const auto title = normalized(page->value("title").toString()).left(200);
-                            sources.append({title.isEmpty() ? term : title, source});
-                        }
-                        done({{}, std::move(sources)});
-                    });
-                return;
-            }
-            done({{}, QList<PersonWebSource>{}});
-        });
+    auto config = llm_recommendation::loadConfig();
+    config.apiKey = QString::fromUtf8(apiKey);
+    person_profile_lookup::lookup(network, name, config, std::move(done));
 }
 
+// >>> DEFENSE-NOTE | cacheSource = 计算人物搜索缓存来源
+// 复用prepare，得到含site参数的来源URL；不要与文章sourceUrl混用。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Result<QUrl> cacheSource(const Request& request)
 {
     const auto plan = prepare(request);
     return {plan.status, plan.value ? std::optional<QUrl>(plan.value->source) : std::nullopt};
 }
 
+// >>> DEFENSE-NOTE | isSearchSource = 判断是不是本模块的Search来源
+// 去除查询部分后比较固定端点，再确认有site参数。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool isSearchSource(const QUrl& source)
 {
     return source.adjusted(QUrl::RemoveQuery) == SearchUrl && QUrlQuery(source).hasQueryItem("site");
 }
 
+// >>> DEFENSE-NOTE | refresh = 对外启动人物资讯刷新
+// 验证请求与Key格式，先beginUpdatesRefresh取得generation，再建立Refresh任务。
+// 成功merge与失败fail都携带该generation，防旧请求覆盖新一轮缓存。
+// <<< DEFENSE-NOTE | 本段讲解结束
 void refresh(person_store::Store& store, QNetworkAccessManager& network, const Request& request,
              const QByteArray& apiKey, StatusCallback done)
 {

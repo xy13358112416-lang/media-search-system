@@ -1,3 +1,7 @@
+// >>> DEFENSE-NOTE | 头文件导读｜单机偏好共享契约
+// Auto自动推断，Any禁止此字段历史补全，Explicit采用本次明确值。Qt依赖抽象服务，具体实现读账户历史。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #pragma once
 
 #include <QString>
@@ -13,6 +17,9 @@ enum class PreferenceMode {
     Explicit  // 使用 value 中明确指定的类别或文件类型。
 };
 
+// >>> DEFENSE-NOTE | 类型说明｜PreferenceSelection
+// 偏好三态与实际值分离：只有Explicit使用value；Auto/Any不能只靠空字符串区分。
+// <<< DEFENSE-NOTE | 本段讲解结束
 struct PreferenceSelection {
     PreferenceMode mode = PreferenceMode::Auto;
     // Auto / Any 时忽略 value；Explicit 时填写实际选项值，不用空字符串区分模式。
@@ -20,6 +27,9 @@ struct PreferenceSelection {
     QString value;
 };
 
+// >>> DEFENSE-NOTE | 类型说明｜RecommendationRequest
+// 单机请求带userId但服务端实现仍须核对当前会话；limit是上限。
+// <<< DEFENSE-NOTE | 本段讲解结束
 struct RecommendationRequest {
     // 与账户草案使用相同的 qint64 类型。0 表示尚无用户，不能代替真实登录身份。
     // 后续服务实现须核对主逻辑的当前会话，不能只信任调用方提供的 ID。
@@ -29,6 +39,9 @@ struct RecommendationRequest {
     int limit = 5; // 与现有推荐一致：小于等于零时，已验证身份的请求成功返回空列表。
 };
 
+// >>> DEFENSE-NOTE | 类型说明｜RecommendationResult
+// success=false是错误；success=true且mediaIds为空是正常无结果；reason供展示。
+// <<< DEFENSE-NOTE | 本段讲解结束
 struct RecommendationResult {
     // 成功但没有结果时为 true 且 mediaIds 为空；失败时为 false，并填写 error。
     // 读取历史失败是错误，不能当成“没有历史”静默改用热门推荐。

@@ -1,3 +1,7 @@
+// >>> DEFENSE-NOTE | 头文件导读｜热榜模型摘要接口
+// 输入已经聚合且满足公开门槛的TrendingResult；只可改summary，失败原样回规则文字。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #pragma once
 
 #include "care_contract.h"

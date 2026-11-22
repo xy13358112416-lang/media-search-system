@@ -1,10 +1,17 @@
-﻿#pragma once
+﻿// >>> DEFENSE-NOTE | 头文件导读｜基础推荐接口
+// 类别/格式是软偏好，viewCount用于热度。recommendMedia是纯规则函数，输出最多limit个有序媒体ID。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
+#pragma once
 
 #include "mediarecord.h"
 #include <QList>
 #include <QString>
 #include <QStringList>
 
+// >>> DEFENSE-NOTE | 类型说明｜RecommendationOptions
+// 基础规则偏好：类别、格式、条数；不包含用户身份，也不自行查询历史。
+// <<< DEFENSE-NOTE | 本段讲解结束
 struct RecommendationOptions {
     QString preferredCategory;  // 所需类别，例如纪录片。去除首尾空白后精确匹配，留空时无偏好。
     QString preferredFileType;  // 偏好的文件扩展名，例如 MP4。忽略大小写及首尾空白，留空时无偏好。

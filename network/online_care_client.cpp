@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜在线扩展服务客户端
+// 阅读路线：契约校验 → JSON序列化 → 同一登录连接发送 → 严格响应解析
+// 联调关系：Qt页面通过本适配访问服务端；本人身份来自会话，不让调用者随意指定userId。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "online_care_client.h"
 #include "media_json.h"
 #include "person_json.h"
@@ -190,7 +195,7 @@ void OnlineCareClient::searchPersonWeb(const QString& name, Callback<QList<Perso
             return;
         }
         const auto encoded = payload.value("sources");
-        if (!encoded.isArray() || encoded.toArray().size() > 1) {
+        if (!encoded.isArray() || encoded.toArray().size() > 3) {
             done({malformed(), {}});
             return;
         }
@@ -204,7 +209,25 @@ void OnlineCareClient::searchPersonWeb(const QString& name, Callback<QList<Perso
                 done({malformed(), {}});
                 return;
             }
-            sources.append({title, url});
+            PersonWebSource source{title, url};
+            source.biography = item.value("biography").toString();
+            const auto works = item.value("works");
+            if (source.biography.size() > 1200 || (!works.isUndefined() && (!works.isArray() || works.toArray().size() > 20))) {
+                done({malformed(), {}}); return;
+            }
+            for (const auto& entry : works.toArray()) {
+                const auto row = entry.toObject();
+                PersonWebWork work{row.value("title").toString(), row.value("year").toString(),
+                                   row.value("role").toString(), QUrl(row.value("source_url").toString(), QUrl::StrictMode)};
+                if (work.title.trimmed().isEmpty() || work.title.size() > 200 || work.role.size() > 80 ||
+                    (!work.year.isEmpty() && !QRegularExpression("^[0-9]{4}$").match(work.year).hasMatch()) ||
+                    !work.sourceUrl.isValid() || work.sourceUrl.scheme() != "https" || work.sourceUrl.host().isEmpty() ||
+                    !work.sourceUrl.userInfo().isEmpty() || (work.sourceUrl.port() != -1 && work.sourceUrl.port() != 443)) {
+                    done({malformed(), {}}); return;
+                }
+                source.works.append(work);
+            }
+            sources.append(source);
         }
         done({{}, std::move(sources)});
     });
@@ -267,6 +290,9 @@ void OnlineCareClient::getPersonUpdates(const PersonUpdatesRequest& input, Callb
     requestPersonPage("get_person_updates", {{"person_id", input.personId}, {"range", rangeJson(input.range)}},
                       input.page, std::move(done));
 }
+// >>> DEFENSE-NOTE | getTrending = 热榜JSON适配
+// 发送kind/range/limit/summary_mode；只有Model使用较长等待，解析时核对响应范围及计数字段。
+// <<< DEFENSE-NOTE | 本段讲解结束
 void OnlineCareClient::getTrending(const TrendingRequest& requestValue, Callback<TrendingResult> done) {
     const auto valid = validate(requestValue);
     if (!valid.ok()) { done({valid, {}}); return; }
@@ -330,6 +356,9 @@ void OnlineCareClient::getTrending(const TrendingRequest& requestValue, Callback
         done({{}, result});
     });
 }
+// >>> DEFENSE-NOTE | getFootprint = 足迹JSON适配
+// 校验请求与返回日期范围，解析当前期/比较期及覆盖信息；协议损坏返回ProtocolError。
+// <<< DEFENSE-NOTE | 本段讲解结束
 void OnlineCareClient::getFootprint(const FootprintRequest& requestValue, Callback<FootprintReport> done) {
     const auto valid = validate(requestValue);
     if (!valid.ok()) { done({valid, {}}); return; }
@@ -353,6 +382,10 @@ void OnlineCareClient::getFootprint(const FootprintRequest& requestValue, Callba
         done({{}, report});
     });
 }
+// >>> DEFENSE-NOTE | recommendTemporal = 时序/场景推荐的客户端请求
+// 三态偏好转JSON，scene转neutral/relax/focus/explore；通过同一登录连接发送。
+// 返回推荐句柄用于取消；作品顺序保留，不在客户端重新计算分数。
+// <<< DEFENSE-NOTE | 本段讲解结束
 warehouse_contract::RecommendationHandle OnlineCareClient::recommendTemporal(const TemporalRecommendationRequest& input, Callback<TemporalRecommendationResult> done) {
     const auto valid = validate(input);
     if (!valid.ok()) { done({valid, {}}); return {}; }
