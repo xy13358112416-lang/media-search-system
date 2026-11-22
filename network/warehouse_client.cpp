@@ -225,6 +225,13 @@ void WarehouseClient::receive() {
     if (!valid) abortProtocol();
 }
 void WarehouseClient::login(const QString& username, const QString& password, Callback<UserInfo> done) {
+    loginWithRole(username, password, {}, std::move(done));
+}
+void WarehouseClient::loginAs(const QString& username, const QString& password, LoginRole role, Callback<UserInfo> done) {
+    loginWithRole(username, password, role == LoginRole::Administrator ? "admin" : "user", std::move(done));
+}
+void WarehouseClient::loginWithRole(const QString& username, const QString& password,
+                                    const QString& role, Callback<UserInfo> done) {
     if (loginPending_ || logoutPending_) {
         done({fail(ErrorCode::InvalidArgument, QStringLiteral("已有登录请求正在进行")),{}}); return;
     }
@@ -233,7 +240,7 @@ void WarehouseClient::login(const QString& username, const QString& password, Ca
     const QString oldToken = std::exchange(token_, QString());
     if (!oldToken.isEmpty()) {
         const quint64 attempt = connectAttempt_;
-        request("logout", {}, [this, attempt, username, password, done=std::move(done)](Status status, QJsonObject) mutable {
+        request("logout", {}, [this, attempt, username, password, role, done=std::move(done)](Status status, QJsonObject) mutable {
             if (connectAttempt_ != attempt) {
                 done({status.ok() ? fail(ErrorCode::Cancelled, QStringLiteral("登录请求已被新的连接操作替代")) : status, {}});
                 return;
@@ -244,15 +251,17 @@ void WarehouseClient::login(const QString& username, const QString& password, Ca
                 done({status,{}});
                 return;
             }
-            sendLogin(username, password, std::move(done));
+            sendLogin(username, password, role, std::move(done));
         }, oldToken);
         return;
     }
-    sendLogin(username, password, std::move(done));
+    sendLogin(username, password, role, std::move(done));
 }
-void WarehouseClient::sendLogin(const QString& username, const QString& password, Callback<UserInfo> done) {
-    request("login", {{"username",username},{"password",password}},
-        [this, done=std::move(done)](Status status, QJsonObject payload) {
+void WarehouseClient::sendLogin(const QString& username, const QString& password, const QString& role, Callback<UserInfo> done) {
+    QJsonObject input{{"username", username}, {"password", password}};
+    if (!role.isEmpty()) input.insert("login_role", role);
+    request("login", input,
+        [this, role, done=std::move(done)](Status status, QJsonObject payload) {
             loginPending_ = false;
             if (!status.ok()) {
                 // A timed-out login may already have created a server session whose token we never received.
@@ -272,6 +281,11 @@ void WarehouseClient::sendLogin(const QString& username, const QString& password
             }
             result.isAdmin = u.value("is_admin").toBool(false);
             result.username = u.value("username").toString();
+            if (!role.isEmpty() && result.isAdmin != (role == "admin")) {
+                disconnectFromServer();
+                done({fail(ErrorCode::PermissionDenied, QStringLiteral("账号角色与登录入口不匹配。")), {}});
+                return;
+            }
             token_ = payload.value("token").toString();
             done({{}, result});
         });

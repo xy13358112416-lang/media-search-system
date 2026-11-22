@@ -31,8 +31,11 @@ class Connection:
         assert result["req_id"] == str(self.sequence)
         return result
 
-    def login(self, name, password="test-pass-123"):
-        result = self.call("login", {"username": name, "password": password})
+    def login(self, name, password="test-pass-123", role=None):
+        payload = {"username": name, "password": password}
+        if role is not None:
+            payload["login_role"] = role
+        result = self.call("login", payload)
         if "payload" in result:
             self.token = result["payload"]["token"]
         return result
@@ -81,6 +84,15 @@ def run(executable):
             clients.append(c)
             return c, c.login(name, password)
         try:
+            for name, wrong, correct in (("operator", "user", "admin"), ("legacy", "admin", "user")):
+                probe = Connection(port)
+                clients.append(probe)
+                assert probe.login(name, role=wrong)["code"] == "PermissionDenied"
+                assert probe.call("admin_list_users", {"offset": "0"})["code"] == "NotAuthenticated"
+                assert probe.login(name, role=correct)["payload"]["user"]["is_admin"] == (correct == "admin")
+            invalid = Connection(port)
+            clients.append(invalid)
+            assert invalid.login("legacy", role=True)["code"] == "InvalidArgument"
             admin, response = connect("operator")
             assert response["payload"]["user"]["is_admin"] is True
             user, response = connect("legacy")

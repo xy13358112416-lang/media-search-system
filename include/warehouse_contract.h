@@ -5,6 +5,7 @@
 #include <QtGlobal>
 #include <functional>
 #include <optional>
+#include <utility>
 
 namespace warehouse_contract {
 enum class ErrorCode { None, InvalidArgument, NotConnected, NotAuthenticated, AuthenticationFailed, PermissionDenied,
@@ -12,6 +13,7 @@ enum class ErrorCode { None, InvalidArgument, NotConnected, NotAuthenticated, Au
 struct Status { ErrorCode code = ErrorCode::None; QString message; bool ok() const { return code == ErrorCode::None; } };
 template<class T> struct Result { Status status; std::optional<T> value; };
 enum class Visibility { Private, Public };
+enum class LoginRole { User, Administrator };
 struct UserInfo { qint64 userId = 0; QString username; bool isAdmin = false; };
 struct WarehouseSummary { qint64 warehouseId = 0; QString name; qint64 ownerId = 0; Visibility visibility = Visibility::Private; };
 struct WarehouseItem { qint64 itemId = 0; MediaRecord media; };
@@ -32,6 +34,18 @@ public:
     virtual void connectToServer(const QString& host, quint16 port, StatusCallback done) = 0;
     virtual void disconnectFromServer() = 0;
     virtual void login(const QString& username, const QString& password, Callback<UserInfo> done) = 0;
+    virtual void loginAs(const QString& username, const QString& password, LoginRole role, Callback<UserInfo> done)
+    {
+        login(username, password, [this, role, done=std::move(done)](Result<UserInfo> result) {
+            if (result.status.ok() && result.value &&
+                result.value->isAdmin != (role == LoginRole::Administrator)) {
+                disconnectFromServer();
+                done({{ErrorCode::PermissionDenied, QStringLiteral("账号角色与登录入口不匹配。")}, {}});
+                return;
+            }
+            done(std::move(result));
+        });
+    }
     virtual void logout(StatusCallback done) = 0;
     virtual void listMyWarehouses(Callback<QList<WarehouseSummary>> done) = 0;
     virtual void listPublicWarehouses(Callback<QList<WarehouseSummary>> done) = 0;

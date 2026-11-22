@@ -134,7 +134,7 @@ private slots:
         client.connectToServer("127.0.0.1", server.serverPort(), [&](auto result) { connected = result; });
         QTRY_VERIFY(connected && connected->ok());
         std::optional<Result<UserInfo>> loggedIn;
-        client.login("operator", "admin-pass", [&](auto result) { loggedIn = result; });
+        client.loginAs("operator", "admin-pass", LoginRole::Administrator, [&](auto result) { loggedIn = result; });
         QTRY_VERIFY(loggedIn && loggedIn->status.ok() && loggedIn->value);
         QVERIFY(loggedIn->value->isAdmin);
         QDialog parent;

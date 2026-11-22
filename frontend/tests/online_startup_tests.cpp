@@ -32,6 +32,16 @@ public:
         if (deferLogin) logins.append(std::move(done));
         else done({{}, UserInfo{42, username}});
     }
+    void loginAs(const QString& username, const QString& password, LoginRole role, Callback<UserInfo> done) override
+    {
+        roles.append(role);
+        login(username, password, [this, done=std::move(done)](auto result) {
+            if (result.value) result.value->isAdmin = returnAdmin;
+            done(std::move(result));
+        });
+    }
+    QList<LoginRole> roles;
+    bool returnAdmin = false;
     bool deferConnect = false;
     bool deferLogin = false;
     Status connectStatus;
@@ -72,6 +82,89 @@ private slots:
     }
     void init() { QSettings().clear(); watchdog.start(5000); }
     void cleanup() { watchdog.stop(); }
+
+    void choiceOpensRoleSpecificLogin_data()
+    {
+        QTest::addColumn<bool>("admin");
+        QTest::newRow("user") << false;
+        QTest::newRow("administrator") << true;
+    }
+    void choiceOpensRoleSpecificLogin()
+    {
+        QFETCH(bool, admin);
+        StartupClient client;
+        client.returnAdmin = admin;
+        UserInfo user;
+        int stage = 0;
+        QTimer drive;
+        connect(&drive, &QTimer::timeout, this, [&] {
+            auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            if (!dialog) return;
+            if (stage == 0) {
+                QCOMPARE(dialog->objectName(), QStringLiteral("onlineRoleChoice"));
+                QVERIFY(client.hosts.isEmpty());
+                ++stage;
+                field<QPushButton>(dialog, admin ? "chooseAdminLogin" : "chooseUserLogin")->click();
+            } else if (stage == 1) {
+                QCOMPARE(dialog->windowTitle(), admin ? QStringLiteral("管理员登录") : QStringLiteral("用户登录"));
+                ++stage;
+                enterCredentials(dialog);
+            }
+        });
+        drive.start(10);
+        QVERIFY(online_ui::signIn(client, user));
+        QCOMPARE(stage, 2);
+        QCOMPARE(client.roles.last(), admin ? LoginRole::Administrator : LoginRole::User);
+        QCOMPARE(user.isAdmin, admin);
+    }
+
+    void backDiscardsPendingLoginBeforeChoosingAnotherRole()
+    {
+        StartupClient client;
+        client.deferLogin = true;
+        UserInfo user;
+        int stage = 0;
+        QTimer drive;
+        connect(&drive, &QTimer::timeout, this, [&] {
+            auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            if (!dialog) return;
+            if (stage == 0) {
+                ++stage; field<QPushButton>(dialog, "chooseUserLogin")->click();
+            } else if (stage == 1) {
+                enterCredentials(dialog);
+                QVERIFY(field<QLineEdit>(dialog, "onlinePassword")->text().isEmpty());
+                ++stage; field<QPushButton>(dialog, "onlineBack")->click();
+            } else if (stage == 2) {
+                QCOMPARE(dialog->objectName(), QStringLiteral("onlineRoleChoice"));
+                client.logins[0]({{}, UserInfo{99, "late-user"}});
+                QCOMPARE(user.userId, qint64(0));
+                ++stage; field<QPushButton>(dialog, "chooseAdminLogin")->click();
+            } else if (stage == 3) {
+                QCOMPARE(dialog->windowTitle(), QStringLiteral("管理员登录"));
+                client.returnAdmin = true;
+                enterCredentials(dialog);
+                ++stage; client.logins[1]({{}, UserInfo{42, "operator", true}});
+            }
+        });
+        drive.start(10);
+        QVERIFY(online_ui::signIn(client, user));
+        QCOMPARE(stage, 4);
+        QVERIFY(user.isAdmin);
+        QCOMPARE(user.username, QStringLiteral("operator"));
+    }
+
+    void cancellingRoleChoiceDoesNotConnect()
+    {
+        StartupClient client;
+        UserInfo user;
+        QTimer::singleShot(20, [] {
+            auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            QVERIFY(dialog);
+            dialog->reject();
+        });
+        QVERIFY(!online_ui::signIn(client, user));
+        QVERIFY(client.hosts.isEmpty());
+    }
 
     void loadsDefaultsAndValidatedIniThenRememberedEndpoint()
     {
@@ -127,7 +220,7 @@ private slots:
             inspected = true;
             enterCredentials(dialog);
         });
-        QVERIFY(online_ui::signIn(client, user, nullptr, settingsDirectory.filePath("missing.ini")));
+        QVERIFY(online_ui::signInAs(client, user, LoginRole::User, nullptr, settingsDirectory.filePath("missing.ini")));
         QVERIFY(inspected);
         QCOMPARE(user.userId, qint64(42));
         QCOMPARE(user.username, QStringLiteral("alice"));
@@ -165,7 +258,7 @@ private slots:
             retried = true;
             enterCredentials(dialog);
         });
-        QVERIFY(online_ui::signIn(client, user));
+        QVERIFY(online_ui::signInAs(client, user, LoginRole::User));
         QVERIFY(retried);
         QCOMPARE(online_ui::loadConnectionSettings().host, QStringLiteral("new-server.test"));
     }
@@ -199,7 +292,7 @@ private slots:
             inspected = true;
             client.logins[1]({{}, UserInfo{42, QStringLiteral("alice")}});
         });
-        QVERIFY(online_ui::signIn(client, user));
+        QVERIFY(online_ui::signInAs(client, user, LoginRole::User));
         QVERIFY(inspected);
         QCOMPARE(user.username, QStringLiteral("alice"));
     }
@@ -223,7 +316,7 @@ private slots:
             enterCredentials(dialog);
             client.logins[1]({{}, UserInfo{42, QStringLiteral("alice")}});
         });
-        QVERIFY(online_ui::signIn(client, user));
+        QVERIFY(online_ui::signInAs(client, user, LoginRole::User));
         QCOMPARE(user.username, QStringLiteral("alice"));
     }
 
@@ -238,7 +331,7 @@ private slots:
             field<QLineEdit>(dialog, "onlinePassword")->setText("discard-me");
             dialog->reject();
         });
-        QVERIFY(!online_ui::signIn(client, user));
+        QVERIFY(!online_ui::signInAs(client, user, LoginRole::User));
         QVERIFY(client.disconnects > 0);
         QCOMPARE(client.connections.size(), 1);
         client.connections[0]({});

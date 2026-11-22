@@ -482,6 +482,9 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
             return invalid();
         if (session.userId)
             return invalid();
+        const auto role = payload.value("login_role");
+        if (!role.isUndefined() && (!role.isString() || (role != "user" && role != "admin")))
+            return invalid();
         const auto username = userKey(payload.value("username").toString());
         const auto password = payload.value("password").toString().toUtf8();
         if (username.isEmpty() || password.isEmpty() || password.size() > 1024)
@@ -495,6 +498,8 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
             return fail("AuthenticationFailed", QStringLiteral("用户名或密码不正确。"));
         if (query.value(4).toBool())
             return fail("AuthenticationFailed", QStringLiteral("此账号已被停用，请联系管理员。"));
+        if (!role.isUndefined() && query.value(3).toBool() != (role == "admin"))
+            return fail("PermissionDenied", QStringLiteral("账号角色与登录入口不匹配，请返回选择对应入口。"));
         session.userId = query.value(0).toLongLong();
         QByteArray token(32, Qt::Uninitialized);
         randombytes_buf(token.data(), token.size());

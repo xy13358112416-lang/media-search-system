@@ -14,6 +14,8 @@ public:
     void connectToServer(const QString& host, quint16 port, warehouse_contract::StatusCallback done) override;
     void disconnectFromServer() override;
     void login(const QString& username, const QString& password, warehouse_contract::Callback<warehouse_contract::UserInfo> done) override;
+    void loginAs(const QString& username, const QString& password, warehouse_contract::LoginRole role,
+                 warehouse_contract::Callback<warehouse_contract::UserInfo> done) override;
     void logout(warehouse_contract::StatusCallback done) override;
     void listMyWarehouses(warehouse_contract::Callback<QList<warehouse_contract::WarehouseSummary>> done) override;
     void listPublicWarehouses(warehouse_contract::Callback<QList<warehouse_contract::WarehouseSummary>> done) override;
@@ -43,7 +45,9 @@ private:
     void sendCancellation(const QString& targetId);
     void cancelSessionRequests();
     void finishConnect(warehouse_contract::Status status);
-    void sendLogin(const QString& username, const QString& password,
+    void loginWithRole(const QString& username, const QString& password, const QString& role,
+                       warehouse_contract::Callback<warehouse_contract::UserInfo> done);
+    void sendLogin(const QString& username, const QString& password, const QString& role,
                    warehouse_contract::Callback<warehouse_contract::UserInfo> done);
     QTcpSocket socket_;
     warehouse_protocol::FrameDecoder decoder_;
