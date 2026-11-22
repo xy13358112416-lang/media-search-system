@@ -30,7 +30,7 @@ public:
     explicit WarehouseServer(llm_recommendation::Config config = llm_recommendation::loadConfig());
     ~WarehouseServer() override;
     bool openDatabase(const QString& path, QString& error);
-    bool addUser(const QString& username, const QString& password, QString& error);
+    bool addUser(const QString& username, const QString& password, QString& error, bool administrator = false, qint64 actorId = 0);
     std::optional<QList<warehouse_contract::WarehouseDetail>> readableCandidates(qint64 userId);
     // Internal server API: caller supplies the authenticated user, never a network payload ID.
     std::optional<QList<StoredBehavior>> queryBehavior(qint64 userId, care_contract::TimeRange range);
@@ -59,6 +59,9 @@ private:
         QString personLookup;
     };
     QJsonObject dispatch(Session& session, const QJsonObject& request);
+    QJsonObject dispatchAdmin(Session& session, const QJsonObject& request);
+    void revokeUserSessions(qint64 userId);
+    QHash<QTcpSocket*, std::shared_ptr<Session>> sessions_;
     std::optional<care_contract::Result<QJsonObject>> dispatchPersonQuery(
         qint64 userId, const QString& type, const QJsonObject& payload);
     care_contract::Result<care_algorithms::CatalogSnapshot> readablePersonCatalog(

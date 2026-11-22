@@ -251,7 +251,7 @@ std::optional<WarehouseSummary> WarehousePage::selection() const
 bool WarehousePage::ownsSelection() const
 {
     const auto warehouse = selection();
-    return warehouse && user_ && warehouse->ownerId == user_->userId;
+    return warehouse && user_ && (warehouse->ownerId == user_->userId || (user_->isAdmin && warehouse->visibility == warehouse_contract::Visibility::Public));
 }
 
 void WarehousePage::updateControls()

@@ -24,6 +24,8 @@ public:
     warehouse_contract::RecommendationHandle recommendResources(const warehouse_contract::WarehouseRecommendationRequest& request,
                             warehouse_contract::Callback<warehouse_contract::WarehouseRecommendationResult> done) override;
     bool cancelRecommendation(const warehouse_contract::RecommendationHandle& handle) override;
+    void adminRequest(const QString& operation, const QJsonObject& payload,
+                      warehouse_contract::Callback<QJsonObject> done);
 private:
     friend class OnlineCareClient;
     using Response = std::function<void(warehouse_contract::Status, QJsonObject)>;

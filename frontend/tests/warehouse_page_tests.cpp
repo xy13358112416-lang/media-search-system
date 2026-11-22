@@ -1,4 +1,6 @@
 #include "../warehouse_page.h"
+#include "../admin_dialog.h"
+#include <QTableWidget>
 #include "../participation_settings_dialog.h"
 #include <QCheckBox>
 #include <QDialog>
@@ -118,6 +120,45 @@ void signIn(WarehousePage& page, quint16 port, const QString& user, const QStrin
 class OnlineWarehouseTests : public QObject {
     Q_OBJECT
 private slots:
+    void administratorIdentityAndUserDialog()
+    {
+        QTemporaryDir temporary;
+        WarehouseServer server(llm_recommendation::Config{});
+        QString error;
+        QVERIFY(server.openDatabase(temporary.filePath("admin.sqlite"), error));
+        QVERIFY(server.addUser("operator", "admin-pass", error, true));
+        QVERIFY(server.addUser("reader", "reader-pass", error));
+        QVERIFY(server.listen(QHostAddress::LocalHost, 0));
+        OnlineCareClient client;
+        std::optional<Status> connected;
+        client.connectToServer("127.0.0.1", server.serverPort(), [&](auto result) { connected = result; });
+        QTRY_VERIFY(connected && connected->ok());
+        std::optional<Result<UserInfo>> loggedIn;
+        client.login("operator", "admin-pass", [&](auto result) { loggedIn = result; });
+        QTRY_VERIFY(loggedIn && loggedIn->status.ok() && loggedIn->value);
+        QVERIFY(loggedIn->value->isAdmin);
+        QDialog parent;
+        bool foundUsers = false;
+        QTimer poll;
+        connect(&poll, &QTimer::timeout, &parent, [&] {
+            for (auto* window : QApplication::topLevelWidgets()) {
+                auto* dialog = qobject_cast<QDialog*>(window);
+                if (!dialog || dialog->windowTitle() != QStringLiteral("用户管理")) continue;
+                auto* table = dialog->findChild<QTableWidget*>();
+                if (table && table->rowCount() == 2) {
+                    foundUsers = table->item(0, 2)->text() == QStringLiteral("管理员");
+                    dialog->reject();
+                }
+            }
+        });
+        QTimer::singleShot(5000, &parent, [&] {
+            for (auto* window : QApplication::topLevelWidgets())
+                if (window->windowTitle() == QStringLiteral("用户管理")) window->close();
+        });
+        poll.start(10);
+        showAdminDialog(client, &parent);
+        QVERIFY(foundUsers);
+    }
     void onlineViewsComeOnlyFromClicksAndFollowTheServerAccount()
     {
         QTemporaryDir temporary;

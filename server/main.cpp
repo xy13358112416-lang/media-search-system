@@ -17,9 +17,10 @@ int main(int argc, char** argv)
     const QCommandLineOption port("port", "监听端口。", "port", "8765");
     const QCommandLineOption database("db", "仓库独立 SQLite 路径。", "path", "warehouse.sqlite");
     const QCommandLineOption initialize("init", "初始化数据库后退出。");
-    const QCommandLineOption user("add-user", "从标准输入读取密码，创建演示账号后退出。", "username");
+    const QCommandLineOption user("add-user", "从标准输入读取密码，创建普通网络账号后退出。", "username");
+    const QCommandLineOption admin("add-admin", "从标准输入读取密码并创建管理员后退出。", "username");
     const QCommandLineOption config("config", "启动配置文件；默认读取 EXE 同目录的 media-server.ini。", "path");
-    for (const auto& option : {address, port, database, initialize, user, config})
+    for (const auto& option : {address, port, database, initialize, user, admin, config})
         parser.addOption(option);
     parser.process(app);
     QTextStream output(stdout);
@@ -59,7 +60,7 @@ int main(int argc, char** argv)
         return 1;
     }
     // A misplaced config must not quietly open a new, empty demonstration.
-    if (useConfig && !parser.isSet(initialize) && !parser.isSet(user) && !QFileInfo::exists(databasePath)) {
+    if (useConfig && !parser.isSet(initialize) && !parser.isSet(user) && !parser.isSet(admin) && !QFileInfo::exists(databasePath)) {
         errors << "配置的数据库不存在；请先导入演示数据，或使用 --init 明确初始化。" << Qt::endl;
         return 1;
     }
@@ -69,10 +70,13 @@ int main(int argc, char** argv)
         errors << error << Qt::endl;
         return 1;
     }
-    if (parser.isSet(user)) {
+    if (parser.isSet(user) && parser.isSet(admin)) {
+        errors << "请单独使用 --add-user 或 --add-admin。" << Qt::endl; return 1;
+    }
+    if (parser.isSet(user) || parser.isSet(admin)) {
         QTextStream input(stdin);
-        output << "请输入演示账号的密码后回车：" << Qt::endl;
-        if (!server.addUser(parser.value(user), input.readLine(), error)) {
+        output << "请输入账号密码后回车：" << Qt::endl;
+        if (!server.addUser(parser.value(parser.isSet(admin) ? admin : user), input.readLine(), error, parser.isSet(admin))) {
             errors << error << Qt::endl;
             return 1;
         }

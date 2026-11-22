@@ -12,7 +12,7 @@ enum class ErrorCode { None, InvalidArgument, NotConnected, NotAuthenticated, Au
 struct Status { ErrorCode code = ErrorCode::None; QString message; bool ok() const { return code == ErrorCode::None; } };
 template<class T> struct Result { Status status; std::optional<T> value; };
 enum class Visibility { Private, Public };
-struct UserInfo { qint64 userId = 0; QString username; };
+struct UserInfo { qint64 userId = 0; QString username; bool isAdmin = false; };
 struct WarehouseSummary { qint64 warehouseId = 0; QString name; qint64 ownerId = 0; Visibility visibility = Visibility::Private; };
 struct WarehouseItem { qint64 itemId = 0; MediaRecord media; };
 struct WarehouseDetail { WarehouseSummary warehouse; QList<WarehouseItem> items; };

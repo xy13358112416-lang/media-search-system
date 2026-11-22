@@ -175,7 +175,8 @@ QString WarehouseClient::request(const QString& type, const QJsonObject& payload
     if (frame.isEmpty()) { callback(fail(ErrorCode::InvalidArgument, error), {}); return {}; }
     const bool mutation = type == "create_warehouse" || type == "add_item" || type == "remove_item" ||
                           type == "record_behavior" || type == "set_participation_settings" || type == "clear_history" ||
-                          type == "set_work_feedback" || type == "set_follow";
+                          type == "set_work_feedback" || type == "set_follow" ||
+                          (type.startsWith("admin_") && type != "admin_list_users");
     const bool cancelOnServer = type == "recommend_resources" || type == "recommend_temporal" ||
         (type == "get_trending" && payload.value("summary_mode") == "model");
     pending_.insert(id, {type + QStringLiteral("_resp"), std::move(callback), mutation, cancelOnServer});
@@ -266,6 +267,10 @@ void WarehouseClient::sendLogin(const QString& username, const QString& password
                 abortProtocol();
                 done({invalidResponse(),{}}); return;
             }
+            if (u.contains("is_admin") && !u.value("is_admin").isBool()) {
+                abortProtocol(); done({invalidResponse(), {}}); return;
+            }
+            result.isAdmin = u.value("is_admin").toBool(false);
             result.username = u.value("username").toString();
             token_ = payload.value("token").toString();
             done({{}, result});
@@ -402,4 +407,16 @@ bool WarehouseClient::cancelRecommendation(const RecommendationHandle& handle) {
     sendCancellation(id);
     p.callback(fail(ErrorCode::Cancelled, QStringLiteral("推荐请求已取消")), {});
     return true;
+}
+
+void WarehouseClient::adminRequest(const QString& operation, const QJsonObject& payload,
+                                   Callback<QJsonObject> done)
+{
+    if (!operation.startsWith("admin_")) {
+        done({fail(ErrorCode::InvalidArgument, QStringLiteral("无效管理操作")), {}}); return;
+    }
+    request(operation, payload, [done=std::move(done)](Status status, QJsonObject result) {
+        if (!status.ok()) { done({status, {}}); return; }
+        done({{}, result});
+    });
 }
