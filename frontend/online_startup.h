@@ -15,6 +15,11 @@ struct ConnectionSettings {
 // An explicit configPath replaces the application-directory INI path.
 ConnectionSettings loadConnectionSettings(const QString& configPath = {});
 
+// Opens one role-specific credential window; signIn includes the role choice screen.
+bool signInAs(warehouse_contract::WarehouseService& service,
+              warehouse_contract::UserInfo& user, warehouse_contract::LoginRole role,
+              QWidget* parent = nullptr, const QString& configPath = {});
+
 // Keeps service connected on success and disconnects it when sign-in is cancelled.
 bool signIn(warehouse_contract::WarehouseService& service,
             warehouse_contract::UserInfo& user, QWidget* parent = nullptr,

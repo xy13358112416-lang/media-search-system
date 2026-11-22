@@ -35,15 +35,15 @@ class StartupDialog final : public QDialog {
 public:
     StartupDialog(warehouse_contract::WarehouseService& service,
                   warehouse_contract::UserInfo& user, QWidget* parent,
-                  const QString& configPath)
-        : QDialog(parent), service_(service), user_(user)
+                  const QString& configPath, warehouse_contract::LoginRole role)
+        : QDialog(parent), service_(service), user_(user), role_(role)
     {
         setObjectName(QStringLiteral("onlineSignIn"));
-        setWindowTitle(QStringLiteral("登录媒体库"));
+        setWindowTitle(role_ == warehouse_contract::LoginRole::Administrator ? QStringLiteral("管理员登录") : QStringLiteral("用户登录"));
         setMinimumWidth(400);
         const auto endpoint = loadConnectionSettings(configPath);
         auto* layout = new QVBoxLayout(this);
-        auto* heading = new QLabel(QStringLiteral("在线媒体库"), this);
+        auto* heading = new QLabel(windowTitle(), this);
         auto font = heading->font();
         font.setPointSize(font.pointSize() + 4);
         font.setBold(true);
@@ -58,7 +58,7 @@ public:
         auto* credentials = new QFormLayout;
         username_ = new QLineEdit(this);
         username_->setObjectName(QStringLiteral("onlineUsername"));
-        username_->setText(QSettings().value(QStringLiteral("online/lastUsername")).toString());
+        username_->setText(QSettings().value(usernameKey()).toString());
         password_ = new QLineEdit(this);
         password_->setObjectName(QStringLiteral("onlinePassword"));
         password_->setEchoMode(QLineEdit::Password);
@@ -89,6 +89,10 @@ public:
         serverSettings_->hide();
 
         auto* buttons = new QHBoxLayout;
+        auto* back = new QPushButton(QStringLiteral("返回选择"), this);
+        back->setObjectName(QStringLiteral("onlineBack"));
+        buttons->addWidget(back);
+        connect(back, &QPushButton::clicked, this, [this] { discard(); done(2); });
         buttons->addStretch();
         auto* cancel = new QPushButton(QStringLiteral("退出"), this);
         cancel->setObjectName(QStringLiteral("onlineCancel"));
@@ -118,6 +122,12 @@ public:
     }
 
 private:
+    QString usernameKey() const
+    {
+        return role_ == warehouse_contract::LoginRole::Administrator
+            ? QStringLiteral("online/adminUsername") : QStringLiteral("online/lastUsername");
+    }
+
     void discard()
     {
         if (finished_) return;
@@ -185,7 +195,7 @@ private:
         status_->setText(QStringLiteral("正在登录…"));
         const auto attempt = epoch_;
         const QPointer<StartupDialog> guard(this);
-        service_.login(username, password, [guard, attempt, username](auto result) {
+        service_.loginAs(username, password, role_, [guard, attempt, username](auto result) {
             if (!guard || guard->finished_ || guard->epoch_ != attempt) return;
             guard->busy_ = false;
             guard->username_->setEnabled(true);
@@ -202,7 +212,7 @@ private:
             QSettings saved;
             saved.setValue(QStringLiteral("online/host"), guard->connectedEndpoint_.host);
             saved.setValue(QStringLiteral("online/port"), guard->connectedEndpoint_.port);
-            saved.setValue(QStringLiteral("online/lastUsername"), username);
+            saved.setValue(guard->usernameKey(), username);
             guard->finished_ = true;
             ++guard->epoch_;
             guard->accept();
@@ -211,6 +221,7 @@ private:
 
     warehouse_contract::WarehouseService& service_;
     warehouse_contract::UserInfo& user_;
+    warehouse_contract::LoginRole role_;
     QLabel* status_ = nullptr;
     QLineEdit* username_ = nullptr;
     QLineEdit* password_ = nullptr;
@@ -240,11 +251,43 @@ ConnectionSettings loadConnectionSettings(const QString& configPath)
     return result;
 }
 
+bool signInAs(warehouse_contract::WarehouseService& service, warehouse_contract::UserInfo& user,
+              warehouse_contract::LoginRole role, QWidget* parent, const QString& configPath)
+{
+    StartupDialog dialog(service, user, parent, configPath, role);
+    return dialog.exec() == QDialog::Accepted;
+}
+
 bool signIn(warehouse_contract::WarehouseService& service, warehouse_contract::UserInfo& user,
             QWidget* parent, const QString& configPath)
 {
-    StartupDialog dialog(service, user, parent, configPath);
-    return dialog.exec() == QDialog::Accepted;
+    while (true) {
+        QDialog choice(parent);
+        choice.setObjectName(QStringLiteral("onlineRoleChoice"));
+        choice.setWindowTitle(QStringLiteral("选择登录身份"));
+        choice.setMinimumWidth(380);
+        auto* layout = new QVBoxLayout(&choice);
+        layout->addWidget(new QLabel(QStringLiteral("请选择登录方式"), &choice));
+        auto* userLogin = new QPushButton(QStringLiteral("用户登录"), &choice);
+        userLogin->setObjectName(QStringLiteral("chooseUserLogin"));
+        auto* adminLogin = new QPushButton(QStringLiteral("管理员登录"), &choice);
+        adminLogin->setObjectName(QStringLiteral("chooseAdminLogin"));
+        layout->addWidget(userLogin);
+        layout->addWidget(adminLogin);
+        auto* cancel = new QPushButton(QStringLiteral("退出"), &choice);
+        layout->addWidget(cancel);
+        QObject::connect(userLogin, &QPushButton::clicked, &choice, [&choice] { choice.done(1); });
+        QObject::connect(adminLogin, &QPushButton::clicked, &choice, [&choice] { choice.done(2); });
+        QObject::connect(cancel, &QPushButton::clicked, &choice, &QDialog::reject);
+        const int selected = choice.exec();
+        if (selected != 1 && selected != 2) return false;
+        const auto role = selected == 2 ? warehouse_contract::LoginRole::Administrator
+                                       : warehouse_contract::LoginRole::User;
+        StartupDialog login(service, user, parent, configPath, role);
+        const int result = login.exec();
+        if (result == QDialog::Accepted) return true;
+        if (result != 2) return false;
+    }
 }
 
 }

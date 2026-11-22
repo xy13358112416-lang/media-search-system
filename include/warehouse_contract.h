@@ -9,6 +9,7 @@
 #include <QtGlobal>
 #include <functional>
 #include <optional>
+#include <utility>
 
 namespace warehouse_contract {
 enum class ErrorCode { None, InvalidArgument, NotConnected, NotAuthenticated, AuthenticationFailed, PermissionDenied,
@@ -19,10 +20,11 @@ enum class ErrorCode { None, InvalidArgument, NotConnected, NotAuthenticated, Au
 struct Status { ErrorCode code = ErrorCode::None; QString message; bool ok() const { return code == ErrorCode::None; } };
 template<class T> struct Result { Status status; std::optional<T> value; };
 enum class Visibility { Private, Public };
+enum class LoginRole { User, Administrator };
+struct UserInfo { qint64 userId = 0; QString username; bool isAdmin = false; };
 // >>> MAIN-DEFENSE | 接口结构｜UserInfo
 // 这是数据包：检查字段含义、默认值和optional缺失状态。
 // <<< MAIN-DEFENSE
-struct UserInfo { qint64 userId = 0; QString username; };
 // >>> MAIN-DEFENSE | 接口结构｜WarehouseSummary
 // 这是数据包：检查字段含义、默认值和optional缺失状态。
 // <<< MAIN-DEFENSE
@@ -75,6 +77,18 @@ public:
     // 按规范化用户名读密码哈希，验证明文输入；成功后建立当前会话，失败不能保留旧身份。
     // <<< MAIN-DEFENSE
     virtual void login(const QString& username, const QString& password, Callback<UserInfo> done) = 0;
+    virtual void loginAs(const QString& username, const QString& password, LoginRole role, Callback<UserInfo> done)
+    {
+        login(username, password, [this, role, done=std::move(done)](Result<UserInfo> result) {
+            if (result.status.ok() && result.value &&
+                result.value->isAdmin != (role == LoginRole::Administrator)) {
+                disconnectFromServer();
+                done({{ErrorCode::PermissionDenied, QStringLiteral("账号角色与登录入口不匹配。")}, {}});
+                return;
+            }
+            done(std::move(result));
+        });
+    }
     // >>> MAIN-DEFENSE | 方法声明｜logout
     // 清当前登录状态，使后续受保护操作不能沿用退出前身份。
     // <<< MAIN-DEFENSE

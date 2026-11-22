@@ -49,10 +49,10 @@ public:
     // 打开在线仓库SQLite并初始化/核对schema，随后人物迁移复用此连接。
     // <<< MAIN-DEFENSE
     bool openDatabase(const QString& path, QString& error);
+    bool addUser(const QString& username, const QString& password, QString& error, bool administrator = false, qint64 actorId = 0);
     // >>> MAIN-DEFENSE | 方法声明｜addUser
     // 创建在线network_users账号并哈希密码；在线仓库权限按所有者，不使用单机admin角色替代。
     // <<< MAIN-DEFENSE
-    bool addUser(const QString& username, const QString& password, QString& error);
     // >>> MAIN-DEFENSE | 方法声明｜readableCandidates
     // 只整理当前用户可读的仓库条目，供推荐使用，不把别人私有数据传给模型。
     // <<< MAIN-DEFENSE
@@ -99,6 +99,9 @@ private:
     // 按请求type分发同步业务，使用当前session校验身份与权限后访问数据库或算法。
     // <<< MAIN-DEFENSE
     QJsonObject dispatch(Session& session, const QJsonObject& request);
+    QJsonObject dispatchAdmin(Session& session, const QJsonObject& request);
+    void revokeUserSessions(qint64 userId);
+    QHash<QTcpSocket*, std::shared_ptr<Session>> sessions_;
     std::optional<care_contract::Result<QJsonObject>> dispatchPersonQuery(
         qint64 userId, const QString& type, const QJsonObject& payload);
     care_contract::Result<care_algorithms::CatalogSnapshot> readablePersonCatalog(

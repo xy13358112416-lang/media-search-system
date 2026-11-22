@@ -273,6 +273,7 @@ WarehouseServer::WarehouseServer(llm_recommendation::Config config)
     connect(this, &QTcpServer::newConnection, this, [this] {
         while (auto* socket = nextPendingConnection()) {
             auto session = std::make_shared<Session>();
+            sessions_.insert(socket, session);
             socket->setReadBufferSize(64 * 1024);
             // >>> MAIN-DEFENSE | WarehouseServer｜处理阶段 02
             // 注册异步信号回调：这里只登记后续要执行的处理，网络完成时才运行lambda，不是在此同步等结果。
@@ -287,6 +288,7 @@ WarehouseServer::WarehouseServer(llm_recommendation::Config config)
                 // 使用当前连接的会话身份检查或构造业务上下文；客户端传来的编号不能替代登录身份。
                 // <<< MAIN-DEFENSE
                 session->userId = 0;
+                sessions_.remove(socket);
             });
             connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
         }
@@ -373,6 +375,12 @@ bool WarehouseServer::openDatabase(const QString& path, QString& error)
                     "warehouse_id INTEGER NOT NULL, item_id INTEGER NOT NULL, PRIMARY KEY(user_id,work_id))") ||
         !query.exec("CREATE TABLE IF NOT EXISTS server_schema_migrations(version INTEGER PRIMARY KEY)") ||
         !query.exec("INSERT OR IGNORE INTO server_schema_migrations(version) VALUES(1)") ||
+        !query.exec("CREATE TABLE IF NOT EXISTS network_user_access (user_id INTEGER PRIMARY KEY "
+                    "REFERENCES network_users(id), is_admin INTEGER NOT NULL DEFAULT 0 CHECK(is_admin IN (0,1)), "
+                    "disabled INTEGER NOT NULL DEFAULT 0 CHECK(disabled IN (0,1)))") ||
+        !query.exec("CREATE TABLE IF NOT EXISTS admin_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "actor_id INTEGER NOT NULL, target_id INTEGER NOT NULL, action TEXT NOT NULL, "
+                    "occurred_at_utc INTEGER NOT NULL)") ||
         !person_schema::migrate(db_, error) ||
         // >>> MAIN-DEFENSE | openDatabase｜处理阶段 04
         // 提交这一批修改；必须检查提交结果，调用了commit不等于已经成功。
@@ -397,12 +405,12 @@ bool WarehouseServer::openDatabase(const QString& path, QString& error)
     return true;
 }
 
+bool WarehouseServer::addUser(const QString& username, const QString& password, QString& error, bool administrator, qint64 actorId)
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::addUser
 // 创建在线network_users账号并哈希密码；在线仓库权限按所有者，不使用单机admin角色替代。
 // 签名提示：bool WarehouseServer::addUser(const QString& username, const QString& password, QString& error)  
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
-bool WarehouseServer::addUser(const QString& username, const QString& password, QString& error)
 {
     const auto key = userKey(username);
     const auto bytes = password.toUtf8();
@@ -422,6 +430,7 @@ bool WarehouseServer::addUser(const QString& username, const QString& password, 
         error = QStringLiteral("无法生成密码哈希。");
         return false;
     }
+    if (!db_.transaction()) { error = QStringLiteral("无法开始账号事务。"); return false; }
     QSqlQuery query(db_);
     // >>> MAIN-DEFENSE | addUser｜处理阶段 03
     // 准备参数化SQL，涉及 network_users。随后把实际参数绑定到问号，执行并检查错误；prepare本身尚未完成读写。
@@ -434,8 +443,22 @@ bool WarehouseServer::addUser(const QString& username, const QString& password, 
     // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
     // <<< MAIN-DEFENSE
     if (!query.exec()) {
+        db_.rollback();
         error = QStringLiteral("无法添加网络账号，请检查用户名是否已存在。");
         return false;
+    }
+    const auto newId = query.lastInsertId();
+    query.prepare("INSERT INTO network_user_access(user_id,is_admin) VALUES (?,?)");
+    query.addBindValue(newId); query.addBindValue(administrator);
+    bool saved = query.exec();
+    if (saved && actorId > 0) {
+        query.prepare("INSERT INTO admin_audit(actor_id,target_id,action,occurred_at_utc) VALUES (?,?,?,?)");
+        query.addBindValue(actorId); query.addBindValue(newId);
+        query.addBindValue("create_user"); query.addBindValue(QDateTime::currentSecsSinceEpoch());
+        saved = query.exec();
+    }
+    if (!saved || !db_.commit()) {
+        db_.rollback(); error = QStringLiteral("无法保存账号权限。"); return false;
     }
     // >>> MAIN-DEFENSE | addUser｜处理阶段 05
     // 结束本函数并交付当前结果。检查返回值中的状态及数据：成功空列表与操作失败的含义不同。
@@ -752,6 +775,9 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         // <<< MAIN-DEFENSE
         if (session.userId)
             return invalid();
+        const auto role = payload.value("login_role");
+        if (!role.isUndefined() && (!role.isString() || (role != "user" && role != "admin")))
+            return invalid();
         const auto username = userKey(payload.value("username").toString());
         const auto password = payload.value("password").toString().toUtf8();
         // >>> MAIN-DEFENSE | dispatch｜处理阶段 05
@@ -759,7 +785,7 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         // <<< MAIN-DEFENSE
         if (username.isEmpty() || password.isEmpty() || password.size() > 1024)
             return invalid();
-        query.prepare("SELECT id,username,password_hash FROM network_users WHERE username_key=?");
+        query.prepare("SELECT u.id,u.username,u.password_hash,COALESCE(a.is_admin,0),COALESCE(a.disabled,0) FROM network_users u LEFT JOIN network_user_access a ON a.user_id=u.id WHERE u.username_key=?");
         query.addBindValue(username);
         // >>> MAIN-DEFENSE | dispatch｜处理阶段 06
         // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
@@ -772,6 +798,10 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
             // 结束本函数并交付当前结果。检查返回值中的状态及数据：成功空列表与操作失败的含义不同。
             // <<< MAIN-DEFENSE
             return fail("AuthenticationFailed", QStringLiteral("用户名或密码不正确。"));
+        if (query.value(4).toBool())
+            return fail("AuthenticationFailed", QStringLiteral("此账号已被停用，请联系管理员。"));
+        if (!role.isUndefined() && query.value(3).toBool() != (role == "admin"))
+            return fail("PermissionDenied", QStringLiteral("账号角色与登录入口不匹配，请返回选择对应入口。"));
         session.userId = query.value(0).toLongLong();
         QByteArray token(32, Qt::Uninitialized);
         randombytes_buf(token.data(), token.size());
@@ -780,7 +810,7 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         // 结束本函数并交付当前结果。检查返回值中的状态及数据：成功空列表与操作失败的含义不同。
         // <<< MAIN-DEFENSE
         return success({{"token", session.token}, {"user", QJsonObject{
-            {"user_id", QString::number(session.userId)}, {"username", query.value(1).toString()}}}});
+            {"user_id", QString::number(session.userId)}, {"username", query.value(1).toString()}, {"is_admin", query.value(3).toBool()}}}});
     }
 
     // >>> MAIN-DEFENSE | dispatch｜处理阶段 09
@@ -796,6 +826,7 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         // <<< MAIN-DEFENSE
         return success();
     }
+    if (type.startsWith("admin_")) return dispatchAdmin(session, request);
     if (const auto person = dispatchPersonQuery(session.userId, type, payload)) {
         if (person->status.ok() && person->value)
             // >>> MAIN-DEFENSE | dispatch｜处理阶段 11
@@ -1491,10 +1522,17 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
         return fail("NotFound", QStringLiteral("仓库不存在。"));
     const auto warehouse = readSummary(query);
     query.finish();
+    query.prepare("SELECT is_admin FROM network_user_access WHERE user_id=? AND disabled=0");
+    query.addBindValue(session.userId);
+    if (!query.exec()) return dbError();
+    const bool administrator = query.next() && query.value(0).toBool();
+    query.finish();
+    if (warehouse.ownerId != session.userId && warehouse.visibility != Visibility::Public)
+        return fail("PermissionDenied", QStringLiteral("没有此仓库的操作权限。"));
+    if (warehouse.ownerId != session.userId && type != "get_warehouse" && !administrator)
     // >>> MAIN-DEFENSE | dispatch｜处理阶段 98
     // 使用当前连接的会话身份检查或构造业务上下文；客户端传来的编号不能替代登录身份。
     // <<< MAIN-DEFENSE
-    if (warehouse.ownerId != session.userId && (type != "get_warehouse" || warehouse.visibility != Visibility::Public))
         return fail("PermissionDenied", QStringLiteral("没有此仓库的操作权限。"));
 
     if (type == "get_warehouse") {
@@ -1526,15 +1564,23 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
             // 结束本函数并交付当前结果。检查返回值中的状态及数据：成功空列表与操作失败的含义不同。
             // <<< MAIN-DEFENSE
             return invalid();
+        if (!db_.transaction()) return dbError();
         query.prepare("INSERT INTO warehouse_items(warehouse_id,media) VALUES (?,?)");
         query.addBindValue(warehouseId);
         query.addBindValue(snapshot);
+        if (!query.exec()) { db_.rollback(); return dbError(); }
+        const auto insertedId = query.lastInsertId().toLongLong();
+        if (administrator) {
+            query.prepare("INSERT INTO admin_audit(actor_id,target_id,action,occurred_at_utc) VALUES (?,?,?,?)");
+            query.addBindValue(session.userId); query.addBindValue(insertedId);
+            query.addBindValue("add_item"); query.addBindValue(QDateTime::currentSecsSinceEpoch());
+            if (!query.exec()) { db_.rollback(); return dbError(); }
+        }
+        if (!db_.commit()) { db_.rollback(); return dbError(); }
+        return success({{"item", itemJson({insertedId, media})}});
         // >>> MAIN-DEFENSE | dispatch｜处理阶段 103
         // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
         // <<< MAIN-DEFENSE
-        if (!query.exec())
-            return dbError();
-        return success({{"item", itemJson({query.lastInsertId().toLongLong(), media})}});
     }
     const qint64 itemId = readId(payload.value("item_id"));
     // >>> MAIN-DEFENSE | dispatch｜处理阶段 104
@@ -1542,16 +1588,25 @@ QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& reque
     // <<< MAIN-DEFENSE
     if (!itemId)
         return invalid();
+    if (!db_.transaction()) return dbError();
     query.prepare("DELETE FROM warehouse_items WHERE id=? AND warehouse_id=?");
     query.addBindValue(itemId);
     query.addBindValue(warehouseId);
+    if (!query.exec()) { db_.rollback(); return dbError(); }
+    if (query.numRowsAffected() != 1) {
+        db_.rollback();
     // >>> MAIN-DEFENSE | dispatch｜处理阶段 105
     // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
     // <<< MAIN-DEFENSE
-    if (!query.exec())
-        return dbError();
-    if (query.numRowsAffected() != 1)
         return fail("NotFound", QStringLiteral("条目不存在。"));
+    }
+    if (administrator) {
+        query.prepare("INSERT INTO admin_audit(actor_id,target_id,action,occurred_at_utc) VALUES (?,?,?,?)");
+        query.addBindValue(session.userId); query.addBindValue(itemId);
+        query.addBindValue("remove_item"); query.addBindValue(QDateTime::currentSecsSinceEpoch());
+        if (!query.exec()) { db_.rollback(); return dbError(); }
+    }
+    if (!db_.commit()) { db_.rollback(); return dbError(); }
     // >>> MAIN-DEFENSE | dispatch｜处理阶段 106
     // 结束本函数并交付当前结果。检查返回值中的状态及数据：成功空列表与操作失败的含义不同。
     // <<< MAIN-DEFENSE

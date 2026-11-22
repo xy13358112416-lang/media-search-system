@@ -4,6 +4,7 @@
 // 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
 // <<< DEFENSE-NOTE | 本段讲解结束
 #include "online_window.h"
+#include "admin_dialog.h"
 #include "online_care_client.h"
 #include "warehouse_page.h"
 #include "assistant_dialog.h"
@@ -123,7 +124,18 @@ public:
         auto* settings = new QPushButton(QStringLiteral("参与设置"));
         auto* exit = new QPushButton(QStringLiteral("退出登录"));
         exit->setObjectName("onlineLogout");
-        top->addWidget(assistant); top->addWidget(settings); top->addWidget(exit);
+        top->addWidget(assistant); top->addWidget(settings);
+        if (user.isAdmin) {
+            if (auto* client = dynamic_cast<WarehouseClient*>(&warehouses)) {
+                auto* admin = new QPushButton(QStringLiteral("管理"));
+                admin->setObjectName("onlineAdmin");
+                top->addWidget(admin);
+                connect(admin, &QPushButton::clicked, this, [this, client] {
+                    showAdminDialog(*client, this);
+                });
+            }
+        }
+        top->addWidget(exit);
         layout->addWidget(banner);
         status_ = new QLabel;
         status_->setObjectName("onlineCatalogStatus");

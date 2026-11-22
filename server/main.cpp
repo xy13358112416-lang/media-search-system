@@ -26,12 +26,13 @@ int main(int argc, char** argv)
     const QCommandLineOption port("port", "监听端口。", "port", "8765");
     const QCommandLineOption database("db", "仓库独立 SQLite 路径。", "path", "warehouse.sqlite");
     const QCommandLineOption initialize("init", "初始化数据库后退出。");
-    const QCommandLineOption user("add-user", "从标准输入读取密码，创建演示账号后退出。", "username");
+    const QCommandLineOption user("add-user", "从标准输入读取密码，创建普通网络账号后退出。", "username");
+    const QCommandLineOption admin("add-admin", "从标准输入读取密码并创建管理员后退出。", "username");
     const QCommandLineOption config("config", "启动配置文件；默认读取 EXE 同目录的 media-server.ini。", "path");
+    for (const auto& option : {address, port, database, initialize, user, admin, config})
     // >>> MAIN-DEFENSE | main｜处理阶段 01
     // 进入批量处理：逐项处理下方集合或查询结果；每次迭代的continue/return决定跳过一项还是终止整个函数。
     // <<< MAIN-DEFENSE
-    for (const auto& option : {address, port, database, initialize, user, config})
         parser.addOption(option);
     parser.process(app);
     QTextStream output(stdout);
@@ -89,10 +90,10 @@ int main(int argc, char** argv)
         return 1;
     }
     // A misplaced config must not quietly open a new, empty demonstration.
+    if (useConfig && !parser.isSet(initialize) && !parser.isSet(user) && !parser.isSet(admin) && !QFileInfo::exists(databasePath)) {
     // >>> MAIN-DEFENSE | main｜处理阶段 08
     // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
     // <<< MAIN-DEFENSE
-    if (useConfig && !parser.isSet(initialize) && !parser.isSet(user) && !QFileInfo::exists(databasePath)) {
         errors << "配置的数据库不存在；请先导入演示数据，或使用 --init 明确初始化。" << Qt::endl;
         return 1;
     }
@@ -105,13 +106,16 @@ int main(int argc, char** argv)
         errors << error << Qt::endl;
         return 1;
     }
+    if (parser.isSet(user) && parser.isSet(admin)) {
+        errors << "请单独使用 --add-user 或 --add-admin。" << Qt::endl; return 1;
+    }
+    if (parser.isSet(user) || parser.isSet(admin)) {
     // >>> MAIN-DEFENSE | main｜处理阶段 10
     // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
     // <<< MAIN-DEFENSE
-    if (parser.isSet(user)) {
         QTextStream input(stdin);
-        output << "请输入演示账号的密码后回车：" << Qt::endl;
-        if (!server.addUser(parser.value(user), input.readLine(), error)) {
+        output << "请输入账号密码后回车：" << Qt::endl;
+        if (!server.addUser(parser.value(parser.isSet(admin) ? admin : user), input.readLine(), error, parser.isSet(admin))) {
             errors << error << Qt::endl;
             // >>> MAIN-DEFENSE | main｜处理阶段 11
             // 结束本函数并交付当前结果。检查返回值中的状态及数据：成功空列表与操作失败的含义不同。

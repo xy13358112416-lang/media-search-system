@@ -36,6 +36,8 @@ public:
     // 按规范化用户名读密码哈希，验证明文输入；成功后建立当前会话，失败不能保留旧身份。
     // <<< MAIN-DEFENSE
     void login(const QString& username, const QString& password, warehouse_contract::Callback<warehouse_contract::UserInfo> done) override;
+    void loginAs(const QString& username, const QString& password, warehouse_contract::LoginRole role,
+                 warehouse_contract::Callback<warehouse_contract::UserInfo> done) override;
     // >>> MAIN-DEFENSE | 方法声明｜logout
     // 清当前登录状态，使后续受保护操作不能沿用退出前身份。
     // <<< MAIN-DEFENSE
@@ -70,6 +72,8 @@ public:
     // 通过请求句柄取消模型类任务并抑制旧结果交付。
     // <<< MAIN-DEFENSE
     bool cancelRecommendation(const warehouse_contract::RecommendationHandle& handle) override;
+    void adminRequest(const QString& operation, const QJsonObject& payload,
+                      warehouse_contract::Callback<QJsonObject> done);
 private:
     friend class OnlineCareClient;
     using Response = std::function<void(warehouse_contract::Status, QJsonObject)>;
@@ -114,7 +118,9 @@ private:
     // 本行约定调用参数和返回类型；具体分块处理在对应cpp，调用者须遵守已有注释中的权限与生命周期约定。
     // <<< MAIN-DEFENSE
     void finishConnect(warehouse_contract::Status status);
-    void sendLogin(const QString& username, const QString& password,
+    void loginWithRole(const QString& username, const QString& password, const QString& role,
+                       warehouse_contract::Callback<warehouse_contract::UserInfo> done);
+    void sendLogin(const QString& username, const QString& password, const QString& role,
                    warehouse_contract::Callback<warehouse_contract::UserInfo> done);
     QTcpSocket socket_;
     warehouse_protocol::FrameDecoder decoder_;

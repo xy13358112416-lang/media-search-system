@@ -323,7 +323,8 @@ QString WarehouseClient::request(const QString& type, const QJsonObject& payload
     if (frame.isEmpty()) { callback(fail(ErrorCode::InvalidArgument, error), {}); return {}; }
     const bool mutation = type == "create_warehouse" || type == "add_item" || type == "remove_item" ||
                           type == "record_behavior" || type == "set_participation_settings" || type == "clear_history" ||
-                          type == "set_work_feedback" || type == "set_follow";
+                          type == "set_work_feedback" || type == "set_follow" ||
+                          (type.startsWith("admin_") && type != "admin_list_users");
     const bool cancelOnServer = type == "recommend_resources" || type == "recommend_temporal" ||
         (type == "get_trending" && payload.value("summary_mode") == "model");
     pending_.insert(id, {type + QStringLiteral("_resp"), std::move(callback), mutation, cancelOnServer});
@@ -406,6 +407,13 @@ void WarehouseClient::receive() {
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 void WarehouseClient::login(const QString& username, const QString& password, Callback<UserInfo> done) {
+    loginWithRole(username, password, {}, std::move(done));
+}
+void WarehouseClient::loginAs(const QString& username, const QString& password, LoginRole role, Callback<UserInfo> done) {
+    loginWithRole(username, password, role == LoginRole::Administrator ? "admin" : "user", std::move(done));
+}
+void WarehouseClient::loginWithRole(const QString& username, const QString& password,
+                                    const QString& role, Callback<UserInfo> done) {
     if (loginPending_ || logoutPending_) {
         done({fail(ErrorCode::InvalidArgument, QStringLiteral("已有登录请求正在进行")),{}}); return;
     }
@@ -417,7 +425,7 @@ void WarehouseClient::login(const QString& username, const QString& password, Ca
     // <<< MAIN-DEFENSE
     if (!oldToken.isEmpty()) {
         const quint64 attempt = connectAttempt_;
-        request("logout", {}, [this, attempt, username, password, done=std::move(done)](Status status, QJsonObject) mutable {
+        request("logout", {}, [this, attempt, username, password, role, done=std::move(done)](Status status, QJsonObject) mutable {
             if (connectAttempt_ != attempt) {
                 done({status.ok() ? fail(ErrorCode::Cancelled, QStringLiteral("登录请求已被新的连接操作替代")) : status, {}});
                 return;
@@ -431,20 +439,22 @@ void WarehouseClient::login(const QString& username, const QString& password, Ca
                 done({status,{}});
                 return;
             }
-            sendLogin(username, password, std::move(done));
+            sendLogin(username, password, role, std::move(done));
         }, oldToken);
         return;
     }
-    sendLogin(username, password, std::move(done));
+    sendLogin(username, password, role, std::move(done));
 }
+void WarehouseClient::sendLogin(const QString& username, const QString& password, const QString& role, Callback<UserInfo> done) {
+    QJsonObject input{{"username", username}, {"password", password}};
+    if (!role.isEmpty()) input.insert("login_role", role);
+    request("login", input,
+        [this, role, done=std::move(done)](Status status, QJsonObject payload) {
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseClient::sendLogin
 // 发登录请求并验证返回字段；通过认证才保存token和用户身份。
 // 签名提示：void WarehouseClient::sendLogin(const QString& username, const QString& password, Callback<UserInfo> done) 
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
-void WarehouseClient::sendLogin(const QString& username, const QString& password, Callback<UserInfo> done) {
-    request("login", {{"username",username},{"password",password}},
-        [this, done=std::move(done)](Status status, QJsonObject payload) {
             loginPending_ = false;
             // >>> MAIN-DEFENSE | sendLogin｜处理阶段 01
             // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
@@ -465,7 +475,16 @@ void WarehouseClient::sendLogin(const QString& username, const QString& password
                 abortProtocol();
                 done({invalidResponse(),{}}); return;
             }
+            if (u.contains("is_admin") && !u.value("is_admin").isBool()) {
+                abortProtocol(); done({invalidResponse(), {}}); return;
+            }
+            result.isAdmin = u.value("is_admin").toBool(false);
             result.username = u.value("username").toString();
+            if (!role.isEmpty() && result.isAdmin != (role == "admin")) {
+                disconnectFromServer();
+                done({fail(ErrorCode::PermissionDenied, QStringLiteral("账号角色与登录入口不匹配。")), {}});
+                return;
+            }
             token_ = payload.value("token").toString();
             done({{}, result});
         });
@@ -688,4 +707,16 @@ bool WarehouseClient::cancelRecommendation(const RecommendationHandle& handle) {
     // 结束本函数并交付当前结果。检查返回值中的状态及数据：成功空列表与操作失败的含义不同。
     // <<< MAIN-DEFENSE
     return true;
+}
+
+void WarehouseClient::adminRequest(const QString& operation, const QJsonObject& payload,
+                                   Callback<QJsonObject> done)
+{
+    if (!operation.startsWith("admin_")) {
+        done({fail(ErrorCode::InvalidArgument, QStringLiteral("无效管理操作")), {}}); return;
+    }
+    request(operation, payload, [done=std::move(done)](Status status, QJsonObject result) {
+        if (!status.ok()) { done({status, {}}); return; }
+        done({{}, result});
+    });
 }
