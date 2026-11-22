@@ -114,7 +114,9 @@ ErrorCode errorCode(const QString& code) {
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseClient::WarehouseClient
 // 构造依赖与初始状态；参数通过初始化列表保存，本段不能当成登录或数据加载已经完成。
-// 签名提示：WarehouseClient::WarehouseClient(QObject* parent, int recommendationTimeoutMs)      : QObject(parent), handlePrefix_(QUuid::createUuid().toString(QUuid::WithoutBraces) + QLatin1Char(':')),        recommendationTimeoutM
+// 签名提示：WarehouseClient::WarehouseClient(QObject* parent, int recommendationTimeoutMs)
+//       : QObject(parent), handlePrefix_(QUuid::createUuid().toString(QUuid::WithoutBraces) + QLatin1Char(':')),
+//         recommendationTimeoutM
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 WarehouseClient::WarehouseClient(QObject* parent, int recommendationTimeoutMs)

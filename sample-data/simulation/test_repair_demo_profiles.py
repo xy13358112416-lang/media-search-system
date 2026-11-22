@@ -1,5 +1,6 @@
 import importlib.util
 import json
+from contextlib import closing
 import sqlite3
 import tempfile
 import unittest
@@ -15,7 +16,7 @@ class RepairTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.source = Path(self.temp.name) / "source.sqlite"
-        with sqlite3.connect(self.source) as db:
+        with closing(sqlite3.connect(self.source)) as db, db:
             db.executescript("""
                 CREATE TABLE demo_import_metadata(id INTEGER,kind TEXT);
                 INSERT INTO demo_import_metadata VALUES(1,'media-demo-v1');
@@ -41,13 +42,13 @@ class RepairTests(unittest.TestCase):
     def test_new_copy_clears_only_placeholder_and_preserves_history(self):
         output = Path(self.temp.name) / "repaired.sqlite"
         repair.repair(self.source, output)
-        with sqlite3.connect(output) as db:
+        with closing(sqlite3.connect(output)) as db, db:
             media = json.loads(db.execute("SELECT media FROM warehouse_items").fetchone()[0])
             self.assertEqual(media["director"], "")
             self.assertEqual(media["file_name"], "Real title")
             self.assertEqual(db.execute("SELECT COUNT(*) FROM behavior_events").fetchone()[0], 1)
         self.assertEqual(repair.repair(output)["placeholder_directors_to_clear"], 0)
-        with sqlite3.connect(self.source) as db:
+        with closing(sqlite3.connect(self.source)) as db, db:
             self.assertEqual(json.loads(db.execute("SELECT media FROM warehouse_items").fetchone()[0]), self.original)
 
     def test_existing_output_is_not_overwritten(self):
@@ -58,7 +59,7 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(output.read_text(), "keep")
 
     def test_user_edit_is_preserved(self):
-        with sqlite3.connect(self.source) as db:
+        with closing(sqlite3.connect(self.source)) as db, db:
             media = dict(self.original, director="User corrected name")
             db.execute("UPDATE warehouse_items SET media=?", (json.dumps(media),))
         self.assertEqual(repair.repair(self.source)["placeholder_directors_to_clear"], 0)

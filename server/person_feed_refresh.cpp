@@ -27,7 +27,8 @@ const QString AtomNamespace = QStringLiteral("http://www.w3.org/2005/Atom");
 
 // >>> MAIN-DEFENSE | 函数入口｜failure
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：Status failure(const QString& message)  
+// 签名提示：Status failure(const QString& message)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 Status failure(const QString& message)
@@ -37,7 +38,8 @@ Status failure(const QString& message)
 
 // >>> MAIN-DEFENSE | 函数入口｜httpsUrl
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：bool httpsUrl(const QUrl& url)  
+// 签名提示：bool httpsUrl(const QUrl& url)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 bool httpsUrl(const QUrl& url)
@@ -48,7 +50,9 @@ bool httpsUrl(const QUrl& url)
 
 // >>> MAIN-DEFENSE | 函数入口｜readEntry
 // 读取一条RSS/Atom内容，核对标题、链接和时间，未知日期保持缺失。
-// 签名提示：bool readEntry(QXmlStreamReader& xml, bool atom, const QUrl& feed, const QString& personId,                 qint64 now, PersonUpdate& item)  
+// 签名提示：bool readEntry(QXmlStreamReader& xml, bool atom, const QUrl& feed, const QString& personId,
+//                  qint64 now, PersonUpdate& item)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 bool readEntry(QXmlStreamReader& xml, bool atom, const QUrl& feed, const QString& personId,
@@ -116,7 +120,9 @@ bool readEntry(QXmlStreamReader& xml, bool atom, const QUrl& feed, const QString
 
 // >>> MAIN-DEFENSE | 函数入口｜parseFeed
 // 将受限RSS/Atom正文解析成资讯列表，外部文本只作为数据，不当指令。
-// 签名提示：std::optional<QList<PersonUpdate>> parseFeed(const QByteArray& body, const person_source_config::Source& source,                                              qint64 now)  
+// 签名提示：std::optional<QList<PersonUpdate>> parseFeed(const QByteArray& body, const person_source_config::Source& source,
+//                                               qint64 now)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 std::optional<QList<PersonUpdate>> parseFeed(const QByteArray& body, const person_source_config::Source& source,
@@ -184,7 +190,9 @@ std::optional<QList<PersonUpdate>> parseFeed(const QByteArray& body, const perso
 
 // >>> MAIN-DEFENSE | 函数入口｜refresh
 // 读取已登记来源，抓取解析后按generation合并；失败标记旧缓存过期。
-// 签名提示：void refresh(person_store::Store& store, QNetworkAccessManager& network,               const person_source_config::Source& source, StatusCallback done)  
+// 签名提示：void refresh(person_store::Store& store, QNetworkAccessManager& network,
+//                const person_source_config::Source& source, StatusCallback done)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 void refresh(person_store::Store& store, QNetworkAccessManager& network,

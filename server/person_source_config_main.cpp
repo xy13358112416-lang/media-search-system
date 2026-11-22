@@ -20,7 +20,8 @@
 namespace {
 // >>> MAIN-DEFENSE | 函数入口｜refreshPerson
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：care_contract::Status refreshPerson(QSqlDatabase& db, const QString& personId)  
+// 签名提示：care_contract::Status refreshPerson(QSqlDatabase& db, const QString& personId)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 care_contract::Status refreshPerson(QSqlDatabase& db, const QString& personId)
@@ -76,7 +77,9 @@ care_contract::Status refreshPerson(QSqlDatabase& db, const QString& personId)
 }
 // >>> MAIN-DEFENSE | 函数入口｜refreshDeepSeek
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：care_contract::Status refreshDeepSeek(QSqlDatabase& db, const QString& personId,                                       const QString& approvedSite, const QString& identityClue)  
+// 签名提示：care_contract::Status refreshDeepSeek(QSqlDatabase& db, const QString& personId,
+//                                        const QString& approvedSite, const QString& identityClue)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 care_contract::Status refreshDeepSeek(QSqlDatabase& db, const QString& personId,

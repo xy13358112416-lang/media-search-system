@@ -125,7 +125,8 @@ bool hasRequiredChecks(QSqlDatabase& db, const QString& table, const QString& fr
 
 // >>> MAIN-DEFENSE | 函数入口｜AccountHistoryServiceImpl::AccountHistoryServiceImpl
 // 构造依赖与初始状态；参数通过初始化列表保存，本段不能当成登录或数据加载已经完成。
-// 签名提示：AccountHistoryServiceImpl::AccountHistoryServiceImpl(QString csvPath)      : connectionName_(QUuid::createUuid().toString(QUuid::WithoutBraces)), csvPath_(std::move(csvPath)) 
+// 签名提示：AccountHistoryServiceImpl::AccountHistoryServiceImpl(QString csvPath)
+//       : connectionName_(QUuid::createUuid().toString(QUuid::WithoutBraces)), csvPath_(std::move(csvPath))
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 AccountHistoryServiceImpl::AccountHistoryServiceImpl(QString csvPath)
@@ -133,7 +134,8 @@ AccountHistoryServiceImpl::AccountHistoryServiceImpl(QString csvPath)
 
 // >>> MAIN-DEFENSE | 函数入口｜AccountHistoryServiceImpl::AccountHistoryServiceImpl
 // 构造依赖与初始状态；参数通过初始化列表保存，本段不能当成登录或数据加载已经完成。
-// 签名提示：AccountHistoryServiceImpl::AccountHistoryServiceImpl(MediaLibrary& library)      : connectionName_(QUuid::createUuid().toString(QUuid::WithoutBraces)), sharedLibrary_(&library) 
+// 签名提示：AccountHistoryServiceImpl::AccountHistoryServiceImpl(MediaLibrary& library)
+//       : connectionName_(QUuid::createUuid().toString(QUuid::WithoutBraces)), sharedLibrary_(&library)
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 AccountHistoryServiceImpl::AccountHistoryServiceImpl(MediaLibrary& library)

@@ -549,7 +549,8 @@ Result<qint64> SqliteStore::beginUpdatesRefresh(const QString& personId, const Q
 
 // >>> MAIN-DEFENSE | 函数入口｜SqliteStore::failUpdatesRefresh
 // 仅处理本轮generation的失败状态，保留旧缓存供过期展示。
-// 签名提示：Status SqliteStore::failUpdatesRefresh(const QString& personId, const QUrl& feedUrl,                                         qint64 generation) 
+// 签名提示：Status SqliteStore::failUpdatesRefresh(const QString& personId, const QUrl& feedUrl,
+//                                          qint64 generation)
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 Status SqliteStore::failUpdatesRefresh(const QString& personId, const QUrl& feedUrl,
@@ -596,7 +597,9 @@ Status SqliteStore::failUpdatesRefresh(const QString& personId, const QUrl& feed
 
 // >>> MAIN-DEFENSE | 函数入口｜SqliteStore::mergeUpdates
 // 校验人物、来源和资讯，事务内合并；提交时检查generation，防旧请求覆盖新刷新结果。
-// 签名提示：Status SqliteStore::mergeUpdates(const QString& personId, const QUrl& feedUrl,                                   qint64 generation, qint64 completedAtUtc,                                   const QList<PersonUpdate>& up
+// 签名提示：Status SqliteStore::mergeUpdates(const QString& personId, const QUrl& feedUrl,
+//                                    qint64 generation, qint64 completedAtUtc,
+//                                    const QList<PersonUpdate>& up
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 Status SqliteStore::mergeUpdates(const QString& personId, const QUrl& feedUrl,

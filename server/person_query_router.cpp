@@ -25,7 +25,8 @@ using warehouse_contract::ErrorCode;
 namespace {
 // >>> MAIN-DEFENSE | 函数入口｜unavailable
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：Status unavailable()  
+// 签名提示：Status unavailable()
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 Status unavailable()
@@ -38,7 +39,8 @@ Status unavailable()
 // without silently inserting a guessed person into the trusted person tables.
 // >>> MAIN-DEFENSE | 函数入口｜mediaFieldCatalog
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：Result<care_algorithms::CatalogSnapshot> mediaFieldCatalog(QSqlDatabase& db, qint64 userId)  
+// 签名提示：Result<care_algorithms::CatalogSnapshot> mediaFieldCatalog(QSqlDatabase& db, qint64 userId)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 Result<care_algorithms::CatalogSnapshot> mediaFieldCatalog(QSqlDatabase& db, qint64 userId)
@@ -92,7 +94,8 @@ Result<care_algorithms::CatalogSnapshot> mediaFieldCatalog(QSqlDatabase& db, qin
 template<class Item>
 // >>> MAIN-DEFENSE | 函数入口｜pageResponse
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：Result<QJsonObject> pageResponse(Result<Page<Item>> result)  
+// 签名提示：Result<QJsonObject> pageResponse(Result<Page<Item>> result)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 Result<QJsonObject> pageResponse(Result<Page<Item>> result)
@@ -117,7 +120,9 @@ Result<QJsonObject> pageResponse(Result<Page<Item>> result)
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::startPersonLookup
 // 发起人物资料异步查询，绑定当前用户/连接，结束后不能向失效会话交付。
-// 签名提示：void WarehouseServer::startPersonLookup(QTcpSocket* socket, const std::shared_ptr<Session>& session,                                          const QJsonObject& request)  
+// 签名提示：void WarehouseServer::startPersonLookup(QTcpSocket* socket, const std::shared_ptr<Session>& session,
+//                                           const QJsonObject& request)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 void WarehouseServer::startPersonLookup(QTcpSocket* socket, const std::shared_ptr<Session>& session,
@@ -187,7 +192,9 @@ void WarehouseServer::startPersonLookup(QTcpSocket* socket, const std::shared_pt
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::readablePersonCatalog
 // 从当前用户可读来源构建人物目录，并附加可信关联/别名与本人关注。
-// 签名提示：Result<care_algorithms::CatalogSnapshot> WarehouseServer::readablePersonCatalog(      qint64 userId, const QString& personId, bool includeAliases)  
+// 签名提示：Result<care_algorithms::CatalogSnapshot> WarehouseServer::readablePersonCatalog(
+//       qint64 userId, const QString& personId, bool includeAliases)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 Result<care_algorithms::CatalogSnapshot> WarehouseServer::readablePersonCatalog(
@@ -289,7 +296,9 @@ Result<care_algorithms::CatalogSnapshot> WarehouseServer::readablePersonCatalog(
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::dispatchPersonQuery
 // 路由人物搜索、关注、作品与资讯请求；返回可选结果表示是否命中此人物分支。
-// 签名提示：std::optional<Result<QJsonObject>> WarehouseServer::dispatchPersonQuery(      qint64 userId, const QString& type, const QJsonObject& payload)  
+// 签名提示：std::optional<Result<QJsonObject>> WarehouseServer::dispatchPersonQuery(
+//       qint64 userId, const QString& type, const QJsonObject& payload)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 std::optional<Result<QJsonObject>> WarehouseServer::dispatchPersonQuery(

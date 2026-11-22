@@ -31,7 +31,8 @@ namespace {
 
 // >>> MAIN-DEFENSE | 函数入口｜userKey
 // 规范化用户名以建立稳定查询键；展示名和登录比较键可以不同。
-// 签名提示：QString userKey(const QString& name)  
+// 签名提示：QString userKey(const QString& name)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 QString userKey(const QString& name)
@@ -42,7 +43,8 @@ QString userKey(const QString& name)
 
 // >>> MAIN-DEFENSE | 函数入口｜readUtc
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：bool readUtc(const QJsonValue& value, qint64& result)  
+// 签名提示：bool readUtc(const QJsonValue& value, qint64& result)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 bool readUtc(const QJsonValue& value, qint64& result)
@@ -58,7 +60,8 @@ bool readUtc(const QJsonValue& value, qint64& result)
 }
 // >>> MAIN-DEFENSE | 函数入口｜readRange
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：bool readRange(const QJsonValue& value, care_contract::TimeRange& range)  
+// 签名提示：bool readRange(const QJsonValue& value, care_contract::TimeRange& range)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 bool readRange(const QJsonValue& value, care_contract::TimeRange& range)
@@ -73,7 +76,8 @@ bool readRange(const QJsonValue& value, care_contract::TimeRange& range)
 }
 // >>> MAIN-DEFENSE | 函数入口｜rangeJson
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：QJsonObject rangeJson(const care_contract::TimeRange& range)  
+// 签名提示：QJsonObject rangeJson(const care_contract::TimeRange& range)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 QJsonObject rangeJson(const care_contract::TimeRange& range)
@@ -82,7 +86,8 @@ QJsonObject rangeJson(const care_contract::TimeRange& range)
 }
 // >>> MAIN-DEFENSE | 函数入口｜readPreference
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：bool readPreference(const QJsonValue& value, recommendation_contract::PreferenceSelection& preference)  
+// 签名提示：bool readPreference(const QJsonValue& value, recommendation_contract::PreferenceSelection& preference)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 bool readPreference(const QJsonValue& value, recommendation_contract::PreferenceSelection& preference)
@@ -106,7 +111,8 @@ bool readPreference(const QJsonValue& value, recommendation_contract::Preference
 }
 // >>> MAIN-DEFENSE | 函数入口｜workJson
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：QJsonObject workJson(const care_contract::ResourceSummary& work)  
+// 签名提示：QJsonObject workJson(const care_contract::ResourceSummary& work)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 QJsonObject workJson(const care_contract::ResourceSummary& work)
@@ -130,7 +136,8 @@ QJsonObject workJson(const care_contract::ResourceSummary& work)
 }
 // >>> MAIN-DEFENSE | 函数入口｜periodJson
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：QJsonObject periodJson(const care_contract::PeriodFootprint& period)  
+// 签名提示：QJsonObject periodJson(const care_contract::PeriodFootprint& period)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 QJsonObject periodJson(const care_contract::PeriodFootprint& period)
@@ -163,7 +170,8 @@ QJsonObject periodJson(const care_contract::PeriodFootprint& period)
 
 // >>> MAIN-DEFENSE | 函数入口｜readId
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：qint64 readId(const QJsonValue& value)  
+// 签名提示：qint64 readId(const QJsonValue& value)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 qint64 readId(const QJsonValue& value)
@@ -177,7 +185,8 @@ qint64 readId(const QJsonValue& value)
 }
 // >>> MAIN-DEFENSE | 函数入口｜readResource
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：bool readResource(const QJsonValue& value, care_contract::ResourceRef& result)  
+// 签名提示：bool readResource(const QJsonValue& value, care_contract::ResourceRef& result)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 bool readResource(const QJsonValue& value, care_contract::ResourceRef& result)
@@ -194,7 +203,8 @@ bool readResource(const QJsonValue& value, care_contract::ResourceRef& result)
 
 // >>> MAIN-DEFENSE | 函数入口｜summaryJson
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：QJsonObject summaryJson(const WarehouseSummary& warehouse)  
+// 签名提示：QJsonObject summaryJson(const WarehouseSummary& warehouse)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 QJsonObject summaryJson(const WarehouseSummary& warehouse)
@@ -206,7 +216,8 @@ QJsonObject summaryJson(const WarehouseSummary& warehouse)
 
 // >>> MAIN-DEFENSE | 函数入口｜itemJson
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：QJsonObject itemJson(const WarehouseItem& item)  
+// 签名提示：QJsonObject itemJson(const WarehouseItem& item)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 QJsonObject itemJson(const WarehouseItem& item)
@@ -216,7 +227,8 @@ QJsonObject itemJson(const WarehouseItem& item)
 
 // >>> MAIN-DEFENSE | 函数入口｜readSummary
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：WarehouseSummary readSummary(const QSqlQuery& query)  
+// 签名提示：WarehouseSummary readSummary(const QSqlQuery& query)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 WarehouseSummary readSummary(const QSqlQuery& query)
@@ -260,7 +272,9 @@ std::optional<QList<WarehouseItem>> listItems(const QSqlDatabase& db, qint64 war
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::WarehouseServer
 // 构造依赖与初始状态；参数通过初始化列表保存，本段不能当成登录或数据加载已经完成。
-// 签名提示：WarehouseServer::WarehouseServer(llm_recommendation::Config config)      : personLookupNetwork_(new QNetworkAccessManager(this)), recommender_(config),        trendSummarizer_(config), sceneRecommender_(std::move(confi
+// 签名提示：WarehouseServer::WarehouseServer(llm_recommendation::Config config)
+//       : personLookupNetwork_(new QNetworkAccessManager(this)), recommender_(config),
+//         trendSummarizer_(config), sceneRecommender_(std::move(confi
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 WarehouseServer::WarehouseServer(llm_recommendation::Config config)
@@ -297,7 +311,8 @@ WarehouseServer::WarehouseServer(llm_recommendation::Config config)
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::~WarehouseServer
 // 析构收尾：释放本对象持有的连接/请求等资源；注意Qt回调与数据库句柄的生命周期。
-// 签名提示：WarehouseServer::~WarehouseServer()  
+// 签名提示：WarehouseServer::~WarehouseServer()
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 WarehouseServer::~WarehouseServer()
@@ -318,7 +333,8 @@ WarehouseServer::~WarehouseServer()
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::openDatabase
 // 打开在线仓库SQLite并初始化/核对schema，随后人物迁移复用此连接。
-// 签名提示：bool WarehouseServer::openDatabase(const QString& path, QString& error)  
+// 签名提示：bool WarehouseServer::openDatabase(const QString& path, QString& error)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 bool WarehouseServer::openDatabase(const QString& path, QString& error)
@@ -408,7 +424,8 @@ bool WarehouseServer::openDatabase(const QString& path, QString& error)
 bool WarehouseServer::addUser(const QString& username, const QString& password, QString& error, bool administrator, qint64 actorId)
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::addUser
 // 创建在线network_users账号并哈希密码；在线仓库权限按所有者，不使用单机admin角色替代。
-// 签名提示：bool WarehouseServer::addUser(const QString& username, const QString& password, QString& error)  
+// 签名提示：bool WarehouseServer::addUser(const QString& username, const QString& password, QString& error)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 {
@@ -468,7 +485,8 @@ bool WarehouseServer::addUser(const QString& username, const QString& password, 
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::readableCandidates
 // 只整理当前用户可读的仓库条目，供推荐使用，不把别人私有数据传给模型。
-// 签名提示：std::optional<QList<WarehouseDetail>> WarehouseServer::readableCandidates(qint64 userId)  
+// 签名提示：std::optional<QList<WarehouseDetail>> WarehouseServer::readableCandidates(qint64 userId)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 std::optional<QList<WarehouseDetail>> WarehouseServer::readableCandidates(qint64 userId)
@@ -512,7 +530,8 @@ std::optional<QList<WarehouseDetail>> WarehouseServer::readableCandidates(qint64
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::sendResponse
 // 将业务结果编码为协议帧并写回当前socket。
-// 签名提示：bool WarehouseServer::sendResponse(QTcpSocket* socket, const QJsonObject& response)  
+// 签名提示：bool WarehouseServer::sendResponse(QTcpSocket* socket, const QJsonObject& response)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 bool WarehouseServer::sendResponse(QTcpSocket* socket, const QJsonObject& response)
@@ -541,7 +560,8 @@ bool WarehouseServer::sendResponse(QTcpSocket* socket, const QJsonObject& respon
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::queryBehavior
 // 按用户与时间窗读服务器行为记录，保存读取失败状态和历史快照。
-// 签名提示：std::optional<QList<StoredBehavior>> WarehouseServer::queryBehavior(qint64 userId, care_contract::TimeRange range)  
+// 签名提示：std::optional<QList<StoredBehavior>> WarehouseServer::queryBehavior(qint64 userId, care_contract::TimeRange range)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 std::optional<QList<StoredBehavior>> WarehouseServer::queryBehavior(qint64 userId, care_contract::TimeRange range)
@@ -623,7 +643,9 @@ std::optional<QList<StoredBehavior>> WarehouseServer::queryBehavior(qint64 userI
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::loadPersonContext
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：care_contract::Result<care_algorithms::PersonContext> WarehouseServer::loadPersonContext(      qint64 userId, const QList<care_contract::ResourceSummary>& authorizedWorks)  
+// 签名提示：care_contract::Result<care_algorithms::PersonContext> WarehouseServer::loadPersonContext(
+//       qint64 userId, const QList<care_contract::ResourceSummary>& authorizedWorks)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 care_contract::Result<care_algorithms::PersonContext> WarehouseServer::loadPersonContext(
@@ -641,7 +663,9 @@ care_contract::Result<care_algorithms::PersonContext> WarehouseServer::loadPerso
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::personCatalog
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：care_contract::Result<care_algorithms::CatalogSnapshot> WarehouseServer::personCatalog(      qint64 userId, const QList<care_contract::ResourceSummary>& authorizedWorks)  
+// 签名提示：care_contract::Result<care_algorithms::CatalogSnapshot> WarehouseServer::personCatalog(
+//       qint64 userId, const QList<care_contract::ResourceSummary>& authorizedWorks)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 care_contract::Result<care_algorithms::CatalogSnapshot> WarehouseServer::personCatalog(
@@ -663,7 +687,8 @@ care_contract::Result<care_algorithms::CatalogSnapshot> WarehouseServer::personC
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::readRequests
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
-// 签名提示：void WarehouseServer::readRequests(QTcpSocket* socket, const std::shared_ptr<Session>& session)  
+// 签名提示：void WarehouseServer::readRequests(QTcpSocket* socket, const std::shared_ptr<Session>& session)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 void WarehouseServer::readRequests(QTcpSocket* socket, const std::shared_ptr<Session>& session)
@@ -737,7 +762,8 @@ void WarehouseServer::readRequests(QTcpSocket* socket, const std::shared_ptr<Ses
 
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::dispatch
 // 按请求type分发同步业务，使用当前session校验身份与权限后访问数据库或算法。
-// 签名提示：QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& request)  
+// 签名提示：QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& request)
+
 // 到这里：刚进入该步骤，还没有完成下方I/O或校验；以实际成功返回为准。
 // <<< MAIN-DEFENSE
 QJsonObject WarehouseServer::dispatch(Session& session, const QJsonObject& request)

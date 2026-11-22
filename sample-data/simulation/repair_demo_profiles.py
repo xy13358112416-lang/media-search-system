@@ -6,6 +6,7 @@ Unverified TV director placeholders become unknown; history is never rewritten.
 import argparse
 import json
 import re
+from contextlib import closing
 import sqlite3
 from pathlib import Path
 
@@ -54,7 +55,7 @@ def plan(db):
 
 def repair(source, output=None):
     source = Path(source).resolve()
-    with sqlite3.connect(source.as_uri() + "?mode=ro", uri=True) as original:
+    with closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True)) as original:
         clean, people, credits = plan(original)
         report = {"placeholder_directors_to_clear": len(clean), "source_artists": len(people), "source_credits": len(credits), "mode": "preview"}
         if output is None:
