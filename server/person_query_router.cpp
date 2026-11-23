@@ -368,14 +368,29 @@ std::optional<Result<QJsonObject>> WarehouseServer::dispatchPersonQuery(
             if(combined.size()>=1000) return Result<QJsonObject>{unavailable(),{}};
             all.page.offset=*confirmed.value->nextOffset;
         }
+        const auto makePage = [&]() {
+            Page<PersonSummary> output;
+            output.items = combined.mid(page.offset, page.limit);
+            if (page.offset + output.items.size() < combined.size())
+                output.nextOffset = page.offset + output.items.size();
+            return pageResponse(Result<Page<PersonSummary>>{{}, output});
+        };
+        const auto confirmedCount = combined.size();
+        const auto handleFieldFailure = [&](Result<QJsonObject> failure) {
+            if (confirmedCount == 0)
+                return failure;
+            // Field-derived hints are optional when confirmed credits already match.
+            combined.resize(confirmedCount);
+            return makePage();
+        };
         all.page.offset=0;
         auto fields=mediaFieldCatalog(db_,userId);
         // >>> MAIN-DEFENSE | dispatchPersonQuery｜处理阶段 09
         // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
         // <<< MAIN-DEFENSE
-        if(!fields.status.ok() || !fields.value) return Result<QJsonObject>{unavailable(),{}};
+        if(!fields.status.ok() || !fields.value) return handleFieldFailure({unavailable(),{}});
         auto fallback=care_algorithms::searchPeople(all,*fields.value);
-        if(!fallback.status.ok() || !fallback.value) return pageResponse(fallback);
+        if(!fallback.status.ok() || !fallback.value) return handleFieldFailure(pageResponse(fallback));
         QSet<QString> names;
         // >>> MAIN-DEFENSE | dispatchPersonQuery｜处理阶段 10
         // 进入批量处理：逐项处理下方集合或查询结果；每次迭代的continue/return决定跳过一项还是终止整个函数。
@@ -394,18 +409,12 @@ std::optional<Result<QJsonObject>> WarehouseServer::dispatchPersonQuery(
             // >>> MAIN-DEFENSE | dispatchPersonQuery｜处理阶段 12
             // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
             // <<< MAIN-DEFENSE
-            if(combined.size()>=2000) return Result<QJsonObject>{unavailable(),{}};
+            if(combined.size()>=2000) return handleFieldFailure({unavailable(),{}});
             all.page.offset=*fallback.value->nextOffset;
             fallback=care_algorithms::searchPeople(all,*fields.value);
-            if(!fallback.status.ok() || !fallback.value) return pageResponse(fallback);
+            if(!fallback.status.ok() || !fallback.value) return handleFieldFailure(pageResponse(fallback));
         }
-        Page<PersonSummary> output;
-        output.items=combined.mid(page.offset,page.limit);
-        // >>> MAIN-DEFENSE | dispatchPersonQuery｜处理阶段 13
-        // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
-        // <<< MAIN-DEFENSE
-        if(page.offset+output.items.size()<combined.size()) output.nextOffset=page.offset+output.items.size();
-        return pageResponse(Result<Page<PersonSummary>>{{},output});
+        return makePage();
     }
     if (!person.isString() || !validatePersonId(personId).ok())
         // >>> MAIN-DEFENSE | dispatchPersonQuery｜处理阶段 14
