@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜媒体助手的输入入口
+// 阅读路线：收集需求和场景 → 选择检索或推荐 → 回调给上层
+// 联调关系：此对话框负责交互，不持有DeepSeek Key；真正网络模型任务由服务端完成。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "assistant_dialog.h"
 
 #include <QButtonGroup>

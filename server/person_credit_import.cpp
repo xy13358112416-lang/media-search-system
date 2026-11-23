@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜可信人物与作品关联导入
+// 阅读路线：严格解析JSON → 来源/ID/角色验证 → 保存点 → 幂等写入 → 提交或回滚
+// 联调关系：人工或可追溯来源提供Person与Credit；写入主逻辑迁移确定的表结构，不按同名猜人物、不创造未登记作品来源。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "person_credit_import.h"
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -19,12 +24,18 @@ constexpr qsizetype MaxJsonBytes = 8 * 1024 * 1024;
 constexpr qsizetype MaxEntries = 10000;
 Status invalid(const QString& message) { return {ErrorCode::InvalidArgument, message}; }
 Status databaseError() { return {ErrorCode::ServerError, QStringLiteral("Person import database operation failed.")}; }
+// >>> DEFENSE-NOTE | validText = 检查展示文本
+// 限制空文本、长度和控制字符，避免坏别名/姓名进入数据库。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool validText(const QString& text) {
     if (text.simplified().isEmpty() || text.size() > MaxQueryUnits) return false;
     for (auto ch : text)
         if (ch.isNull() || ch.category() == QChar::Other_Control) return false;
     return true;
 }
+// >>> DEFENSE-NOTE | validSource = 检查证据URL
+// 要求HTTPS、有效域名且无用户信息；真实批次拒绝.invalid假来源，合成夹具必须明确synthetic。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool validSource(const QUrl& url, bool synthetic) {
     if (!url.isValid() || url.scheme() != "https" || url.host().isEmpty() ||
         !url.userInfo().isEmpty() || url.toString().size() > 2048) return false;
@@ -32,6 +43,9 @@ bool validSource(const QUrl& url, bool synthetic) {
     if (host.endsWith('.')) host.chop(1);
     return synthetic || (host != "invalid" && !host.endsWith(".invalid"));
 }
+// >>> DEFENSE-NOTE | roleText = 角色枚举转数据库字符串
+// Actor/Director/Musician分别写actor/director/musician；未知枚举返回空并由验证拒绝。
+// <<< DEFENSE-NOTE | 本段讲解结束
 QString roleText(PersonRole role) {
     switch (role) {
     case PersonRole::Actor: return QStringLiteral("actor");
@@ -40,6 +54,9 @@ QString roleText(PersonRole role) {
     }
     return {};
 }
+// >>> DEFENSE-NOTE | validateBatch = 验证整个导入批次
+// 检查来源说明、条数、人物ID/姓名/别名和证据URL，以及每项作品关联的角色和精确资源引用。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Status validateBatch(const Batch& batch) {
     if (!validText(batch.provenance) || batch.people.size() > MaxEntries || batch.credits.size() > MaxEntries)
         return invalid(QStringLiteral("Import provenance or entry count is invalid."));
@@ -56,6 +73,9 @@ Status validateBatch(const Batch& batch) {
             return invalid(QStringLiteral("Credit person, resource, role or evidence URL is invalid."));
     return {};
 }
+// >>> DEFENSE-NOTE | decimalId = 无溢出解析正整数ID
+// JSON使用十进制字符串保存64位编号；逐位累计前检查溢出，不接受前导零或非数字。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool decimalId(const QJsonValue& value, qint64& result) {
     if (!value.isString()) return false;
     const auto text = value.toString();
@@ -69,11 +89,17 @@ bool decimalId(const QJsonValue& value, qint64& result) {
     }
     return true;
 }
+// >>> DEFENSE-NOTE | sourceUrl = 解析并验证来源地址
+// 只接受字符串且限制长度，再用StrictMode解析URL，复用真实/合成来源规则。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool sourceUrl(const QJsonValue& value, QUrl& url, bool synthetic) {
     if (!value.isString() || value.toString().size() > 2048) return false;
     url = QUrl(value.toString(),QUrl::StrictMode);
     return validSource(url,synthetic);
 }
+// >>> DEFENSE-NOTE | execute = 参数化SQL执行
+// 先finish旧结果再prepare，逐一绑定values，避免把外部文本拼进SQL。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool execute(QSqlQuery& query, const QString& sql, const QList<QVariant>& values = {}) {
     query.finish();
     if (!query.prepare(sql)) return false;
@@ -82,6 +108,10 @@ bool execute(QSqlQuery& query, const QString& sql, const QList<QVariant>& values
 }
 // Releasing this savepoint commits only when no transaction was already active.
 // Failure paths preserve the caller's transaction and roll back every import write.
+// >>> DEFENSE-NOTE | Savepoint = 导入批次的作用域回滚保护
+// 使用独立SAVEPOINT；成功release，否则析构ROLLBACK TO并RELEASE。
+// 可嵌套于调用者现有事务，不擅自提交或破坏外层事务；这是数据库保存点，不是C++索引临时对象。
+// <<< DEFENSE-NOTE | 本段讲解结束
 class Savepoint {
 public:
     explicit Savepoint(QSqlDatabase& db) : db_(db), name_("person_import_" + QUuid::createUuid().toString(QUuid::Id128)) {}
@@ -107,6 +137,9 @@ private:
 };
 }
 
+// >>> DEFENSE-NOTE | parse = 将JSON解码为导入批次
+// 限制8MiB及条数，验证结构和字段，保留synthetic/provenance和可核验证据；不写数据库。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Result<Batch> parse(const QByteArray& bytes) {
     if (bytes.size() > MaxJsonBytes)
         return {invalid(QStringLiteral("Person import JSON exceeds 8 MiB.")), {}};
@@ -168,6 +201,10 @@ Result<Batch> parse(const QByteArray& bytes) {
     return {{},batch};
 }
 
+// >>> DEFENSE-NOTE | importBatch = 将已验证批次写入目录与credits
+// 先校验数据与显式合成许可，再检查现有目录、登记来源三元组及关联冲突。
+// 保存点保护全批次，重复导入不重复记插入；返回人物/别名/关联实际新增数，失败不能留下半份结果。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Result<Report> importBatch(QSqlDatabase& db, const Batch& batch, const Options& options) {
     if (batch.synthetic && !options.allowSynthetic)
         return {invalid(QStringLiteral("Synthetic person import requires explicit opt-in.")), {}};

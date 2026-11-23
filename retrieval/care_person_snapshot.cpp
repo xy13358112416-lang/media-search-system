@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜可信人物关联的快照适配
+// 阅读路线：清除未确认人物 → 精确三元组匹配 → 验证人物 → 附加关注标记
+// 联调关系：主逻辑提供PersonContext，推荐/足迹消费附加后的快照；历史快照保留当时事实，不被今天的数据补写。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "care_person_snapshot.h"
 #include "care_algorithm_common.h"
 #include <QMap>
@@ -7,20 +12,32 @@ namespace care_algorithms {
 namespace {
 using namespace care_contract;
 using ResourceKey = QPair<QString, QPair<qint64, qint64>>;
+// >>> DEFENSE-NOTE | key = 作品与来源的三元组键
+// 使用(workId,(warehouseId,itemId))匹配关联；仅workId相同不足以确认某个来源的映射。
+// <<< DEFENSE-NOTE | 本段讲解结束
 ResourceKey key(const ResourceRef& resource) {
     return {resource.workId, {resource.source.warehouseId, resource.source.itemId}};
 }
+// >>> DEFENSE-NOTE | validPersonId = 稳定人物ID校验
+// 复用公开契约，不按同名去匹配不同的人。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool validPersonId(const QString& id) {
     // Reuse the public contract's identifier rules rather than invent a weaker
     // rule for trusted-store records or follow entries.
     return validate(PersonUpdatesRequest{id, {0, 1}, {}}).ok();
 }
+// >>> DEFENSE-NOTE | validName = 可展示姓名校验
+// 拒绝空、过长和控制字符；姓名仍是展示属性，不能替代人物ID。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool validName(const QString& name) {
     if (name.simplified().isEmpty() || name.size() > MaxQueryUnits) return false;
     for (const auto ch : name)
         if (ch.isNull() || ch.category() == QChar::Other_Control) return false;
     return true;
 }
+// >>> DEFENSE-NOTE | confirmedPeople = 整理已确认人物
+// 按personId合并角色，冲突姓名报错，角色排序去重并限制单作品人物数；followed标记后续从当前用户上下文重建。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Result<QList<PersonSummary>> confirmedPeople(const QList<PersonSummary>& input) {
     QMap<QString, PersonSummary> unique;
     for (auto person : input) {
@@ -50,6 +67,9 @@ Result<QList<PersonSummary>> confirmedPeople(const QList<PersonSummary>& input) 
     }
     return {{}, result};
 }
+// >>> DEFENSE-NOTE | samePeople = 比较两份人物关联
+// 比较稳定身份、姓名及角色，用于发现同一来源被提供了矛盾关联。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool samePeople(const QList<PersonSummary>& a, const QList<PersonSummary>& b) {
     if (a.size() != b.size()) return false;
     for (qsizetype i = 0; i < a.size(); ++i)
@@ -58,6 +78,10 @@ bool samePeople(const QList<PersonSummary>& a, const QList<PersonSummary>& b) {
 }
 } // namespace
 
+// >>> DEFENSE-NOTE | attachConfirmedPeople = 向当前目录附加可信人物
+// 先清空作品原有people，不把未经确认的客户端字段当证据。
+// 仅采用在可读三元组集合里的credits；按已确认映射附加人物并设置本人followed状态。
+// <<< DEFENSE-NOTE | 本段讲解结束
 care_contract::Result<CatalogSnapshot> attachConfirmedPeople(
     const CatalogSnapshot& snapshot, const PersonContext& context) {
     if (!snapshot.dataAvailable || !context.dataAvailable)
@@ -110,6 +134,9 @@ care_contract::Result<CatalogSnapshot> attachConfirmedPeople(
     }
     return {{}, result};
 }
+// >>> DEFENSE-NOTE | attachConfirmedPeople = 向个人快照附加当前人物
+// 复用目录重载，只更新readableWorks/followedPeople；不遍历重写events，历史快照里的空人物也是当时事实。
+// <<< DEFENSE-NOTE | 本段讲解结束
 care_contract::Result<PersonalSnapshot> attachConfirmedPeople(
     const PersonalSnapshot& snapshot, const PersonContext& context) {
     if (!snapshot.historyAvailable)

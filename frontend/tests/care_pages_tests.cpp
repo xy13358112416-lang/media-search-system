@@ -12,6 +12,7 @@
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QtTest>
+#include <QFontDatabase>
 #include <memory>
 
 using namespace care_contract;
@@ -153,12 +154,37 @@ public:
 class CarePagesTests final : public QObject {
     Q_OBJECT
 private slots:
+    void homepageShowsStructuredExternalWorks()
+    {
+        FakeCareService service;
+        std::unique_ptr<CarePage> page(createFollowCenter(service));
+        page->resize(1100,700);
+        page->findChild<QLineEdit*>()->setText(QStringLiteral("周杰伦"));
+        button(*page,QStringLiteral("联网人物主页"))->click();
+        PersonWebSource person{QStringLiteral("周杰伦"),QUrl("https://example.org/person"),QStringLiteral("音乐人，以下资料用于测试界面。"),
+            {{QStringLiteral("作品甲"),"2001",QStringLiteral("演唱"),QUrl("https://example.org/person")}}};
+        service.webDone(success(QList<PersonWebSource>{person}));
+        auto* dialog=page->findChild<QDialog*>();
+        QVERIFY(dialog);
+        auto* table=dialog->findChild<QTableWidget*>();
+        QCOMPARE(table->rowCount(),1);
+        QCOMPARE(table->item(0,0)->text(),QStringLiteral("作品甲"));
+        QCOMPARE(table->item(0,1)->text(),QString("2001"));
+        const auto screenshot=qEnvironmentVariable("MEDIA_PROFILE_SCREENSHOT");
+        if(!screenshot.isEmpty()) {
+            QFontDatabase::addApplicationFont(QStringLiteral("C:/Windows/Fonts/msyh.ttc"));
+            dialog->setFont(QFont(QStringLiteral("Microsoft YaHei"),11));
+            QTest::qWait(50);
+            QVERIFY(dialog->grab().save(screenshot));
+        }
+        dialog->close();
+    }
     void personWebResultsCannotPopulateAnInactivePage()
     {
         FakeCareService service;
         std::unique_ptr<CarePage> page(createFollowCenter(service));
         auto* query = page->findChild<QLineEdit*>();
-        auto* online = button(*page, QStringLiteral("联网找人物"));
+        auto* online = button(*page, QStringLiteral("联网人物主页"));
         QVERIFY(query && online);
         query->setText("Alan Alda");
         online->click();
@@ -179,7 +205,8 @@ private slots:
         second(result);
         auto* dialog = page->findChild<QDialog*>();
         QVERIFY(dialog);
-        QCOMPARE(dialog->findChild<QListWidget*>()->count(), 1);
+        QCOMPARE(dialog->findChild<QComboBox*>()->count(), 1);
+        QCOMPARE(dialog->findChild<QTableWidget*>()->rowCount(), 0);
         QVERIFY(service.worksCalls.isEmpty());
         dialog->close();
     }
@@ -376,79 +403,36 @@ private slots:
         QVERIFY(!more->isEnabled());
     }
 
-    void staleNewsIsIdentifiedAsCached()
+    void personHomepageHasWorksWithoutEmptyNewsTabs()
     {
         FakeCareService service;
         std::unique_ptr<CarePage> page(createFollowCenter(service));
         page->activate();
-        auto oldArticle = update(QStringLiteral("之前的资讯"));
-        oldArticle.stale = true;
-        service.finishUpdates(0, {{oldArticle}, std::nullopt});
-        auto* news = qobject_cast<QListWidget*>(page->findChild<QTabWidget*>()->widget(1));
-        QVERIFY(news && news->count() == 1);
-        QVERIFY(news->item(0)->text().contains(QStringLiteral("之前的资讯")));
-        QVERIFY(news->item(0)->text().contains(QStringLiteral("已过期缓存")));
+        QCOMPARE(service.updatesCalls.size(), 0);
+        auto* tabs = page->findChild<QTabWidget*>();
+        QCOMPARE(tabs->count(), 1);
+        QCOMPARE(tabs->tabText(0), QStringLiteral("关联作品"));
+        QVERIFY(!button(*page, QStringLiteral("加载更多更新")));
     }
 
-    void updatesSecondPageIsReachable()
-    {
-        FakeCareService service;
-        std::unique_ptr<CarePage> page(createFollowCenter(service));
-        page->activate();
-        Page<PersonUpdate> first;
-        for (int i = 0; i < 50; ++i)
-            first.items.append(update(QStringLiteral("资讯%1").arg(i)));
-        first.nextOffset = 50;
-        service.finishUpdates(0, std::move(first));
-        auto* more = button(*page, QStringLiteral("加载更多更新"));
-        QVERIFY2(more, "News and release updates must expose their second page");
-        QVERIFY(more->isEnabled());
-        more->click();
-        QCOMPARE(service.updatesCalls.size(), 2);
-        QCOMPARE(service.updatesCalls.at(1).request.page.offset, 50);
-        QVERIFY(!more->isEnabled());
-        service.finishUpdates(1, {{update(QStringLiteral("第二页发布"), UpdateKind::Release)}, std::nullopt});
-        auto* calendar = qobject_cast<QListWidget*>(page->findChild<QTabWidget*>()->widget(2));
-        QVERIFY(calendar);
-        QCOMPARE(calendar->count(), 1); // No leftover "no releases" placeholder.
-        QVERIFY(calendar->item(0)->text().contains(QStringLiteral("第二页发布")));
-        QVERIFY(!more->isEnabled());
-    }
-
-    void switchingPersonDiscardsBothPendingSecondPages()
+    void switchingPersonDiscardsPendingWorks()
     {
         FakeCareService service;
         std::unique_ptr<CarePage> page(createFollowCenter(service));
         page->activate();
         service.finishWorks(0, {{work(QStringLiteral("甲作品"))}, 50});
-        service.finishUpdates(0, {{update(QStringLiteral("甲资讯"))}, 50});
-        auto* worksMore = button(*page, QStringLiteral("加载更多作品"));
-        auto* updatesMore = button(*page, QStringLiteral("加载更多更新"));
-        QVERIFY(worksMore);
-        QVERIFY(updatesMore);
-        worksMore->click();
-        updatesMore->click();
-        auto* people = page->findChildren<QListWidget*>().first();
+        button(*page, QStringLiteral("加载更多作品"))->click();
+        auto* people = page->findChild<QListWidget*>();
         for (auto* list : page->findChildren<QListWidget*>())
-            if (list->accessibleName() == QStringLiteral("人物列表"))
-                people = list;
+            if (list->accessibleName() == QStringLiteral("人物列表")) people=list;
         people->setCurrentRow(1);
         QCOMPARE(service.worksCalls.size(), 3);
-        QCOMPARE(service.updatesCalls.size(), 3);
-        QCOMPARE(service.worksCalls.at(2).person, QStringLiteral("person-b"));
         service.finishWorks(1, {{work(QStringLiteral("迟到甲作品"))}, 100});
-        service.finishUpdates(1, {{update(QStringLiteral("迟到甲资讯"))}, 100});
         service.finishWorks(2, {{work(QStringLiteral("乙作品"))}, std::nullopt});
-        service.finishUpdates(2, {{update(QStringLiteral("乙资讯"))}, std::nullopt});
-        auto* tabs = page->findChild<QTabWidget*>();
-        auto* works = qobject_cast<QListWidget*>(tabs->widget(0));
-        auto* news = qobject_cast<QListWidget*>(tabs->widget(1));
+        auto* works = qobject_cast<QListWidget*>(page->findChild<QTabWidget*>()->widget(0));
         QCOMPARE(works->count(), 1);
         QCOMPARE(works->item(0)->text(), QStringLiteral("乙作品"));
-        QCOMPARE(news->count(), 1);
-        QVERIFY(news->item(0)->text().contains(QStringLiteral("乙资讯")));
-        QVERIFY(!worksMore->isEnabled());
-        QVERIFY(!updatesMore->isEnabled());
+        QCOMPARE(service.updatesCalls.size(), 0);
     }
 
     void workDetailsRequireAnExplicitActionAndDiscardLateReplies()

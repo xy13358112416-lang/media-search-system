@@ -1,3 +1,7 @@
+// >>> DEFENSE-NOTE | 头文件导读｜单机今日服务的依赖组合
+// base_生成偏好候选，currentMedia_用于成功空候选的热度回退，dailyPick完成洗牌。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #pragma once
 
 #include "personalrecommendation_service.h"

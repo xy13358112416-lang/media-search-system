@@ -13,7 +13,7 @@ target_compile_features(qt_care_pages PUBLIC cxx_std_17)
 target_link_libraries(qt_care_pages PUBLIC care_contract Qt6::Widgets)
 target_compile_options(qt_care_pages PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
-add_library(qt_online_window STATIC online_window.cpp)
+add_library(qt_online_window STATIC online_window.cpp admin_dialog.cpp)
 target_include_directories(qt_online_window PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(qt_online_window PUBLIC media_business warehouse_client qt_care_pages Qt6::Widgets)
 
@@ -62,7 +62,7 @@ if(BUILD_TESTING)
     add_test(NAME frontend_regressions COMMAND media_frontend_tests)
 
 
-    add_executable(warehouse_page_tests tests/warehouse_page_tests.cpp warehouse_page.cpp)
+    add_executable(warehouse_page_tests tests/warehouse_page_tests.cpp warehouse_page.cpp admin_dialog.cpp)
     set_target_properties(warehouse_page_tests PROPERTIES AUTOMOC ON)
     target_include_directories(warehouse_page_tests PRIVATE ${PROJECT_SOURCE_DIR}/server)
     target_link_libraries(warehouse_page_tests PRIVATE warehouse_client warehouse_server qt_care_pages Qt6::Widgets Qt6::Test)

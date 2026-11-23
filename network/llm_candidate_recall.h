@@ -1,3 +1,7 @@
+// >>> DEFENSE-NOTE | 头文件导读｜词面候选召回接口
+// 最多30候选和有限上下文。与DeepSeek配合做输入压缩，不负责用户认证，也不保证词面补位一定语义相关。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #pragma once
 #include "llm_recommendation.h"
 

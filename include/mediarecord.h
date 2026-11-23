@@ -1,3 +1,7 @@
+// >>> DEFENSE-NOTE | 头文件导读｜共享媒体数据结构
+// 业务模块提供记录，检索/推荐只读取或规范化副本。category内容类别与fileType扩展名不是一个字段；id不负责表示真实人物身份。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #pragma once
 
 #include <QDate>

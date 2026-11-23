@@ -54,6 +54,30 @@ private slots:
         QCOMPARE(history->first().peopleSnapshot.size(),1); QCOMPARE(history->first().peopleSnapshot.first().personId,QStringLiteral("person:test"));
         bob.getResource(ref.source,[&](auto r) { status=r.status; done=true; });
         QTRY_VERIFY(done); QCOMPARE(status.code,ErrorCode::PermissionDenied);
+
+        // Add unrelated, readable records without adding any new confirmed credits.
+        {
+            auto db=QSqlDatabase::addDatabase("QSQLITE","person-overflow-fixture");
+            db.setDatabaseName(path); QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.prepare(
+                "WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM seq WHERE n<1000) "
+                "INSERT INTO warehouse_items(id,warehouse_id,media) "
+                "SELECT 10000+n,warehouse_id,media FROM seq,warehouse_items WHERE id=?"));
+            q.addBindValue(ref.source.itemId);
+            QVERIFY(q.exec());
+            QVERIFY(q.exec("INSERT INTO work_sources(warehouse_id,item_id,work_id) "
+                           "SELECT warehouse_id,id,'srv:fixture-' || id FROM warehouse_items WHERE id>10000"));
+        }
+        QSqlDatabase::removeDatabase("person-overflow-fixture");
+        done=false;
+        Result<cc::Page<cc::PersonSummary>> found;
+        alice.searchPeople({"Verified",{}},[&](auto r) { found=r; done=true; });
+        QTRY_VERIFY(done);
+        QVERIFY2(found.status.ok(), qPrintable(found.status.message));
+        QVERIFY(found.value);
+        QCOMPARE(found.value->items.size(),1);
+        QCOMPARE(found.value->items.first().personId,QStringLiteral("person:test"));
     }
     void historyExtensionRejectsCorruptionAndAllowsLegacy() {
         MediaRecord media; media.id = "m"; media.fileName = "Legacy";

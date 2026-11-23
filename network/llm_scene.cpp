@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜最新工作区的场景实时搜索模型
+// 阅读路线：规则候选 → 场景提示词 → web搜索工具 → 搜索完成证据 → 候选ID校验
+// 联调关系：本文件只在服务器调用；不是旧时序公式的一部分。Qt传场景，路由先给30条有权限的规则候选，再按场景筛选。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "llm_scene.h"
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -11,11 +16,21 @@
 namespace llm_scene {
 namespace {
 constexpr qint64 MaxBytes = 512 * 1024;
+// >>> DEFENSE-NOTE | fallback = 场景查询失败后的规则回退信号
+// 这里只返回fallback=true；实际规则作品由场景路由保留，避免模型客户端重新读数据库。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Result fallback() { return {{}, true, QStringLiteral("实时场景查询不可用，已使用规则推荐。")} ; }
+// >>> DEFENSE-NOTE | usableUrl = 请求地址检查
+// 正常采用HTTPS，测试允许本机HTTP；拒绝包含用户信息的URL。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool usableUrl(const QUrl& url) {
     const bool test = url.scheme() == "http" && (url.host() == "127.0.0.1" || url.host() == "localhost");
     return url.isValid() && url.userInfo().isEmpty() && (test || url.scheme() == "https");
 }
+// >>> DEFENSE-NOTE | parse = 验证实时搜索证据和候选ID
+// 不能只因为请求声明了搜索工具就认定搜过；要求响应有已完成search且包含sources。
+// 最后解析ids数组，拒绝未知ID、重复ID或超量；有效空数组是成功未找到合适作品。
+// <<< DEFENSE-NOTE | 本段讲解结束
 std::optional<QStringList> parse(const QByteArray& bytes, const QSet<QString>& allowed, int limit) {
     const auto envelope = QJsonDocument::fromJson(bytes).object();
     if (envelope.contains("error")) return {};
@@ -45,6 +60,9 @@ std::optional<QStringList> parse(const QByteArray& bytes, const QSet<QString>& a
     return ids;
 }
 }
+// >>> DEFENSE-NOTE | Job = 场景选择任务状态
+// allowed保存本次候选白名单；bytes累计网络响应；limit限制最终数量，done回调仅由finish交付。
+// <<< DEFENSE-NOTE | 本段讲解结束
 struct Client::Job {
     quint64 id = 0;
     Completion done;
@@ -55,6 +73,10 @@ struct Client::Job {
 };
 Client::Client(llm_recommendation::Config config, QObject* parent) : QObject(parent), config_(std::move(config)) {}
 Client::~Client() { const auto ids=jobs_.keys(); for (const auto id:ids) cancel(id); }
+// >>> DEFENSE-NOTE | recommend = 按主动场景实时查询候选
+// 候选最多30条，发送作品ID、标题、作者、年份和类别；不发用户身份或浏览明细。
+// 无候选是成功空结果；无Key或请求地址不可用是规则回退。
+// <<< DEFENSE-NOTE | 本段讲解结束
 quint64 Client::recommend(care_contract::BrowseScene scene, QList<llm_recommendation::Candidate> candidates,
                           int limit, Completion done) {
     auto job=std::make_shared<Job>(); job->id=++nextId_; job->done=std::move(done); job->limit=std::clamp(limit,1,30);
@@ -74,6 +96,9 @@ quint64 Client::recommend(care_contract::BrowseScene scene, QList<llm_recommenda
     if (config_.apiKey.trimmed().isEmpty() || !usableUrl(config_.endpoint)) {
         QTimer::singleShot(0,this,[this,job] {finish(job,fallback());}); return job->id;
     }
+    // >>> DEFENSE-NOTE | 场景步骤 01｜枚举转可理解的场景需求
+    // 放松、专注、探索对应不同自然语言用途；不是从浏览行为擅自推断用户情绪。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     const QString sceneName=scene==care_contract::BrowseScene::Relax ? QStringLiteral("放松观看或聆听") :
         scene==care_contract::BrowseScene::Focus ? QStringLiteral("专注学习或工作时作为背景，避免对白或情节干扰") :
         QStringLiteral("探索不同风格和新内容");
@@ -85,10 +110,18 @@ quint64 Client::recommend(care_contract::BrowseScene scene, QList<llm_recommenda
         "最终只输出 JSON：{\"ids\":[\"候选中的id\"]}。搜索尽量合并查询，禁止编造新id。");
     QJsonObject input{{"scene",sceneName},{"limit",job->limit},{"candidates",rows}};
     // DeepSeek web tools require text output; JSON mode with tools returns HTTP 400.
+    // >>> DEFENSE-NOTE | 场景步骤 02｜声明web搜索工具并约束输出
+    // 提示模型按标题/作者/年份核对身份，只从候选选ID。最终content是JSON文本；工具模式不使用json_object响应模式。
+    // 实际是否完成搜索由parse核验；不能根据提示词本身宣称联网成功。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     QJsonObject body{{"model","deepseek-flash"},{"stream",false},{"thinking",QJsonObject{{"type","disabled"}}},
         {"max_tokens",1024},{"tools",QJsonArray{QJsonObject{{"type","deepseek_web_search"}}}},
         {"messages",QJsonArray{QJsonObject{{"role","system"},{"content",instruction}},
                                QJsonObject{{"role","user"},{"content",QString::fromUtf8(QJsonDocument(input).toJson(QJsonDocument::Compact))}}}}};
+    // >>> DEFENSE-NOTE | 场景步骤 03｜异步网络、响应上限与超时
+    // 最多累计512KiB，超量/网络失败/超时均fallback；禁止自动重定向。
+    // 函数返回model任务ID，服务端req_id在路由另行管理。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     QNetworkRequest request(config_.endpoint);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
     request.setHeader(QNetworkRequest::ContentTypeHeader,"application/json");
@@ -116,10 +149,16 @@ quint64 Client::recommend(care_contract::BrowseScene scene, QList<llm_recommenda
     });
     return job->id;
 }
+// >>> DEFENSE-NOTE | finish = 确保任务只交付一次
+// 先从jobs_移除，移除失败说明已完成或取消；移动回调后返回结果，防止迟到事件重复交付。
+// <<< DEFENSE-NOTE | 本段讲解结束
 void Client::finish(const std::shared_ptr<Job>& job,Result result) {
     if(!jobs_.remove(job->id)) return;
     auto done=std::move(job->done); if(done) done(std::move(result));
 }
+// >>> DEFENSE-NOTE | cancel = 静默取消场景查询
+// 从哈希表取走任务并清回调，再abort回复；退出登录后不能把旧查询结果送给新用户。
+// <<< DEFENSE-NOTE | 本段讲解结束
 void Client::cancel(quint64 id) {
     const auto job=jobs_.take(id); if(!job) return;
     job->done={}; if(job->reply) {job->reply->abort();job->reply->deleteLater();}

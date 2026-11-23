@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜单机基于历史补全偏好
+// 阅读路线：核对会话 → 当前媒体快照 → 历史聚合 → Auto/Any/Explicit 解析 → 基础规则推荐
+// 联调关系：通过 AccountHistoryService 读当前用户历史，通过 MediaProvider 获取媒体；不直接执行SQL。在线时序评分有独立实现。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "personalrecommendation_service.h"
 #include "mediarecommendation.h"
 #include <QHash>
@@ -8,7 +13,13 @@
 
 namespace recommendation_contract {
 namespace {
+// >>> DEFENSE-NOTE | failure = 统一构造失败结果
+// success=false，带错误信息，清空ID与理由。读取失败与成功空结果必须区分。
+// <<< DEFENSE-NOTE | 本段讲解结束
 RecommendationResult failure(const QString& error) { return {false, error, {}, {}}; }
+// >>> DEFENSE-NOTE | valid = 验证偏好选择
+// Auto自动推断、Any不使用此偏好、Explicit明确值；Explicit不能传空值，未知枚举拒绝。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool valid(const PreferenceSelection& choice) {
     switch (choice.mode) {
     case PreferenceMode::Auto:
@@ -19,6 +30,9 @@ bool valid(const PreferenceSelection& choice) {
 }
 struct Interest { quint64 clicks = 0; qint64 lastViewedAt = 0; };
 using Interests = QHash<QString, Interest>;
+// >>> DEFENSE-NOTE | accumulate = 累加一个字段的历史兴趣
+// QHash 按类别/格式累计浏览次数，保留最近浏览时间；相加前检查无符号整数溢出。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool accumulate(Interests& interests, const QString& value, const account_contract::MediaHistoryEntry& entry) {
     if (value.isEmpty()) return true;
     auto& interest = interests[value];
@@ -28,6 +42,9 @@ bool accumulate(Interests& interests, const QString& value, const account_contra
     interest.lastViewedAt = std::max(interest.lastViewedAt, entry.lastViewedAt);
     return true;
 }
+// >>> DEFENSE-NOTE | favorite = 选出最偏好的字段值
+// 次数最多者优先，次数相同选最近浏览，再相同按字符串升序；不依赖哈希遍历顺序。
+// <<< DEFENSE-NOTE | 本段讲解结束
 QString favorite(const Interests& interests) {
     QString best;
     Interest score;
@@ -41,6 +58,9 @@ QString favorite(const Interests& interests) {
     }
     return best;
 }
+// >>> DEFENSE-NOTE | explanation = 生成偏好来源说明
+// 区分本次明确选择、不限、从历史补全、没有可用历史；不是大模型生成的文本。
+// <<< DEFENSE-NOTE | 本段讲解结束
 QString explanation(const QString& field, const PreferenceSelection& choice, const QString& resolved) {
     if (choice.mode == PreferenceMode::Any) return field + QStringLiteral("：不限");
     if (choice.mode == PreferenceMode::Explicit) return field + QStringLiteral("：按本次选择“") + resolved + QStringLiteral("”");
@@ -53,6 +73,10 @@ PersonalRecommendationServiceImpl::PersonalRecommendationServiceImpl(
     account_contract::AccountHistoryService& accounts, MediaProvider currentMedia)
     : accounts_(accounts), currentMedia_(std::move(currentMedia)) {}
 
+// >>> DEFENSE-NOTE | recommend = 单机个性化推荐总入口
+// 只允许当前登录用户请求自己的推荐，不能仅相信 request.userId。
+// 依次验证请求、取得媒体快照、建立ID查找表、按需要读取历史；异常明确返回失败。
+// <<< DEFENSE-NOTE | 本段讲解结束
 RecommendationResult PersonalRecommendationServiceImpl::recommend(const RecommendationRequest& request) {
     const auto user = accounts_.currentUser();
     if (!user || request.userId <= 0 || user->userId != request.userId)
@@ -67,6 +91,10 @@ RecommendationResult PersonalRecommendationServiceImpl::recommend(const Recommen
     catch (const std::exception&) { return failure(QStringLiteral("读取当前媒体数据失败。")); }
     const QList<MediaRecord> records = std::move(snapshot);
     if (records.isEmpty()) return {true, {}, {}, QStringLiteral("媒体库暂无可推荐记录。")};
+    // >>> DEFENSE-NOTE | 步骤 01｜建立当前媒体查找表
+    // ID→记录指针，便于将历史 mediaId 关联到当前作品。指针仅在本次 records 生命周期内使用。
+    // 空ID/重复ID说明输入不可靠，终止推荐。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     QHash<QString, const MediaRecord*> byId;
     byId.reserve(records.size());
     for (const auto& record : records) {
@@ -75,6 +103,9 @@ RecommendationResult PersonalRecommendationServiceImpl::recommend(const Recommen
         byId.insert(record.id, &record);
     }
 
+    // >>> DEFENSE-NOTE | 步骤 02｜仅 Auto 字段读取历史
+    // 两项都是Any或Explicit时不必查历史。已删除媒体的历史跳过；负次数是错误，零次数不贡献。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     Interests categories, types;
     if (request.category.mode == PreferenceMode::Auto || request.fileType.mode == PreferenceMode::Auto) {
         const auto history = accounts_.loadMediaHistory(request.userId);
@@ -94,6 +125,10 @@ RecommendationResult PersonalRecommendationServiceImpl::recommend(const Recommen
         }
     }
 
+    // >>> DEFENSE-NOTE | 步骤 03｜将三态偏好转成实际字段值
+    // Explicit采用用户值；Auto使用 favorite；Any返回空值，明确禁止历史补全。
+    // 之后调用 recommendMedia 评分，返回ID及整体理由，Qt按既定顺序展示。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     const auto resolve = [](const PreferenceSelection& choice, const Interests& interests) {
         if (choice.mode == PreferenceMode::Explicit) return choice.value.trimmed();
         return choice.mode == PreferenceMode::Auto ? favorite(interests) : QString();

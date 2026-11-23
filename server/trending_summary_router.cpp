@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜热榜AI摘要的请求生命周期
+// 阅读路线：解析模式 → 当前公共聚合 → 保存证据 → 模型摘要 → 再聚合复核 → 只替换文字
+// 联调关系：规则热榜和模型文字分层；同会话仅一个摘要任务。页面普通刷新不应触发模型。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "warehouse_server.h"
 #include "care_trending.h"
 #include "media_json.h"
@@ -12,12 +17,21 @@
 using namespace care_contract;
 using warehouse_contract::ErrorCode;
 namespace {
+// >>> DEFENSE-NOTE | databaseFailure = 统一数据库错误
+// 读取公开数据失败必须报错，不能生成看似正常的空榜。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Status databaseFailure() { return {ErrorCode::ServerError, QStringLiteral("仓库数据库操作失败。")}; }
+// >>> DEFENSE-NOTE | utcValue = 严格读取十进制UTC秒字符串
+// 大整数以字符串传输，避免JSON浮点精度问题；拒绝负数和非规范格式。
+// <<< DEFENSE-NOTE | 本段讲解结束
 bool utcValue(const QJsonValue& value, qint64& number) {
     if (!value.isString()) return false;
     bool ok=false;number=value.toString().toLongLong(&ok);
     return ok && number>=0 && QString::number(number)==value.toString();
 }
+// >>> DEFENSE-NOTE | publicContents = 可比较的公共榜单证据
+// 去掉生成时间、摘要文字和模型标志，只比较实际公开条目、元数据与精确计数。
+// <<< DEFENSE-NOTE | 本段讲解结束
 QJsonObject publicContents(QJsonObject result) {
     // Comparison includes complete public rows/metadata and exact counts, but not
     // generated time or derived wording which can change without new public evidence.
@@ -26,6 +40,9 @@ QJsonObject publicContents(QJsonObject result) {
 }
 }
 
+// >>> DEFENSE-NOTE | parseTrendingRequest = 解析榜单请求
+// 校验作品/搜索词、时间窗口与数量；summary_mode缺省rules保持旧请求兼容，model需显式选择。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Status WarehouseServer::parseTrendingRequest(const QJsonObject& payload, TrendingRequest& output) {
     const auto invalid=[] {return Status{ErrorCode::InvalidArgument, QStringLiteral("请求参数无效。")};};
     TrendingRequest input;
@@ -47,6 +64,10 @@ Status WarehouseServer::parseTrendingRequest(const QJsonObject& payload, Trendin
     output=input;return {};
 }
 
+// >>> DEFENSE-NOTE | currentTrending = 从数据库重新生成当前公共热榜
+// SQL限制当前公开来源、用户允许公共贡献、事件当时public_eligible及时间范围；再调用纯算法buildTrending。
+// 候选数、字节数与事件数都有限额，不能把数据库异常当成无数据。
+// <<< DEFENSE-NOTE | 本段讲解结束
 Result<TrendingResult> WarehouseServer::currentTrending(const TrendingRequest& input) {
     care_algorithms::PublicSnapshot snapshot;
     snapshot.nowUtc = QDateTime::currentSecsSinceEpoch();
@@ -105,6 +126,9 @@ Result<TrendingResult> WarehouseServer::currentTrending(const TrendingRequest& i
     return care_algorithms::buildTrending(input,snapshot);
 }
 
+// >>> DEFENSE-NOTE | trendingJson = 榜单转网络JSON
+// 64位人数和次数用十进制字符串，保留条目顺序、模拟标记和summary_from_model供客户端验证和展示。
+// <<< DEFENSE-NOTE | 本段讲解结束
 QJsonObject WarehouseServer::trendingJson(const TrendingResult& result) {
     QJsonArray items;
     for(const auto& item:result.items) {
@@ -126,6 +150,9 @@ QJsonObject WarehouseServer::trendingJson(const TrendingResult& result) {
         {"contains_synthetic_data",result.containsSyntheticData}};
 }
 
+// >>> DEFENSE-NOTE | startTrendingSummary = 用户显式请求AI摘要
+// 先核对当前连接登录身份、请求模式和同会话并发限制，生成规则结果与公共证据快照。
+// <<< DEFENSE-NOTE | 本段讲解结束
 void WarehouseServer::startTrendingSummary(QTcpSocket* socket,const std::shared_ptr<Session>& session,
                                           const QJsonObject& request) {
     const auto id=request.value("req_id").toString();
@@ -145,6 +172,9 @@ void WarehouseServer::startTrendingSummary(QTcpSocket* socket,const std::shared_
     }
     const auto original=currentTrending(input);
     if(!original.status.ok() || !original.value) {fail("ServerError",original.status.message);return;}
+    // >>> DEFENSE-NOTE | 生命周期 01｜记录发出时证据和会话
+    // 保存榜单公共内容、token和用户ID；模型调用耗时期间可能退出、撤权或出现新行为。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     const auto evidence=publicContents(trendingJson(*original.value));
     session->summaries.insert(id,{0,session->token,session->userId});
     QPointer<QTcpSocket> guarded(socket);
@@ -155,6 +185,10 @@ void WarehouseServer::startTrendingSummary(QTcpSocket* socket,const std::shared_
             const auto pending=it.value();session->summaries.erase(it);
             if(!guarded || guarded->state()!=QAbstractSocket::ConnectedState ||
                session->token!=pending.token || session->userId!=pending.userId) return;
+            // >>> DEFENSE-NOTE | 生命周期 02｜模型回来后重新聚合
+            // 先比对连接/用户/token，再从数据库得到当前规则结果。
+            // 只有当前公共证据与发出时完全一致，才允许采用模型摘要；变化时返回当前规则结果，不自动再付费调用。
+            // <<< DEFENSE-NOTE | 本段讲解结束
             auto current=currentTrending(input);
             if(!current.status.ok() || !current.value) {
                 sendResponse(guarded,{{"type","error_resp"},{"req_id",id},{"code","ServerError"},

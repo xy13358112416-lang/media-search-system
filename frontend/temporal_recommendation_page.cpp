@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜动态推荐页与反馈
+// 阅读路线：读取三态偏好 → 请求推荐 → 保持返回顺序 → 不感兴趣/恢复反馈
+// 联调关系：页面使用CareService，不直接读SQLite；评分由服务端调用算法执行。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "temporal_recommendation_page.h"
 
 #include <QSignalBlocker>
@@ -145,6 +150,9 @@ private:
         }));
     }
 
+    // >>> DEFENSE-NOTE | request = 提交一次动态推荐
+    // 从下拉框构造Auto/Any/Explicit与当前场景，禁止重复提交并保存取消句柄；latest代次保护旧响应。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void request()
     {
         if (blocked_->isChecked()) {
@@ -188,6 +196,9 @@ private:
             handle_ = handle;
     }
 
+    // >>> DEFENSE-NOTE | cancelRequest = 取消在途推荐
+    // 页面失活或点击取消时清句柄并让旧回调失效，不自动发起新付费请求。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void cancelRequest()
     {
         invalidate(0);
@@ -217,6 +228,9 @@ private:
         reason_->setText(selected ? entries_.at(row).reason : QString());
     }
 
+    // >>> DEFENSE-NOTE | updateFeedback = 标记或恢复不感兴趣
+    // 将精确资源引用交给业务接口，服务端按本人身份持久化，后续算法排除该workId。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void updateFeedback()
     {
         const auto row = list_->currentRow();

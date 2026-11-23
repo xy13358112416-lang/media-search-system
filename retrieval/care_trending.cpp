@@ -1,3 +1,8 @@
+// >>> DEFENSE-NOTE | 文件导读｜公开热榜聚合
+// 阅读路线：合法公共快照 → 时间/类型过滤 → 用户每日封顶 → 三人门槛 → 稳定排序 → 规则摘要
+// 联调关系：服务端先核实公开资源与用户参与设置；本文件只统计，DeepSeek摘要是后续可选文字层。
+// 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #include "care_trending.h"
 #include "care_algorithm_common.h"
 #include <QMap>
@@ -7,11 +12,18 @@
 
 namespace care_algorithms {
 namespace {
+// >>> DEFENSE-NOTE | Contributions = 某个热榜对象的贡献记录
+// QMap<用户ID,QSet<北京时间日编号>>；不同用户数取Map大小，有效事件数按用户/对象/日封顶。
+// <<< DEFENSE-NOTE | 本段讲解结束
 struct Contributions {
     QMap<QString, QSet<qint64>> daysByUser;
     qint64 effectiveEvents = 0;
     bool synthetic = false;
 
+    // >>> DEFENSE-NOTE | add = 累加一次合格行为
+    // 同用户当天第一次贡献才增加 effectiveEvents；重复点击不能刷有效次数。
+    // 模拟数据来源采用OR保留，不能因为同天又出现真实点击就抹去模拟标记。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     void add(const ObservedBehavior& event)
     {
         const auto day = QDateTime::fromSecsSinceEpoch(event.record.occurredAtUtc,
@@ -33,6 +45,9 @@ struct RankedItem {
 };
 }
 
+// >>> DEFENSE-NOTE | buildTrending = 建立作品榜或搜索词榜
+// 先校验请求、时区和可信输入；统计时不访问用户数据库，不负责自己推断公共资格。
+// <<< DEFENSE-NOTE | 本段讲解结束
 care_contract::Result<care_contract::TrendingResult> buildTrending(
     const care_contract::TrendingRequest& request, const PublicSnapshot& snapshot)
 {
@@ -49,6 +64,10 @@ care_contract::Result<care_contract::TrendingResult> buildTrending(
     for (const auto& work : *works.value)
         currentWorks.insert(work.resource.workId, work);
 
+    // >>> DEFENSE-NOTE | 步骤 01｜按榜单对象分桶
+    // 作品榜只收浏览，key=workId且作品当前公开可用；搜索词榜只收搜索，key为规范化词。
+    // 窗口使用 [begin,end)，未来行为排除。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     QMap<QString, Contributions> contributions;
     for (const auto& event : *events.value) {
         const auto at = event.record.occurredAtUtc;
@@ -67,6 +86,10 @@ care_contract::Result<care_contract::TrendingResult> buildTrending(
         contributions[key].add(event);
     }
 
+    // >>> DEFENSE-NOTE | 步骤 02｜至少三名不同用户才公开
+    // 不是三次点击。单用户点一百次也不满足三人门槛。
+    // 输出分别保留 distinctUsers 与 effectiveEvents 两个指标，不能混说原始点击总数。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     QList<RankedItem> ranked;
     for (auto it = contributions.cbegin(); it != contributions.cend(); ++it) {
         if (it->daysByUser.size() < 3) continue;
@@ -81,6 +104,9 @@ care_contract::Result<care_contract::TrendingResult> buildTrending(
             value.item.term = it.key();
         ranked.append(value);
     }
+    // >>> DEFENSE-NOTE | 步骤 03｜按用户数、有效次数、稳定键排序
+    // 先人数降序，再有效次数降序，最后稳定字符串键；复杂度包含排序，通常 O(k log k)。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     std::sort(ranked.begin(), ranked.end(), [](const RankedItem& a, const RankedItem& b) {
         if (a.item.distinctUsers != b.item.distinctUsers)
             return a.item.distinctUsers > b.item.distinctUsers;
@@ -89,6 +115,9 @@ care_contract::Result<care_contract::TrendingResult> buildTrending(
         return a.stableKey < b.stableKey;
     });
 
+    // >>> DEFENSE-NOTE | 步骤 04｜取前 limit 并产生规则摘要
+    // 这里的摘要由精确聚合结果拼接；总有效数对应返回榜单条目，不是所有未展示对象的总量。
+    // <<< DEFENSE-NOTE | 本段讲解结束
     care_contract::TrendingResult output;
     output.kind = request.kind;
     output.range = request.range;

@@ -1,3 +1,7 @@
+// >>> MAIN-DEFENSE | 主逻辑头文件导读
+// 共享接口/数据契约：上层通过这里的类型和方法与主逻辑对接。声明不等于执行，实际实现见对应cpp。
+// 阅读顺序：输入数据结构 → 返回状态/可选数据 → 方法声明 → 私有成员。引用/指针保存依赖，必须确认由谁拥有及何时释放。
+// <<< MAIN-DEFENSE
 #pragma once
 
 #include "care_person_snapshot.h"
@@ -7,8 +11,14 @@
 // N03 implements this using the server's existing connection, migration and transactions.
 // Calls stay on that connection's owning thread; the caller supplies an authenticated user.
 namespace person_store {
+// >>> MAIN-DEFENSE | 接口结构｜Store
+// 这是服务对象：public为调用入口，private保存内部状态；Qt或其他模块通过接口调用，业务权限在实现中校验。
+// <<< MAIN-DEFENSE
 class Store {
 public:
+    // >>> MAIN-DEFENSE | 方法声明｜Store
+    // 本行约定调用参数和返回类型；具体分块处理在对应cpp，调用者须遵守已有注释中的权限与生命周期约定。
+    // <<< MAIN-DEFENSE
     virtual ~Store() = default;
 
     // Only exact server-registered work/source triples may be decorated. The caller has

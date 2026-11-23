@@ -1,3 +1,7 @@
+// >>> DEFENSE-NOTE | 头文件导读｜仓库与模型ID适配接口
+// fromWarehouses将可读资源转模型候选，toWarehouses在完成时按当前可读资源映射，权限检查由服务器负责。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #pragma once
 
 #include "llm_recommendation.h"

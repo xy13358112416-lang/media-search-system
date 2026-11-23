@@ -1,3 +1,7 @@
+// >>> DEFENSE-NOTE | 头文件导读｜温暖场景与主题映射
+// Scene枚举表达主动选择；browseScene转成业务枚举，theme提供标题/色彩/情绪提示，场景不是系统推断的真实情绪。
+// 读法：struct说明传哪些数据；class/函数声明说明谁可调用；实际算法去同名.cpp或引用的实现文件。
+// <<< DEFENSE-NOTE | 本段讲解结束
 #pragma once
 
 #include "media_mood.h"
