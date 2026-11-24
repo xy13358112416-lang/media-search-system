@@ -136,7 +136,7 @@ while ($pending.Count -gt 0) {
 }
 
 $docs = New-Item -ItemType Directory -Path (Join-Path $out 'docs')
-foreach ($file in @('双端测试操作手册.md', '管理员模块开发.md', '管理员模块验收.md', '管理员初始化与升级测试.md')) {
+foreach ($file in @('双端测试操作手册.md', '管理员模块开发.md', '管理员模块验收.md', '管理员初始化与升级测试.md', '在线媒体分类与日期排序.md')) {
     Copy-Item -LiteralPath (Join-Path $source "../docs/$file") -Destination $docs
 }
 foreach ($file in @('README.md', 'PERSON_SCHEMA.md', 'PERSON_IMPORT.md',
