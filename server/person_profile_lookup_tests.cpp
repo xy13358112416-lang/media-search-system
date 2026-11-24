@@ -23,6 +23,59 @@ private:
             {"works",QJsonArray{QJsonObject{{"title",QStringLiteral("作品A")},{"year","2001"},{"role",QStringLiteral("演唱")},{"source_url",workSource}}}}};
     }
 private slots:
+    void mobileBaiduNavigationParametersAreNotPageIdentity() {
+        // Reduced from the user's 2026-11-24 response; no API key or factual biography retained.
+        const QString clean = QString::fromUtf8("https://wapbaike.baidu.com/item/周杰伦/129156");
+        auto document = QJsonDocument::fromJson(reply({person("https://not-in-search.example/work")})).object();
+        auto choices = document["choices"].toArray();
+        auto choice = choices[0].toObject();
+        auto message = choice["message"].toObject();
+        auto profile = person("https://not-in-search.example/work");
+        profile["source_url"] = clean;
+        message["content"] = QString::fromUtf8(QJsonDocument(QJsonObject{{"people",QJsonArray{profile}}}).toJson());
+        message["server_tool_calls"] = QJsonArray{QJsonObject{{"calls",QJsonArray{QJsonObject{
+            {"type","deepseek_web_search"},{"kind","search"},{"status","completed"},
+            {"sources",QJsonArray{QJsonObject{{"url",clean + "?fromModule=lemma_starMap&lemmaFrom=lemma_relation_starMap&structureId=tracking&structureClickId=129156&structureItemId=tracking&lemmaIdFrom=3717628#1"}}}}}}}}};
+        choice["message"] = message; choices[0] = choice; document["choices"] = choices;
+        const auto result = person_profile_lookup::parseReply(QJsonDocument(document).toJson());
+        QVERIFY2(result.status.ok(), qPrintable(result.status.message));
+        QCOMPARE(result.value->size(), 1);
+        QCOMPARE(result.value->first().url, QUrl(clean));
+        QVERIFY(result.value->first().works.isEmpty()); // An invented work URL is still rejected.
+    }
+
+    void navigationNormalizationIsRestrictedToBaiduNumericItemPages() {
+        for (const auto& source : {QString("https://example.org/person?fromModule=other"),
+                 QString("https://wapbaike.baidu.com/item/jay?structureId=other"),
+                 QString("https://wapbaike.baidu.com/item/jay/999?fromModule=other"),
+                 QString("https://wapbaike.baidu.com/item/jay/129156?id=2&fromModule=other"),
+                 QString("https://wapbaike.baidu.com/item/jay/129156?oldid=2&fromModule=other")}) {
+            auto document = QJsonDocument::fromJson(reply({person()})).object();
+            auto choices = document["choices"].toArray(); auto choice = choices[0].toObject();
+            auto message = choice["message"].toObject();
+            auto profile = person();
+            profile["source_url"] = source.startsWith("https://example.org")
+                ? QString("https://example.org/person") : QString("https://wapbaike.baidu.com/item/jay/129156");
+            message["content"] = QString::fromUtf8(QJsonDocument(QJsonObject{{"people",QJsonArray{profile}}}).toJson());
+            message["server_tool_calls"] = QJsonArray{QJsonObject{{"calls",QJsonArray{QJsonObject{
+                {"type","deepseek_web_search"},{"kind","search"},{"status","completed"},
+                {"sources",QJsonArray{QJsonObject{{"url",source}}}}}}}}};
+            choice["message"] = message; choices[0] = choice; document["choices"] = choices;
+            QVERIFY(!person_profile_lookup::parseReply(QJsonDocument(document).toJson()).status.ok());
+        }
+    }
+
+    void malformedFieldsDoNotPretendToBeMissingSources() {
+        auto profile = person();
+        profile["name"] = "";
+        auto result = person_profile_lookup::parseReply(reply({profile}));
+        QVERIFY(!result.status.ok());
+        QVERIFY(result.status.message.contains(QStringLiteral("姓名或简介")));
+        profile = person(); profile["biography"] = QString(1201, 'a');
+        result = person_profile_lookup::parseReply(reply({profile}));
+        QVERIFY(!result.status.ok());
+        QVERIFY(result.status.message.contains(QStringLiteral("姓名或简介")));
+    }
     void trackingParametersReferToSamePage() {
         auto body = reply({person()});
         // Public real-response failure reduced to a deterministic fixture.
@@ -53,7 +106,7 @@ private slots:
         QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));
         auto result=person_profile_lookup::parseReply(file.readAll());
         QVERIFY2(result.status.ok(),qPrintable(result.status.message));QVERIFY(result.value && !result.value->isEmpty());
-        QVERIFY(!result.value->first().works.isEmpty());
+        // A sourced profile may legitimately have no works: unverified work URLs stay filtered.
         qInfo()<<"Replay accepted"<<result.value->first().title<<"works="<<result.value->first().works.size();
     }
     void fakeHttpReturnsStructuredProfile() {

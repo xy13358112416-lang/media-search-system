@@ -17,6 +17,8 @@ ctest -R "^warehouse_server_tests$" --output-on-failure
 
 ## 服务端智能推荐
 
+人物联网来源核对：百度百科带数字词条ID的页面会忽略已知的导航参数（如fromModule、lemmaFrom、structureId），片段和追踪参数不作为页面身份。人物路径、数字ID及id、title、oldid等实际内容参数仍严格匹配；其他站点不适用百度导航规则。模型引用了本次搜索未返回的作品网址时，该作品不会展示，人物资料可保留且作品列表允许为空。来源匹配仅表示网址出现在搜索证据中，模型整理的事实仍应核对原文。
+
 服务器在进程启动时读取 `MEDIA_SERVER_DEEPSEEK_API_KEY`；也可通过 `MEDIA_SERVER_DEEPSEEK_CONFIG_PATH` 指向服务端配置文件，客户端无需配置 Key。未配置 Key 或模型服务失败时，推荐模块返回带 `fallback` 标记和说明的规则结果；模型正常返回空结果时保留空列表。
 
 `recommend_resources` 接受 `query`、`limit`（1–50）和可选的 `warehouse_id`。服务器验证当前连接的会话及目标仓库的可读权限，仅从本人仓库和公开仓库中构造候选，返回前再次确认会话与资源可读性。推荐异步完成，普通请求无需等待模型。`cancel_recommendation` 的 `target_req_id` 必须指向同一连接的推荐；取消先到时原请求收到 `Cancelled`，取消请求收到独立确认。退出或断开连接会取消该会话的待处理任务，迟到结果被丢弃。
