@@ -17,6 +17,8 @@ ctest -R "^warehouse_server_tests$" --output-on-failure
 
 ## 服务端智能推荐
 
+人物联网来源核对：百度百科带数字词条ID的页面会忽略已知的导航参数（如fromModule、lemmaFrom、structureId），片段和追踪参数不作为页面身份。人物路径、数字ID及id、title、oldid等实际内容参数仍严格匹配；其他站点不适用百度导航规则。模型引用了本次搜索未返回的作品网址时，该作品不会展示，人物资料可保留且作品列表允许为空。来源匹配仅表示网址出现在搜索证据中，模型整理的事实仍应核对原文。
+
 服务器在进程启动时读取 `MEDIA_SERVER_DEEPSEEK_API_KEY`；也可通过 `MEDIA_SERVER_DEEPSEEK_CONFIG_PATH` 指向服务端配置文件，客户端无需配置 Key。未配置 Key 或模型服务失败时，推荐模块返回带 `fallback` 标记和说明的规则结果；模型正常返回空结果时保留空列表。
 
 `recommend_resources` 接受 `query`、`limit`（1–50）和可选的 `warehouse_id`。服务器验证当前连接的会话及目标仓库的可读权限，仅从本人仓库和公开仓库中构造候选，返回前再次确认会话与资源可读性。推荐异步完成，普通请求无需等待模型。`cancel_recommendation` 的 `target_req_id` 必须指向同一连接的推荐；取消先到时原请求收到 `Cancelled`，取消请求收到独立确认。退出或断开连接会取消该会话的待处理任务，迟到结果被丢弃。
@@ -31,3 +33,9 @@ ctest -R "^warehouse_server_tests$" --output-on-failure
 事件 ID 按用户去重，搜索或浏览时间由服务器记录；浏览快照在资源删除后仍供该用户的历史统计使用。公开贡献默认为关闭，关闭后撤销之前事件的贡献资格；暂停历史记录不会删除旧记录。`clear_history` 清除当前事件数据；当前版本尚未创建足迹或热榜派生缓存，后续接入缓存时需同步扩展清理事务。
 
 `WarehouseServer::queryBehavior` 是仅供可信服务端调用的内部接口，调用方必须从已认证会话取得用户 ID，返回半开 UTC 秒区间内的记录和媒体快照。查询最多 10000 条且快照合计最多 16 MiB，超限或数据库失败返回空的 `optional`，调用方应报告错误，不能视作空历史。`publicEligible` 仅表示事件产生时的贡献资格，公开统计时仍需重新检查来源当前是否公开。
+
+## 服务端本机创建首个管理员
+
+服务端包双击 01-Setup-Admin.cmd，打开 Qt 初始化窗口，核对实际数据库后填写用户名、密码和确认密码。已有管理员时入口锁定，沿用原账号。此工具不监听网络，普通客户端不提供管理员注册。
+
+终端交互双击 01-Setup-Admin-Terminal.cmd，或运行 media_server.exe --config media-server.ini --setup-admin。用户名与两次密码逐项输入，终端密码隐藏。旧 --add-admin 用户名 保留用于服务器维护，重定向单行密码与原脚本兼容。

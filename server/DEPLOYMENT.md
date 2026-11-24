@@ -37,7 +37,9 @@ Copy-Item D:\media-server\formal\server.sqlite D:\media-server\backups\server-in
 
 初始化会打开现有 SQLite 连接并执行版本迁移。初次创建后应立即备份空库；之后每次升级、导入人物或修改 feed 前再次备份。
 
-创建两个演示账号，密码由标准输入读取，不写在命令行或发布包中：
+首次管理员推荐在停服后双击 `01-Setup-Admin.cmd`，使用本机 Qt 窗口输入账号、密码和确认密码，确认数据库路径与本配置一致。已有管理员时初始化入口关闭，沿用原账号。也可运行 `media_server.exe --config media-server.ini --setup-admin`，按终端提示逐项输入，密码隐藏。更多步骤见 `docs/管理员初始化与升级测试.md`。
+
+创建两个普通演示账号，密码由标准输入读取，不写在命令行或发布包中；交互终端需确认两次密码，旧脚本重定向一行密码保持兼容：
 
 ```powershell
 .\media_server.exe --db D:\media-server\formal\server.sqlite --add-user alice

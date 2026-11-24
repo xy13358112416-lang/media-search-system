@@ -56,9 +56,9 @@ $help = @'
 多媒体文件管理及检索系统 · Windows 演示
 
 1. 把整个压缩包解压到可写目录，双击 media_library_qt.exe。
-2. 程序会自动连接 media-client.ini 配置的服务器，输入服务器用户名和密码后进入；所有页面共用本次登录。
+2. 先选择用户登录或管理员登录，再连接 media-client.ini 配置的服务器，输入服务器用户名和密码；所有页面共用本次登录。
 3. 在线媒体库读取本人和公开仓库，浏览和检索记录保存在服务器。无账号请联系服务器管理员。
-4. 检索样例作品时请选择文件类型「不限」，因为样例的实际文件格式未知。
+4. 检索可选择全部文件类型、未记录文件类型或已知格式，发行时间支持年份、年月与完整日期。
 5. 动态推荐页可选类别与类型。单机模式的检索页「性能对照」展示 10 万条合成数据的已记录实验。
 6. 服务器换地址时，在登录页点击「更改服务器」；成功登录后记住地址和用户名，不记住密码。
 7. 需要原来的单机功能时，用 media_library_qt.exe --local 启动，单机账户、CSV 和历史与服务器分开。
@@ -66,3 +66,9 @@ $help = @'
 默认服务器地址 192.168.43.8:8765。服务器必须先启动；客户端启动不负责启动远端电脑的服务器。
 '@
 Set-Content -LiteralPath (Join-Path $out '使用说明.txt') -Value $help -Encoding UTF8
+
+$docs = New-Item -ItemType Directory -Path (Join-Path $out 'docs')
+foreach ($file in @('双端测试操作手册.md', '管理员模块开发.md', '管理员模块验收.md', '管理员初始化与升级测试.md', '在线媒体分类与日期排序.md')) {
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/$file") -Destination $docs
+}
+Set-Content -LiteralPath (Join-Path $out 'Start-Client.cmd') -Encoding Ascii -Value '@echo off', 'start "" "%~dp0media_library_qt.exe"'

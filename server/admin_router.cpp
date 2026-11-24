@@ -1,4 +1,5 @@
 #include "warehouse_server.h"
+#include "password_policy.h"
 #include <QDateTime>
 #include <QJsonArray>
 #include <QSqlQuery>
@@ -79,9 +80,10 @@ QJsonObject WarehouseServer::dispatchAdmin(Session& session, const QJsonObject& 
 
     QString hash;
     if (type == "admin_reset_password") {
-        const auto password = payload.value("password").toString().toUtf8();
-        if (password.size() < 6 || password.size() > 1024)
-            return fail("InvalidArgument", QStringLiteral("密码长度为 6–1024 字节。"));
+        const auto text = payload.value("password").toString();
+        const auto error = online_password::validationError(text);
+        if (!error.isEmpty()) return fail("InvalidArgument", error);
+        const auto password = text.toUtf8();
         char encoded[crypto_pwhash_STRBYTES];
         if (crypto_pwhash_str(encoded, password.constData(), password.size(),
                 crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0)

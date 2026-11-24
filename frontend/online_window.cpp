@@ -1,5 +1,5 @@
 // >>> DEFENSE-NOTE | 文件导读｜在线界面与检索/今日推荐对接
-// 阅读路线：读可用仓库 → 建检索索引 → 提交条件 → 今日候选与洗牌
+// 阅读路线：读可用仓库 → 分类和日期排序 → 建检索索引 → 提交条件 → 按推荐返回顺序展示
 // 联调关系：Qt负责控件与生命周期；检索/推荐服务返回数据，资源权限仍由服务器核验。
 // 标有“答辩导读”的内容仅为讲解注释；原有条件、接口和算法不变。
 // <<< DEFENSE-NOTE | 本段讲解结束
@@ -8,7 +8,6 @@
 #include "online_care_client.h"
 #include "warehouse_page.h"
 #include "assistant_dialog.h"
-#include "daily_pick.h"
 #include "follow_center.h"
 #include "footprint_page.h"
 #include "library_style.h"
@@ -31,11 +30,15 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QSet>
+#include <QSignalBlocker>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTimer>
 #include <QUuid>
 #include <QVBoxLayout>
+#include <algorithm>
+#include <optional>
+#include <tuple>
 
 namespace {
 using warehouse_contract::WarehouseService;
@@ -49,6 +52,30 @@ using warehouse_contract::WarehouseRecommendationRequest;
 using warehouse_contract::WarehouseRecommendationResult;
 using namespace care_contract;
 struct CatalogEntry { MediaRecord media; WarehouseItemRef source; };
+
+// Display order only: never modify saved dates, retrieval IDs or recommendation ranking.
+QString catalogFileType(const MediaRecord& media)
+{
+    return media.fileType.trimmed().toUpper();
+}
+
+std::tuple<bool, int, int, int> catalogReleaseOrder(const MediaRecord& media)
+{
+    if (media.releaseDate.isValid())
+        return {true, media.releaseDate.year(), media.releaseDate.month(), media.releaseDate.day()};
+    if (validReleasePeriod(media.releasePeriod))
+        return {true, media.releasePeriod.left(4).toInt(),
+                media.releasePeriod.size() == 7 ? media.releasePeriod.mid(5, 2).toInt() : 0, 0};
+    // Zero represents an unknown component, not a manufactured January/first-day date.
+    return {false, 0, 0, 0};
+}
+
+struct CatalogSearch {
+    SearchQuery query;
+    QString title, period, category;
+    media_mood::Mood mood = media_mood::Mood::Any;
+    bool unknownType = false;
+};
 
 QTableWidget* createMediaTable(const QString& name)
 {
@@ -75,7 +102,7 @@ QString mediaValue(const QString& value)
 
 void setMediaRow(QTableWidget* table, int row, const QString& key, const MediaRecord& media)
 {
-    const QStringList cells{media.fileName, media.category, media.fileType, media.director,
+    const QStringList cells{media.fileName, media.category, catalogFileType(media), media.director,
                             mediaReleaseText(media)};
     for (qsizetype column = 0; column < cells.size(); ++column) {
         auto* item = new QTableWidgetItem(mediaValue(cells.at(column)));
@@ -146,8 +173,18 @@ public:
         layout->addWidget(tabs_,1);
         auto* media = new QWidget;
         auto* mediaLayout = new QVBoxLayout(media);
+        auto* mediaControls = new QHBoxLayout;
         auto* refresh = new QPushButton(QStringLiteral("刷新在线媒体"));
-        mediaLayout->addWidget(refresh, 0, Qt::AlignLeft);
+        refresh->setObjectName("onlineMediaRefresh");
+        mediaControls->addWidget(refresh);
+        mediaControls->addWidget(new QLabel(QStringLiteral("文件类型")));
+        mediaType_ = new QComboBox;
+        mediaType_->setObjectName("onlineMediaType");
+        mediaType_->setAccessibleName(QStringLiteral("媒体库文件类型"));
+        mediaType_->addItems({QStringLiteral("全部文件类型"), QStringLiteral("未记录文件类型")});
+        mediaControls->addWidget(mediaType_);
+        mediaControls->addStretch();
+        mediaLayout->addLayout(mediaControls);
         mediaList_ = createMediaTable(QStringLiteral("onlineMediaList"));
         mediaLayout->addWidget(mediaList_,1);
         tabs_->addTab(media,QStringLiteral("媒体库"));
@@ -225,6 +262,7 @@ public:
             int row=todayList_->row(item); if (row>=0 && row<daily_.size()) openWork(daily_[row].work.resource.source);
         });
         connect(refresh,&QPushButton::clicked,this,[this] { reloadCatalog(); });
+        connect(mediaType_, &QComboBox::currentIndexChanged, this, [this] { showCatalog(); });
         connect(submit,&QPushButton::clicked,this,[this] { submitSearch(); });
         connect(retryToday,&QPushButton::clicked,this,[this] { loadToday(); });
         connect(exit,&QPushButton::clicked,this,[this] { finish(); });
@@ -260,6 +298,7 @@ public:
         for (auto* page:carePages_) page->resetSession();
         warehouse_->connectionLost();
         catalog_.clear(); order_.clear(); index_.rebuild({});
+        lastSearch_.reset();
         mediaList_->setRowCount(0); searchList_->setRowCount(0); todayList_->clear(); daily_.clear();
         hide();
         const auto callback=logout_;
@@ -300,6 +339,7 @@ private:
         if (finished_) return;
         const auto generation=++generation_;
         catalogReady_=false;
+        mediaType_->setEnabled(false);
         catalog_.clear(); order_.clear(); index_.rebuild({}); mediaList_->setRowCount(0); searchList_->setRowCount(0);
         searchStatus_->clear();
         status_->setText(QStringLiteral("正在加载服务器公开仓库及我的仓库…"));
@@ -322,6 +362,21 @@ private:
     void loadNext(quint64 generation) {
         if (finished_ || generation!=generation_) return;
         if (pendingPosition_>=pending_.size()) {
+            // Known types group alphabetically; known release components sort newest first.
+            // Deterministic title/source ties prevent warehouse response order from moving rows.
+            std::sort(order_.begin(), order_.end(), [this](const QString& left, const QString& right) {
+                const auto& a = catalog_[left].media;
+                const auto& b = catalog_[right].media;
+                const auto aType = catalogFileType(a), bType = catalogFileType(b);
+                if (aType.isEmpty() != bType.isEmpty()) return !aType.isEmpty();
+                if (aType != bType) return aType < bType;
+                const auto aDate = catalogReleaseOrder(a), bDate = catalogReleaseOrder(b);
+                if (aDate != bDate) return aDate > bDate;
+                const auto nameOrder = QString::compare(a.fileName, b.fileName, Qt::CaseInsensitive);
+                if (nameOrder != 0) return nameOrder < 0;
+                if (a.fileName != b.fileName) return a.fileName < b.fileName;
+                return left < right;
+            });
             QList<MediaRecord> records;
             for (const auto& key:order_) { auto record=catalog_[key].media; record.id=key; records.append(record); }
             index_.rebuild(records);
@@ -333,16 +388,17 @@ private:
                     types.append(type);
             }
             types.sort();
-            const auto selectedType = type_->currentText();
-            type_->clear();
-            type_->addItems({QStringLiteral("全部文件类型"), QStringLiteral("未记录文件类型")});
-            type_->addItems(types);
-            type_->setCurrentIndex(qMax(0, type_->findText(selectedType)));
-            mediaList_->setRowCount(order_.size());
-            for (qsizetype row = 0; row < order_.size(); ++row) {
-                const auto& key = order_.at(row);
-                setMediaRow(mediaList_, row, key, catalog_[key].media);
+            for (auto* box : {type_, mediaType_}) {
+                const QSignalBlocker blocker(box);
+                const auto selectedType = box->currentText();
+                box->clear();
+                box->addItems({QStringLiteral("全部文件类型"), QStringLiteral("未记录文件类型")});
+                box->addItems(types);
+                box->setCurrentIndex(qMax(0, box->findText(selectedType)));
             }
+            mediaType_->setEnabled(true);
+            showCatalog();
+            if (lastSearch_) showSearch(*lastSearch_); // Refresh display without recording a new search.
             status_->setText(QStringLiteral("在线可读作品 %1 条；未能读取的仓库 %2 个。权限由服务器核验。").arg(catalog_.size()).arg(failedDetails_));
             return;
         }
@@ -358,6 +414,39 @@ private:
             // Queue the next request to avoid recursive stack growth with synchronous services.
             QTimer::singleShot(0,this,[this,generation] { loadNext(generation); });
         }));
+    }
+    void showCatalog()
+    {
+        if (!catalogReady_) return;
+        QStringList visible;
+        for (const auto& key : order_) {
+            const auto type = catalogFileType(catalog_[key].media);
+            if (mediaType_->currentIndex() == 0 || (mediaType_->currentIndex() == 1 && type.isEmpty()) ||
+                (mediaType_->currentIndex() >= 2 && type == mediaType_->currentText())) visible.append(key);
+        }
+        mediaList_->setRowCount(visible.size());
+        for (qsizetype row = 0; row < visible.size(); ++row)
+            setMediaRow(mediaList_, row, visible.at(row), catalog_[visible.at(row)].media);
+    }
+    void showSearch(const CatalogSearch& filters)
+    {
+        const auto hits = index_.search(filters.query);
+        const QSet<QString> matches(hits.cbegin(), hits.cend());
+        QStringList visible;
+        // Render matching IDs in catalog order, not the index's ID/intersection order.
+        for (const auto& key : order_) {
+            const auto& media = catalog_[key].media;
+            if (matches.contains(key) && media.fileName.contains(filters.title, Qt::CaseInsensitive)
+                && (!filters.unknownType || catalogFileType(media).isEmpty())
+                && (filters.period.isEmpty() || (std::get<0>(catalogReleaseOrder(media)) &&
+                    mediaReleaseText(media).startsWith(filters.period)))
+                && (filters.category.isEmpty() || media.category == filters.category)
+                && media_mood::matches(media, filters.mood)) visible.append(key);
+        }
+        searchList_->setRowCount(visible.size());
+        for (qsizetype row = 0; row < visible.size(); ++row)
+            setMediaRow(searchList_, row, visible.at(row), catalog_[visible.at(row)].media);
+        searchStatus_->setText(QStringLiteral("共 %1 条结果").arg(visible.size()));
     }
     // >>> DEFENSE-NOTE | submitSearch = 把输入交给索引并展示
     // 导演/演员/格式先交MediaSearch，标题/助手类别与情绪在候选结果上继续过滤。
@@ -377,6 +466,7 @@ private:
         const auto period = release_->text().trimmed();
         MediaRecord checkedDate;
         if (!parseMediaRelease(period, checkedDate)) {
+            lastSearch_.reset();
             searchList_->setRowCount(0);
             searchStatus_->setText(QStringLiteral("请输入有效的发行年份、年月或日期，如 1981、1981-05 或 1981-05-22。"));
             return;
@@ -390,28 +480,21 @@ private:
         if (!period.isEmpty()) terms << QStringLiteral("发行时间:%1").arg(period);
         if (!assistantCategory_.isEmpty()) terms<<QStringLiteral("类别:%1").arg(assistantCategory_);
         if (assistantMood_!=media_mood::Mood::Any) terms<<media_mood::label(assistantMood_);
-        if (terms.isEmpty()) { searchStatus_->setText(QStringLiteral("请填写至少一个搜索条件。")); return; }
+        if (terms.isEmpty()) {
+            lastSearch_.reset(); searchList_->setRowCount(0);
+            searchStatus_->setText(QStringLiteral("请填写至少一个搜索条件。")); return;
+        }
         BehaviorEvent event; event.eventId=QUuid::createUuid().toString(QUuid::WithoutBraces);
         event.action=BehaviorAction::Search; event.query=terms.join(QStringLiteral(" ")).left(MaxQueryUnits);
-        searchList_->setRowCount(0);
-        const auto hits=index_.search(query);
-        for (const auto& key:hits) if (catalog_.contains(key) && catalog_[key].media.fileName.contains(title,Qt::CaseInsensitive)
-            && (!unknownType || catalog_[key].media.fileType.trimmed().isEmpty())
-            && (period.isEmpty() || mediaReleaseText(catalog_[key].media).startsWith(period))
-            && (assistantCategory_.isEmpty() || catalog_[key].media.category==assistantCategory_)
-            && media_mood::matches(catalog_[key].media,assistantMood_)) {
-            const int row = searchList_->rowCount();
-            searchList_->insertRow(row);
-            setMediaRow(searchList_, row, key, catalog_[key].media);
-        }
-        searchStatus_->setText(QStringLiteral("共 %1 条结果").arg(searchList_->rowCount()));
+        lastSearch_ = CatalogSearch{query, title, period, assistantCategory_, assistantMood_, unknownType};
+        showSearch(*lastSearch_);
         care_.recordBehavior(event,guard(generation_,[this](Status status) {
             if (!status.ok()) searchStatus_->setText(QStringLiteral("搜索记录未保存：%1").arg(status.message));
         }));
     }
     // >>> DEFENSE-NOTE | loadToday = 在线今日推荐的总入口
-    // 先请求最多30个时序/场景候选，结果按workId去重，再按北京时间日期种子dailyPick最多6个。
-    // 不是直接从全库随机抽六条；新版非默认场景可能走服务端实时模型，需以返回状态判断是否回退。
+    // 结果按workId保留首次出现项，展示算法返回的前6条；不按媒体分类或日期重排，也不在客户端洗牌。
+    // 非默认场景可能走服务端实时模型，需以返回状态判断是否回退。
     // QPointer和todayGeneration_防页面销毁、换号或旧请求覆盖新结果。
     // <<< DEFENSE-NOTE | 本段讲解结束
     void loadToday() {
@@ -436,7 +519,7 @@ private:
                 if (!key.isEmpty() && !pool.contains(key)) { keys.append(key); pool.insert(key,item); }
             }
             self->daily_.clear(); self->todayList_->clear();
-            const auto picked=liveScene?keys.mid(0,6):dailyPick(keys,static_cast<quint64>(date.toJulianDay()),6);
+            const auto picked=keys.mid(0,6);
             for (const auto& key:picked) {
                 const auto item=pool.value(key); self->daily_.append(item);
                 new QListWidgetItem(item.work.media.fileName,self->todayList_);
@@ -467,9 +550,10 @@ private:
     WarehousePage* warehouse_=nullptr; QList<CarePage*> carePages_; CarePage* activeCare_=nullptr;
     QTabWidget* tabs_; QTableWidget *mediaList_, *searchList_; QListWidget* todayList_;
     QLineEdit *title_, *director_, *actor_, *release_;
-    QComboBox* type_;
+    QComboBox *type_, *mediaType_;
     QLabel *status_,*searchStatus_,*todayStatus_;
     QHash<QString,CatalogEntry> catalog_; QStringList order_; MediaSearch index_;
+    std::optional<CatalogSearch> lastSearch_; // Last submitted criteria; refresh never submits a new event.
     bool catalogReady_=false;
     QList<WarehouseSummary> pending_; int pendingPosition_=0,failedDetails_=0;
     QList<RecommendedResource> daily_; QDate dailyDate_; bool todayLoading_=false,finished_=false;

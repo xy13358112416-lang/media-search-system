@@ -56,6 +56,10 @@ def run(executable):
         provision("--add-user", "legacy")
         # Reproduce the schema of a database from before the admin extension.
         with closing(sqlite3.connect(database)) as db, db:
+            # Fixed test-only Argon2 vector for an account created under the old byte policy.
+            db.execute("INSERT INTO network_users(username,username_key,password_hash) VALUES (?,?,?)", (
+                "old-short", "old-short",
+                "$argon2id$v=19$m=65536,t=2,p=1$wvZZdn9WBWZfXA0pZPk29g$cBYFrokGHJ+KigPM6S3nIacdXATAFcSy9304X0ER01o"))
             db.execute("DROP TABLE network_user_access")
             db.execute("DROP TABLE admin_audit")
         provision("--add-admin", "operator")
@@ -95,6 +99,8 @@ def run(executable):
             assert invalid.login("legacy", role=True)["code"] == "InvalidArgument"
             admin, response = connect("operator")
             assert response["payload"]["user"]["is_admin"] is True
+            _, response = connect("old-short", "中文")
+            assert "payload" in response  # Policy changes must not lock out existing accounts.
             user, response = connect("legacy")
             assert response["payload"]["user"]["is_admin"] is False
             assert user.call("admin_list_users", {"offset": "0"})["code"] == "PermissionDenied"
@@ -106,6 +112,23 @@ def run(executable):
             assert admin.call("admin_list_users", {"offset": "-1"})["code"] == "InvalidArgument"
             rows = admin.call("admin_list_users", {"offset": "0"})["payload"]["users"]
             reader_id = next(r["user_id"] for r in rows if r["username"] == "reader")
+            # Minimum is six Unicode code points, never six UTF-8 bytes/UTF-16 units.
+            for password in ("12345", "中文", "一二三四五", "😀😀😀", "a" * 1025, "中" * 342):
+                rejected = admin.call("admin_create_user", {"username": "invalid-length", "password": password})
+                assert rejected["code"] == "InvalidArgument"
+                assert admin.call("admin_reset_password", {"user_id": reader_id, "password": password})["code"] == "InvalidArgument"
+            # Invalid resets do not revoke sessions or replace the previous password.
+            assert "payload" in reader.call("list_my_warehouses")
+            for index, password in enumerate(("123456", "一二三四五六", "😀😀😀😀😀😀", "中A文12好")):
+                name = f"unicode{index}"
+                assert "payload" in admin.call("admin_create_user", {"username": name, "password": password})
+                _, login_result = connect(name, password)
+                assert "payload" in login_result
+                assert "payload" in admin.call("admin_reset_password", {"user_id": reader_id, "password": password})
+                _, login_result = connect("reader", password)
+                assert "payload" in login_result
+            assert "payload" in admin.call("admin_reset_password", {"user_id": reader_id, "password": "test-pass-123"})
+            reader, _ = connect("reader")
             admin_id = next(r["user_id"] for r in rows if r["is_admin"])
             assert admin.call("admin_set_disabled", {"user_id": admin_id, "disabled": True})["code"] == "InvalidArgument"
             second_reader, _ = connect("reader")
@@ -140,7 +163,7 @@ def run(executable):
                     db.execute("INSERT INTO network_users(username,username_key,password_hash) SELECT ?,?,password_hash FROM network_users LIMIT 1", (f"page{i}", f"page{i}"))
             page = admin.call("admin_list_users", {"offset": "0"})["payload"]
             assert len(page["users"]) == 100 and page["has_more"]
-            assert len(admin.call("admin_list_users", {"offset": "100"})["payload"]["users"]) == 4
+            assert len(admin.call("admin_list_users", {"offset": "100"})["payload"]["users"]) == 9
             private = user.call("create_warehouse", {"name": "private", "visibility": "private"})["payload"]["warehouse"]["warehouse_id"]
             public = user.call("create_warehouse", {"name": "public", "visibility": "public"})["payload"]["warehouse"]["warehouse_id"]
             assert admin.call("get_warehouse", {"warehouse_id": private})["code"] == "PermissionDenied"

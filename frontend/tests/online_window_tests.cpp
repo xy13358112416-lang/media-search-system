@@ -8,7 +8,9 @@
 #include <QPushButton>
 #include <QTabWidget>
 #include <QTableWidget>
+#include <QHash>
 #include <QtTest>
+#include <algorithm>
 #include <memory>
 
 using warehouse_contract::WarehouseService;
@@ -36,6 +38,8 @@ public:
     Callback<TemporalRecommendationResult> temporalDone;
     QList<BrowseScene> requestedScenes;
     TemporalRecommendationResult temporalResult;
+    WarehouseRecommendationResult warehouseResult;
+    QHash<qint64, QList<WarehouseItem>> catalogItems;
     WarehouseSummary mine{1, "Mine", 7, Visibility::Private};
     WarehouseSummary shared{2, "Shared", 8, Visibility::Public};
     MediaRecord media(QString title) {
@@ -59,13 +63,14 @@ public:
         if (defer) { delayed=std::move(cb); return; }
         if (id==2 && denyPublic) { cb({{warehouse_contract::ErrorCode::PermissionDenied,"Denied"}, {}}); return; }
         QList<WarehouseItem> items;
-        if (id != 1 || !removed) items.append({11,media(id==1?"Private movie":"Public movie")});
+        if (catalogItems.contains(id)) items = catalogItems.value(id);
+        else if (id != 1 || !removed) items.append({11,media(id==1?"Private movie":"Public movie")});
         cb(ok(WarehouseDetail{id==1?mine:shared, items}));
     }
     void createWarehouse(const QString&, Visibility, Callback<WarehouseSummary> cb) override { cb(ok(mine)); }
     void addItem(qint64, const MediaRecord&, Callback<WarehouseItem> cb) override { cb(ok(WarehouseItem{})); }
     void removeItem(qint64,qint64,StatusCallback cb) override { removed = true; cb({}); }
-    RecommendationHandle recommendResources(const WarehouseRecommendationRequest&, Callback<WarehouseRecommendationResult> cb) override { cb(ok(WarehouseRecommendationResult{})); return {}; }
+    RecommendationHandle recommendResources(const WarehouseRecommendationRequest&, Callback<WarehouseRecommendationResult> cb) override { cb(ok(warehouseResult)); return {}; }
     bool cancelRecommendation(const RecommendationHandle& handle) override {
         cancelled.append(handle);
         auto cb=std::exchange(temporalDone,{});
@@ -99,6 +104,126 @@ public:
 class OnlineWindowTests final : public QObject {
     Q_OBJECT
 private slots:
+    void catalogAndSearchGroupTypesAndKeepReleaseOrderAfterFilterAndRefresh()
+    {
+        FakeService service;
+        auto add = [&](qint64 warehouse, qint64 id, const QString& name, const QString& type, const QString& date) {
+            auto media = service.media(name); media.fileType = type;
+            if (!parseMediaRelease(date, media)) media.releasePeriod = date; // Defensive malformed-date case.
+            service.catalogItems[warehouse].append({id, media});
+        };
+        // Deliberately scrambled, across two warehouses, with IDs unrelated to dates.
+        add(2, 11, "MP4 unknown", "MP4", "");
+        add(1, 61, "MP4 month", " mp4 ", "2025-06");
+        add(2, 9, "MP4 old", "MP4", "2024-12-31");
+        add(1, 50, "MP3 old", "mp3", "1990");
+        add(2, 90, "MP4 year", "MP4", "2025");
+        add(1, 51, "MP4 January", "MP4", "2025-01-01");
+        add(2, 35, "MP4 same B", "MP4", "2025-06-01");
+        add(1, 71, "MP4 same A", "MP4", "2025-06-01");
+        add(2, 3, "MP4 same source", "MP4", "2025-06-01");
+        add(1, 70, "MP4 same source", "MP4", "2025-06-01");
+        add(1, 40, "FLAC unknown", "FLAC", "");
+        add(2, 10, "MP4 next year", "MP4", "2026");
+        add(1, 150, "Unknown type", "", "2029-12-31");
+        add(2, 12, "MP4 late day", "MP4", "2025-06-30");
+        add(1, 30, "MP4 invalid", "MP4", "2025-13");
+        const QStringList expected{"FLAC unknown", "MP3 old", "MP4 next year", "MP4 late day",
+            "MP4 same A", "MP4 same B", "MP4 same source", "MP4 same source", "MP4 month",
+            "MP4 January", "MP4 year", "MP4 old", "MP4 invalid", "MP4 unknown", "Unknown type"};
+        auto titles = [](QTableWidget* table) {
+            QStringList result;
+            for (int row = 0; row < table->rowCount(); ++row) result.append(table->item(row, 0)->text());
+            return result;
+        };
+        std::unique_ptr<QWidget> window(createOnlineWindow(service, service, {7,"reader"}, [] {}));
+        auto* catalog = window->findChild<QTableWidget*>("onlineMediaList");
+        auto* results = window->findChild<QTableWidget*>("onlineSearchList");
+        auto* mediaType = window->findChild<QComboBox*>("onlineMediaType");
+        auto* searchType = window->findChild<QComboBox*>("onlineSearchType");
+        auto* release = window->findChild<QLineEdit*>("onlineSearchRelease");
+        auto* search = window->findChild<QPushButton*>("onlineSearchSubmit");
+        QTRY_COMPARE(catalog->rowCount(), expected.size());
+        QCOMPARE(titles(catalog), expected);
+        QCOMPARE(catalog->item(6, 0)->data(Qt::UserRole).toString(), QString("1/70"));
+        QCOMPARE(catalog->item(7, 0)->data(Qt::UserRole).toString(), QString("2/3"));
+        QCOMPARE(catalog->item(8, 4)->text(), QString("2025-06"));
+        QCOMPARE(catalog->item(8, 2)->text(), QString("MP4"));
+        QCOMPARE(catalog->item(10, 4)->text(), QString("2025"));
+        QVERIFY(service.events.isEmpty());
+        mediaType->setCurrentIndex(mediaType->findText("MP4"));
+        QCOMPARE(titles(catalog), expected.mid(2, 12));
+        window->findChild<QLineEdit*>("onlineSearchDirector")->setText("Director");
+        search->click(); QCOMPARE(titles(results), expected); // Catalog type filter is independent.
+        searchType->setCurrentIndex(searchType->findText("MP4"));
+        search->click(); QCOMPARE(titles(results), expected.mid(2, 12));
+        release->setText("2025"); search->click();
+        const auto yearMatches = expected.mid(3, 8);
+        QCOMPARE(titles(results), yearMatches);
+        QCOMPARE(service.events.size(), 3);
+        release->setText("1900"); // Unsubmitted edits must not replace the last applied search on refresh.
+        for (auto it = service.catalogItems.begin(); it != service.catalogItems.end(); ++it)
+            std::reverse(it->begin(), it->end());
+        add(1, 99, "MP4 new after refresh", "MP4", "2027-02-01");
+        window->findChild<QPushButton*>("onlineMediaRefresh")->click();
+        QTRY_COMPARE(catalog->rowCount(), 13);
+        QCOMPARE(mediaType->currentText(), QString("MP4"));
+        auto updated = expected.mid(2, 12); updated.prepend("MP4 new after refresh");
+        QCOMPARE(titles(catalog), updated);
+        QCOMPARE(titles(results), yearMatches);
+        QCOMPARE(service.events.size(), 3); // Refresh/filter/automatic selection do not record behavior.
+        release->clear(); search->click(); QCOMPARE(titles(results), updated);
+        searchType->setCurrentIndex(1); search->click();
+        QCOMPARE(titles(results), QStringList{"Unknown type"});
+        mediaType->setCurrentIndex(1);
+        QCOMPARE(titles(catalog), QStringList{"Unknown type"});
+        const auto eventCount = service.events.size();
+        catalog->cellClicked(0, 0);
+        QCOMPARE(service.opened.last().warehouseId, qint64(1));
+        QCOMPARE(service.opened.last().itemId, qint64(150));
+        QCOMPARE(service.events.size(), eventCount + 1);
+    }
+
+    void recommendationPagesPreserveServiceOrderInsteadOfCatalogOrder()
+    {
+        FakeService service;
+        QStringList returned;
+        for (int index = 0; index < 8; ++index) {
+            ResourceSummary work;
+            work.resource = {QString::number(index), {2, index + 1}};
+            work.media = service.media(QString("Rank %1").arg(8 - index));
+            work.media.fileType = index % 2 == 0 ? "MP4" : "FLAC";
+            work.media.releaseDate = QDate(1990 + index, 1, 1);
+            service.temporalResult.items.append({work, "reason"});
+            service.warehouseResult.items.append({2, index + 1, work.media, "reason"});
+            returned.append(work.media.fileName);
+        }
+        std::unique_ptr<QWidget> window(createOnlineWindow(service, service, {7,"reader"}, [] {}));
+        auto* catalog = window->findChild<QTableWidget*>("onlineMediaList");
+        QTRY_COMPARE(catalog->rowCount(), 2);
+        auto* tabs = window->findChild<QTabWidget*>("onlineTabs");
+        tabs->setCurrentIndex(2);
+        auto* today = window->findChild<QListWidget*>("onlineTodayList");
+        QCOMPARE(today->count(), 6);
+        for (int row = 0; row < today->count(); ++row) QCOMPARE(today->item(row)->text(), returned[row]);
+        window->findChild<QComboBox*>("onlineScene")->setCurrentIndex(1);
+        QCOMPARE(today->count(), 6);
+        for (int row = 0; row < today->count(); ++row) QCOMPARE(today->item(row)->text(), returned[row]);
+        tabs->setCurrentIndex(6);
+        auto* temporal = window->findChild<QListWidget*>("careTemporalList");
+        QCOMPARE(temporal->count(), returned.size());
+        for (int row = 0; row < temporal->count(); ++row) QCOMPARE(temporal->item(row)->text(), returned[row]);
+        tabs->setCurrentIndex(3);
+        window->findChild<QLineEdit*>("warehouseRecommendationQuery")->setText("test query");
+        auto* page = tabs->widget(3);
+        QPushButton* recommend = nullptr;
+        for (auto* button : page->findChildren<QPushButton*>())
+            if (button->text() == QStringLiteral("获取推荐")) recommend = button;
+        QVERIFY(recommend); QVERIFY(recommend->isEnabled()); recommend->click();
+        auto* suggestions = window->findChild<QListWidget*>("onlineWarehouseRecommendations");
+        QCOMPARE(suggestions->count(), returned.size());
+        for (int row = 0; row < suggestions->count(); ++row) QVERIFY(suggestions->item(row)->text().startsWith(returned[row]));
+    }
     void sceneChangesReloadTodayAndCancelOldScene() {
         FakeService service;
         std::unique_ptr<QWidget> window(createOnlineWindow(service,service,{7,"reader"},[]{}));
@@ -232,7 +357,7 @@ private slots:
         QVERIFY(service.events.isEmpty());
         catalog->cellClicked(0, 2);
         QCOMPARE(service.opened.size(),1);
-        QCOMPARE(service.opened.front().warehouseId,2);
+        QCOMPARE(service.opened.front().warehouseId,1);
         QCOMPARE(service.opened.front().itemId,11);
         QCOMPARE(service.events.size(),1);
         QCOMPARE(service.events.front().resource->workId,QString("canonical"));
