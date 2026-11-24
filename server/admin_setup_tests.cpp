@@ -1,0 +1,98 @@
+#include "admin_setup_dialog.h"
+#include "warehouse_server.h"
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QTemporaryDir>
+#include <QtTest>
+
+class AdminSetupTests : public QObject {
+    Q_OBJECT
+    static void fill(AdminSetupDialog& dialog, const QString& name, const QString& first,
+                     const QString& second)
+    {
+        dialog.findChild<QLineEdit*>("setupUsername")->setText(name);
+        dialog.findChild<QLineEdit*>("setupPassword")->setText(first);
+        dialog.findChild<QLineEdit*>("setupConfirmation")->setText(second);
+        dialog.findChild<QPushButton*>("createAdministrator")->click();
+    }
+private slots:
+    void validatesConfirmationAndLocksAfterSuccess()
+    {
+        QTemporaryDir directory;
+        const auto path = directory.filePath("accounts.sqlite");
+        AdminSetupDialog dialog(path);
+        auto* create = dialog.findChild<QPushButton*>("createAdministrator");
+        auto* password = dialog.findChild<QLineEdit*>("setupPassword");
+        auto* status = dialog.findChild<QLabel*>("setupStatus");
+        QVERIFY(create->isEnabled());
+        QCOMPARE(password->echoMode(), QLineEdit::Password);
+        QCOMPARE(dialog.findChild<QLineEdit*>("setupConfirmation")->echoMode(), QLineEdit::Password);
+        fill(dialog, "first-admin", "test-pass-123", "different-pass");
+        QVERIFY(status->text().contains(QStringLiteral("不一致")));
+        fill(dialog, "first-admin", "123", "123");
+        QVERIFY(status->text().contains(QStringLiteral("密码长度")));
+        QVERIFY(password->text().isEmpty());
+        fill(dialog, "first-admin", "test-pass-123", "test-pass-123");
+        QVERIFY(status->text().contains(QStringLiteral("创建成功")));
+        QVERIFY(password->text().isEmpty());
+        QVERIFY(!create->isEnabled());
+        AdminSetupDialog reopened(path);
+        QVERIFY(!reopened.findChild<QPushButton*>("createAdministrator")->isEnabled());
+        QVERIFY(reopened.findChild<QLabel*>("setupStatus")->text().contains(QStringLiteral("已有管理员")));
+    }
+    void doesNotPromoteExistingUserAndRechecksConcurrentInitialization()
+    {
+        QTemporaryDir directory;
+        const auto path = directory.filePath("accounts.sqlite");
+        WarehouseServer server;
+        QString error;
+        QVERIFY(server.openDatabase(path, error));
+        QVERIFY(server.addUser("reader", "test-pass-123", error));
+        AdminSetupDialog first(path), second(path);
+        fill(first, "reader", "test-pass-123", "test-pass-123");
+        QVERIFY(first.findChild<QPushButton*>("createAdministrator")->isEnabled());
+        QCOMPARE(server.hasAdministrator(error), std::optional<bool>(false));
+        fill(first, "operator", "test-pass-123", "test-pass-123");
+        fill(second, "second-operator", "test-pass-123", "test-pass-123");
+        QVERIFY(second.findChild<QLabel*>("setupStatus")->text().contains(QStringLiteral("已有管理员")));
+        QVERIFY(!second.findChild<QPushButton*>("createAdministrator")->isEnabled());
+        QCOMPARE(server.hasAdministrator(error), std::optional<bool>(true));
+    }
+    void databaseFailureDoesNotEnableCreation()
+    {
+        QTemporaryDir directory;
+        AdminSetupDialog dialog(directory.filePath("missing/invalid.sqlite"));
+        QVERIFY(!dialog.findChild<QPushButton*>("createAdministrator")->isEnabled());
+        QVERIFY(!dialog.findChild<QLabel*>("setupStatus")->text().isEmpty());
+    }
+    void auditFailureRollsBackFirstAdministrator()
+    {
+        QTemporaryDir directory;
+        const auto path = directory.filePath("accounts.sqlite");
+        WarehouseServer server;
+        QString error;
+        QVERIFY(server.openDatabase(path, error));
+        {
+            auto db = QSqlDatabase::addDatabase("QSQLITE", "setup-test-audit");
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            {
+                QSqlQuery query(db);
+                QVERIFY(query.exec("CREATE TRIGGER reject_admin_audit BEFORE INSERT ON admin_audit "
+                                   "BEGIN SELECT RAISE(ABORT,'test'); END"));
+            }
+            db.close();
+        }
+        QSqlDatabase::removeDatabase("setup-test-audit");
+        QVERIFY(!server.initializeAdministrator("operator", "test-pass-123", error));
+        QCOMPARE(server.hasAdministrator(error), std::optional<bool>(false));
+        // The original username remains available because the account insertion rolled back.
+        QVERIFY(server.addUser("operator", "test-pass-123", error));
+    }
+};
+
+QTEST_MAIN(AdminSetupTests)
+#include "admin_setup_tests.moc"

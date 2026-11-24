@@ -9,6 +9,7 @@
 #include <QFileInfo>
 #include <QSettings>
 #include <QTextStream>
+#include "console_input.h"
 
 // >>> MAIN-DEFENSE | 函数入口｜main
 // 本文件的辅助函数。阅读下方实际参数、判断和返回值，服务于上述文件职责；错误分支提前返回，调用者必须检查返回状态。
@@ -28,8 +29,9 @@ int main(int argc, char** argv)
     const QCommandLineOption initialize("init", "初始化数据库后退出。");
     const QCommandLineOption user("add-user", "从标准输入读取密码，创建普通网络账号后退出。", "username");
     const QCommandLineOption admin("add-admin", "从标准输入读取密码并创建管理员后退出。", "username");
+    const QCommandLineOption setupAdmin("setup-admin", "逐项输入账号和两次密码，初始化首个管理员后退出。");
     const QCommandLineOption config("config", "启动配置文件；默认读取 EXE 同目录的 media-server.ini。", "path");
-    for (const auto& option : {address, port, database, initialize, user, admin, config})
+    for (const auto& option : {address, port, database, initialize, user, admin, setupAdmin, config})
     // >>> MAIN-DEFENSE | main｜处理阶段 01
     // 进入批量处理：逐项处理下方集合或查询结果；每次迭代的continue/return决定跳过一项还是终止整个函数。
     // <<< MAIN-DEFENSE
@@ -37,6 +39,11 @@ int main(int argc, char** argv)
     parser.process(app);
     QTextStream output(stdout);
     QTextStream errors(stderr);
+    const int accountModes = int(parser.isSet(user)) + int(parser.isSet(admin)) + int(parser.isSet(setupAdmin));
+    if (accountModes > 1 || (accountModes && parser.isSet(initialize))) {
+        errors << "请单独使用 --setup-admin、--add-user、--add-admin 或 --init。" << Qt::endl;
+        return 1;
+    }
     const QString configPath = parser.isSet(config) ? QFileInfo(parser.value(config)).absoluteFilePath()
         : QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("media-server.ini"));
     const bool useConfig = QFileInfo::exists(configPath);
@@ -90,7 +97,7 @@ int main(int argc, char** argv)
         return 1;
     }
     // A misplaced config must not quietly open a new, empty demonstration.
-    if (useConfig && !parser.isSet(initialize) && !parser.isSet(user) && !parser.isSet(admin) && !QFileInfo::exists(databasePath)) {
+    if (useConfig && !parser.isSet(initialize) && !accountModes && !QFileInfo::exists(databasePath)) {
     // >>> MAIN-DEFENSE | main｜处理阶段 08
     // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
     // <<< MAIN-DEFENSE
@@ -106,23 +113,44 @@ int main(int argc, char** argv)
         errors << error << Qt::endl;
         return 1;
     }
-    if (parser.isSet(user) && parser.isSet(admin)) {
-        errors << "请单独使用 --add-user 或 --add-admin。" << Qt::endl; return 1;
-    }
-    if (parser.isSet(user) || parser.isSet(admin)) {
+    if (accountModes) {
     // >>> MAIN-DEFENSE | main｜处理阶段 10
     // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
     // <<< MAIN-DEFENSE
         QTextStream input(stdin);
-        output << "请输入账号密码后回车：" << Qt::endl;
-        if (!server.addUser(parser.value(parser.isSet(admin) ? admin : user), input.readLine(), error, parser.isSet(admin))) {
+        QString username = parser.value(parser.isSet(admin) ? admin : user);
+        if (parser.isSet(setupAdmin)) {
+            const auto exists = server.hasAdministrator(error);
+            if (!exists || *exists) {
+                errors << (exists ? QStringLiteral("此数据库已有管理员，不能重复初始化。") : error) << Qt::endl;
+                return 1;
+            }
+            const auto name = console_input::readLine(input, output, QStringLiteral("请输入管理员用户名："), false, error);
+            if (!name) { errors << error << Qt::endl; return 1; }
+            username = *name;
+        }
+        auto password = console_input::readLine(input, output, QStringLiteral("请输入密码："), true, error);
+        if (!password) { errors << error << Qt::endl; return 1; }
+        if (parser.isSet(setupAdmin) || console_input::isTerminal()) {
+            const auto confirmation = console_input::readLine(input, output, QStringLiteral("请再次输入密码："), true, error);
+            if (!confirmation || *confirmation != *password) {
+                errors << (confirmation ? QStringLiteral("两次密码不一致，账号未创建。") : error) << Qt::endl;
+                password->fill(QChar());
+                return 1;
+            }
+        }
+        const bool saved = parser.isSet(setupAdmin)
+            ? server.initializeAdministrator(username, *password, error)
+            : server.addUser(username, *password, error, parser.isSet(admin));
+        password->fill(QChar());
+        if (!saved) {
             errors << error << Qt::endl;
             // >>> MAIN-DEFENSE | main｜处理阶段 11
             // 结束本函数并交付当前结果。检查返回值中的状态及数据：成功空列表与操作失败的含义不同。
             // <<< MAIN-DEFENSE
             return 1;
         }
-        output << "已创建演示账号。" << Qt::endl;
+        output << (parser.isSet(setupAdmin) ? "首个管理员创建成功。" : "账号创建成功。") << Qt::endl;
         return 0;
     }
     // >>> MAIN-DEFENSE | main｜处理阶段 12

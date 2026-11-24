@@ -50,6 +50,9 @@ public:
     // <<< MAIN-DEFENSE
     bool openDatabase(const QString& path, QString& error);
     bool addUser(const QString& username, const QString& password, QString& error, bool administrator = false, qint64 actorId = 0);
+    // Local bootstrap only: creation fails atomically if any administrator exists.
+    bool initializeAdministrator(const QString& username, const QString& password, QString& error);
+    std::optional<bool> hasAdministrator(QString& error) const;
     // >>> MAIN-DEFENSE | 方法声明｜addUser
     // 创建在线network_users账号并哈希密码；在线仓库权限按所有者，不使用单机admin角色替代。
     // <<< MAIN-DEFENSE
@@ -69,6 +72,8 @@ public:
     void setPersonContextLoader(PersonContextLoader loader) { personContextLoader_ = std::move(loader); }
 
 private:
+    bool createUser(const QString& username, const QString& password, QString& error,
+                    bool administrator, qint64 actorId, bool firstAdministratorOnly);
     // >>> MAIN-DEFENSE | 接口结构｜Session
     // 这是数据包：检查字段含义、默认值和optional缺失状态。
     // <<< MAIN-DEFENSE

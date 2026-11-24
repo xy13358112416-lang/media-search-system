@@ -422,6 +422,27 @@ bool WarehouseServer::openDatabase(const QString& path, QString& error)
 }
 
 bool WarehouseServer::addUser(const QString& username, const QString& password, QString& error, bool administrator, qint64 actorId)
+{
+    return createUser(username, password, error, administrator, actorId, false);
+}
+
+std::optional<bool> WarehouseServer::hasAdministrator(QString& error) const
+{
+    QSqlQuery query(db_);
+    if (!query.exec("SELECT EXISTS(SELECT 1 FROM network_user_access WHERE is_admin=1)") || !query.next()) {
+        error = QStringLiteral("无法检查管理员状态。");
+        return std::nullopt;
+    }
+    return query.value(0).toBool();
+}
+
+bool WarehouseServer::initializeAdministrator(const QString& username, const QString& password, QString& error)
+{
+    return createUser(username, password, error, true, 0, true);
+}
+
+bool WarehouseServer::createUser(const QString& username, const QString& password, QString& error,
+                                 bool administrator, qint64 actorId, bool firstAdministratorOnly)
 // >>> MAIN-DEFENSE | 函数入口｜WarehouseServer::addUser
 // 创建在线network_users账号并哈希密码；在线仓库权限按所有者，不使用单机admin角色替代。
 // 签名提示：bool WarehouseServer::addUser(const QString& username, const QString& password, QString& error)
@@ -448,6 +469,15 @@ bool WarehouseServer::addUser(const QString& username, const QString& password, 
         return false;
     }
     if (!db_.transaction()) { error = QStringLiteral("无法开始账号事务。"); return false; }
+    if (firstAdministratorOnly) {
+        // Count and insert share one transaction; concurrent bootstrap cannot create two admins.
+        const auto exists = hasAdministrator(error);
+        if (!exists || *exists) {
+            db_.rollback();
+            if (exists) error = QStringLiteral("此数据库已有管理员，不能重复初始化。请使用已有账号登录。");
+            return false;
+        }
+    }
     QSqlQuery query(db_);
     // >>> MAIN-DEFENSE | addUser｜处理阶段 03
     // 准备参数化SQL，涉及 network_users。随后把实际参数绑定到问号，执行并检查错误；prepare本身尚未完成读写。
@@ -468,10 +498,11 @@ bool WarehouseServer::addUser(const QString& username, const QString& password, 
     query.prepare("INSERT INTO network_user_access(user_id,is_admin) VALUES (?,?)");
     query.addBindValue(newId); query.addBindValue(administrator);
     bool saved = query.exec();
-    if (saved && actorId > 0) {
+    if (saved && (actorId > 0 || firstAdministratorOnly)) {
         query.prepare("INSERT INTO admin_audit(actor_id,target_id,action,occurred_at_utc) VALUES (?,?,?,?)");
-        query.addBindValue(actorId); query.addBindValue(newId);
-        query.addBindValue("create_user"); query.addBindValue(QDateTime::currentSecsSinceEpoch());
+        query.addBindValue(actorId > 0 ? QVariant(actorId) : newId); query.addBindValue(newId);
+        query.addBindValue(firstAdministratorOnly ? "initialize_admin" : "create_user");
+        query.addBindValue(QDateTime::currentSecsSinceEpoch());
         saved = query.exec();
     }
     if (!saved || !db_.commit()) {
