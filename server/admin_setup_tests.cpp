@@ -1,5 +1,6 @@
 #include "admin_setup_dialog.h"
 #include "warehouse_server.h"
+#include "password_policy.h"
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -19,6 +20,23 @@ class AdminSetupTests : public QObject {
         dialog.findChild<QPushButton*>("createAdministrator")->click();
     }
 private slots:
+    void passwordLengthCountsUnicodeCharacters()
+    {
+        for (const auto& password : {QStringLiteral("12345"), QStringLiteral("中文"),
+                 QStringLiteral("一二三四五"), QString::fromUtf8("😀😀😀")})
+            QVERIFY(online_password::validationError(password).contains(QStringLiteral("6 个字符")));
+        for (const auto& password : {QStringLiteral("123456"), QStringLiteral("一二三四五六"),
+                 QString::fromUtf8("😀😀😀😀😀😀"), QStringLiteral("中A文12好")})
+            QVERIFY(online_password::validationError(password).isEmpty());
+        QVERIFY(!online_password::validationError(QString(1025, 'a')).isEmpty());
+        QVERIFY(!online_password::validationError(QString(342, QChar(0x4e2d))).isEmpty());
+        QTemporaryDir directory;
+        AdminSetupDialog dialog(directory.filePath("unicode.sqlite"));
+        fill(dialog, "operator", QStringLiteral("一二三四五"), QStringLiteral("一二三四五"));
+        QVERIFY(dialog.findChild<QLabel*>("setupStatus")->text().contains(QStringLiteral("6 个字符")));
+        fill(dialog, "operator", QStringLiteral("一二三四五六"), QStringLiteral("一二三四五六"));
+        QVERIFY(dialog.findChild<QLabel*>("setupStatus")->text().contains(QStringLiteral("创建成功")));
+    }
     void validatesConfirmationAndLocksAfterSuccess()
     {
         QTemporaryDir directory;

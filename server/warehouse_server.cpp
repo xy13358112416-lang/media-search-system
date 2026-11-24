@@ -3,6 +3,7 @@
 // 阅读时先看函数入口说明，再按“处理阶段”往下；到每个return核对成功、空结果和错误是否区别。
 // <<< MAIN-DEFENSE
 #include "warehouse_server.h"
+#include "password_policy.h"
 #include "media_json.h"
 #include "behavior_contract.h"
 #include "care_footprint.h"
@@ -455,10 +456,12 @@ bool WarehouseServer::createUser(const QString& username, const QString& passwor
     // >>> MAIN-DEFENSE | addUser｜处理阶段 01
     // 检查下一项条件：括号表达式决定是否进入下方处理。带错误return时会立即结束，不执行后续阶段。
     // <<< MAIN-DEFENSE
-    if (key.isEmpty() || username.size() > 64 || bytes.size() < 6 || bytes.size() > 1024) {
-        error = QStringLiteral("用户名最多 64 个字符，密码长度为 6–1024 字节。");
+    if (key.isEmpty() || username.size() > 64) {
+        error = QStringLiteral("用户名不能为空，最多 64 个字符。");
         return false;
     }
+    error = online_password::validationError(password);
+    if (!error.isEmpty()) return false;
     char hash[crypto_pwhash_STRBYTES];
     // >>> MAIN-DEFENSE | addUser｜处理阶段 02
     // 生成密码哈希：明文只用于本次计算，保存带盐哈希；这不是可逆加密。

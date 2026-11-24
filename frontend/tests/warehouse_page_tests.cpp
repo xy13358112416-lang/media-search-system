@@ -120,6 +120,98 @@ void signIn(WarehousePage& page, quint16 port, const QString& user, const QStrin
 class OnlineWarehouseTests : public QObject {
     Q_OBJECT
 private slots:
+    void adminFormsKeepErrorsVisibleAndUseExplicitAccountActions()
+    {
+        QTemporaryDir temporary;
+        WarehouseServer server(llm_recommendation::Config{});
+        QString error;
+        QVERIFY(server.openDatabase(temporary.filePath("forms.sqlite"), error));
+        QVERIFY(server.addUser("operator", "admin-pass", error, true));
+        QVERIFY(server.addUser("reader", "reader-pass", error));
+        QVERIFY(server.listen(QHostAddress::LocalHost, 0));
+        OnlineCareClient client;
+        std::optional<Status> connected;
+        client.connectToServer("127.0.0.1", server.serverPort(), [&](auto r) { connected = r; });
+        QTRY_VERIFY(connected && connected->ok());
+        std::optional<Result<UserInfo>> login;
+        client.loginAs("operator", "admin-pass", LoginRole::Administrator, [&](auto r) { login = r; });
+        QTRY_VERIFY(login && login->status.ok());
+        const std::unique_ptr<QDialog> dialog(createAdminDialog(client));
+        dialog->show();
+        auto* table = dialog->findChild<QTableWidget*>("adminUserTable");
+        auto* enable = dialog->findChild<QPushButton*>("adminEnableUser");
+        auto* disable = dialog->findChild<QPushButton*>("adminDisableUser");
+        auto* reset = dialog->findChild<QPushButton*>("adminResetPassword");
+        QTRY_COMPARE(table->rowCount(), 2);
+        QVERIFY(!enable->isEnabled()); QVERIFY(!disable->isEnabled());
+        table->selectRow(0);
+        QVERIFY(!enable->isEnabled()); QVERIFY(!disable->isEnabled()); QVERIFY(!reset->isEnabled());
+        table->selectRow(1);
+        QVERIFY(!enable->isEnabled()); QVERIFY(disable->isEnabled());
+        disable->click();
+        auto* confirmation = dialog->findChild<QMessageBox*>("adminDisableConfirmation");
+        QVERIFY(confirmation); QCOMPARE(confirmation->windowTitle(), QStringLiteral("停用账号"));
+        QCOMPARE(confirmation->defaultButton(), confirmation->button(QMessageBox::No));
+        confirmation->button(QMessageBox::No)->click();
+        QVERIFY(disable->isEnabled());
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        disable->click();
+        confirmation = dialog->findChild<QMessageBox*>("adminDisableConfirmation");
+        QVERIFY(confirmation); confirmation->button(QMessageBox::Yes)->click();
+        QTRY_VERIFY(enable->isEnabled());
+        QCOMPARE(table->item(table->currentRow(), 1)->text(), QStringLiteral("reader"));
+        QCOMPARE(table->item(table->currentRow(), 3)->text(), QStringLiteral("停用"));
+        QVERIFY(!disable->isEnabled());
+        enable->click();
+        confirmation = dialog->findChild<QMessageBox*>("adminEnableConfirmation");
+        QVERIFY(confirmation); QCOMPARE(confirmation->windowTitle(), QStringLiteral("启用账号"));
+        confirmation->button(QMessageBox::Yes)->click();
+        QTRY_VERIFY(disable->isEnabled());
+        QCOMPARE(table->item(table->currentRow(), 3)->text(), QStringLiteral("正常"));
+
+        dialog->findChild<QPushButton*>("adminCreateUser")->click();
+        auto* form = dialog->findChild<QDialog*>("adminCredentials");
+        QVERIFY(form);
+        auto* name = form->findChild<QLineEdit*>("adminUsername");
+        auto* password = form->findChild<QLineEdit*>("adminPassword");
+        auto* repeat = form->findChild<QLineEdit*>("adminConfirmation");
+        auto* submit = form->findChild<QPushButton*>("adminSubmit");
+        auto* message = form->findChild<QLabel*>("adminFormError");
+        QCOMPARE(password->echoMode(), QLineEdit::Password);
+        submit->click(); QVERIFY(message->text().contains(QStringLiteral("用户名")));
+        name->setText("reader");
+        password->setText(QStringLiteral("一二三四五")); repeat->setText(password->text());
+        submit->click(); QVERIFY(message->text().contains(QStringLiteral("6 个字符")));
+        QVERIFY(form->isVisible());
+        password->setText(QStringLiteral("一二三四五六")); repeat->setText("different");
+        submit->click(); QVERIFY(message->text().contains(QStringLiteral("不一致")));
+        repeat->setText(password->text()); submit->click();
+        QTRY_VERIFY(submit->isEnabled());
+        QVERIFY(form->isVisible()); QVERIFY(!message->text().isEmpty());
+        QVERIFY(message->text() != QStringLiteral("正在保存…"));
+        name->setText("new-reader"); submit->click();
+        QTRY_COMPARE(table->rowCount(), 3);
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        table->selectRow(1); reset->click();
+        form = dialog->findChild<QDialog*>("adminCredentials");
+        QVERIFY(form); QVERIFY(form->findChild<QLineEdit*>("adminUsername")->isReadOnly());
+        password = form->findChild<QLineEdit*>("adminPassword");
+        repeat = form->findChild<QLineEdit*>("adminConfirmation");
+        submit = form->findChild<QPushButton*>("adminSubmit");
+        message = form->findChild<QLabel*>("adminFormError");
+        password->setText(QString::fromUtf8("😀😀😀")); repeat->setText(password->text());
+        submit->click(); QVERIFY(form->isVisible());
+        QVERIFY(message->text().contains(QStringLiteral("6 个字符")));
+        password->setText("123456"); repeat->setText(password->text()); submit->click();
+        QTRY_VERIFY(dialog->findChild<QLabel*>("adminStatus")->text().contains(QStringLiteral("已重置")));
+        OnlineCareClient reader;
+        std::optional<Status> readerConnected;
+        reader.connectToServer("127.0.0.1", server.serverPort(), [&](auto r) { readerConnected = r; });
+        QTRY_VERIFY(readerConnected && readerConnected->ok());
+        std::optional<Result<UserInfo>> readerLogin;
+        reader.login("reader", "123456", [&](auto r) { readerLogin = r; });
+        QTRY_VERIFY(readerLogin && readerLogin->status.ok());
+    }
     void administratorIdentityAndUserDialog()
     {
         QTemporaryDir temporary;

@@ -39,6 +39,17 @@ class AdminBootstrapTests(unittest.TestCase):
                 with closing(sqlite3.connect(path)) as db:
                     self.assertEqual(db.execute("SELECT COUNT(*) FROM network_users").fetchone()[0], 0)
 
+    def test_unicode_passwords_use_six_characters_in_terminal_too(self):
+        for password, accepted in (("12345", False), ("中文", False), ("一二三四五", False),
+                                   ("😀😀😀", False), ("123456", True), ("一二三四五六", True),
+                                   ("😀😀😀😀😀😀", True)):
+            with self.subTest(password=password), tempfile.TemporaryDirectory() as temp:
+                path = Path(temp) / "accounts.sqlite"
+                result = self.invoke(path, f"operator\n{password}\n{password}\n", "--setup-admin")
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                with closing(sqlite3.connect(path)) as db:
+                    self.assertEqual(db.execute("SELECT COUNT(*) FROM network_users").fetchone()[0], int(accepted))
+
     def test_existing_normal_account_is_not_promoted_and_legacy_input_works(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "accounts.sqlite"

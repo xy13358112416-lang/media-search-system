@@ -48,7 +48,7 @@ AdminSetupDialog::AdminSetupDialog(const QString& path, QWidget* parent) : QDial
         edit->setMaxLength(1024);
         edit->setInputMethodHints(Qt::ImhSensitiveData | Qt::ImhNoAutoUppercase);
     }
-    password_->setPlaceholderText(QStringLiteral("至少6字节，密码区分大小写"));
+    password_->setPlaceholderText(QStringLiteral("至少 6 个字符，密码区分大小写"));
     form->addRow(QStringLiteral("管理员账号"), username_);
     form->addRow(QStringLiteral("密码"), password_);
     form->addRow(QStringLiteral("确认密码"), confirmation_);
